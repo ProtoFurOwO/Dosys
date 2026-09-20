@@ -73,6 +73,11 @@ Primero levanta `backend/` y verifica `http://127.0.0.1:8000/health`.
 
 Los módulos de estudios, recetas y QR siguen mostrando datos demo hasta que se agreguen sus endpoints.
 
+### Si el emulador no tiene red
+
+Comprueba dentro del emulador: `adb shell ping -c 1 10.0.2.2`. Si falla, reinicia el AVD con
+**Cold Boot Now** desde el Device Manager o ejecuta `emulator -avd DosysPhone -no-snapshot`.
+
 ## Notas de seguridad
 
 - Solo `MainActivity` está exportada (requisito del launcher).
