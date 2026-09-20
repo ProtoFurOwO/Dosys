@@ -2,9 +2,12 @@ package mx.unach.dosys.data.remote
 
 import mx.unach.dosys.data.model.LoginRequest
 import mx.unach.dosys.data.model.LoginResponse
+import mx.unach.dosys.data.model.PatientAppointment
+import mx.unach.dosys.data.model.PatientConsultation
 import mx.unach.dosys.data.model.PatientProfile
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
 
 /**
@@ -20,12 +23,16 @@ interface ApiService {
     suspend fun login(@Body request: LoginRequest): LoginResponse
 
     @GET("patients/me")
-    suspend fun me(): PatientProfile
+    suspend fun me(@Header("Authorization") authorization: String): PatientProfile
+
+    @GET("patients/me/consultations")
+    suspend fun myConsultations(@Header("Authorization") authorization: String): List<PatientConsultation>
+
+    @GET("patients/me/appointments")
+    suspend fun myAppointments(@Header("Authorization") authorization: String): List<PatientAppointment>
 
     // Próximos endpoints:
-    // @GET("consultations")        historial de consultas
     // @GET("study-orders")         estudios y resultados
     // @GET("prescriptions")        recetas + tomas
-    // @GET("appointments")         citas
     // @POST("qr/token")            token temporal para el check-in
 }

@@ -16,6 +16,7 @@ data class LoginResponse(
     @SerialName("access_token") val accessToken: String,
     @SerialName("refresh_token") val refreshToken: String? = null,
     @SerialName("token_type") val tokenType: String = "bearer",
+    val role: String = "",
 )
 
 /** Datos básicos del paciente autenticado (solo lectura). */
@@ -25,4 +26,6 @@ data class PatientProfile(
     @SerialName("full_name") val fullName: String,
     val curp: String? = null,
     @SerialName("blood_type") val bloodType: String? = null,
+    @SerialName("birth_date") val birthDate: String? = null,
+    @SerialName("emergency_contact") val emergencyContact: String? = null,
 )

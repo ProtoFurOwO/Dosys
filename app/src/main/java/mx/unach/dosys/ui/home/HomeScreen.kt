@@ -30,12 +30,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.unach.dosys.data.mock.MockData
+import mx.unach.dosys.data.model.PatientAppointment
+import mx.unach.dosys.ui.format.formatClinicalDateTime
 
 /**
  * Pantalla de inicio del paciente: resumen de su próxima cita,
@@ -50,7 +55,10 @@ fun HomeScreen(
     onOpenPrescriptions: () -> Unit,
     onOpenQr: () -> Unit,
     onOpenAppointments: () -> Unit,
+    viewModel: HomeViewModel = viewModel(),
 ) {
+    val state by viewModel.state.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -58,14 +66,14 @@ fun HomeScreen(
                     Column {
                         Text("Hola,", style = MaterialTheme.typography.labelMedium)
                         Text(
-                            text = MockData.PATIENT_NAME,
+                            text = state.patientName,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                         )
                     }
                 },
                 actions = {
-                    IconButton(onClick = onLogout) {
+                    IconButton(onClick = { viewModel.logout(onLogout) }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ExitToApp,
                             contentDescription = "Cerrar sesión",
@@ -87,7 +95,22 @@ fun HomeScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { NextAppointmentCard(onClick = onOpenAppointments) }
+            item {
+                NextAppointmentCard(
+                    appointment = state.nextAppointment,
+                    isLoading = state.isLoading,
+                    onClick = onOpenAppointments,
+                )
+            }
+            state.error?.let { error ->
+                item {
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
             item { ActiveTreatmentCard(onClick = onOpenPrescriptions) }
             item {
                 Text(
@@ -122,8 +145,11 @@ fun HomeScreen(
 }
 
 @Composable
-private fun NextAppointmentCard(onClick: () -> Unit) {
-    val appointment = MockData.nextAppointment
+private fun NextAppointmentCard(
+    appointment: PatientAppointment?,
+    isLoading: Boolean,
+    onClick: () -> Unit,
+) {
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -140,13 +166,25 @@ private fun NextAppointmentCard(onClick: () -> Unit) {
                 )
             }
             Spacer(Modifier.height(8.dp))
-            Text(appointment.specialty, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(appointment.doctor, style = MaterialTheme.typography.bodyMedium)
-            Text(
-                text = "${appointment.date} · ${appointment.time}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            when {
+                isLoading -> Text(
+                    text = "Cargando cita asignada por el hospital…",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                appointment == null -> Text(
+                    text = "No tienes citas próximas.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                else -> {
+                    Text(appointment.specialty, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(appointment.doctorName ?: "Personal hospitalario", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = formatClinicalDateTime(appointment.scheduledAt),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             Text(
                 text = "Toca para ver todas tus citas",
                 style = MaterialTheme.typography.labelSmall,

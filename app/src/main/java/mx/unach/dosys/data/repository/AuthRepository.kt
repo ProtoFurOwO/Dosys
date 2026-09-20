@@ -5,6 +5,8 @@ import kotlinx.coroutines.delay
 import mx.unach.dosys.core.auth.SessionManager
 import mx.unach.dosys.data.model.LoginRequest
 import mx.unach.dosys.data.remote.ApiService
+import retrofit2.HttpException
+import java.io.IOException
 
 /** Resultado de una operación de autenticación. */
 sealed interface AuthResult {
@@ -42,10 +44,22 @@ class RemoteAuthRepository(
 
     override suspend fun login(username: String, password: String): AuthResult = try {
         val response = api.login(LoginRequest(username = username, password = password))
-        session.saveToken(response.accessToken)
-        AuthResult.Success(response.accessToken)
+        if (response.role != "patient") {
+            AuthResult.Error("Este acceso es exclusivo para pacientes")
+        } else {
+            session.saveToken(response.accessToken)
+            AuthResult.Success(response.accessToken)
+        }
     } catch (cancellation: CancellationException) {
         throw cancellation // nunca se debe "tragar" la cancelación de una corrutina
+    } catch (error: HttpException) {
+        if (error.code() == 401) {
+            AuthResult.Error("Usuario o contraseña incorrectos")
+        } else {
+            AuthResult.Error("No se pudo iniciar sesión. Intenta más tarde")
+        }
+    } catch (error: IOException) {
+        AuthResult.Error("No se pudo conectar con el servidor")
     } catch (error: Exception) {
         AuthResult.Error(error.message ?: "No se pudo conectar con el servidor")
     }

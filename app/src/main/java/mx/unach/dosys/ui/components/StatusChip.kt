@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import mx.unach.dosys.data.mock.MockData
+import mx.unach.dosys.data.model.AppointmentStatus
 
 @Composable
 fun StatusChip(text: String, color: Color, modifier: Modifier = Modifier) {
@@ -51,4 +52,18 @@ fun appointmentStatusColor(status: MockData.AppointmentStatus): Color = when (st
     MockData.AppointmentStatus.CONFIRMADA -> Color(0xFF13653F)
     MockData.AppointmentStatus.ATENDIDA -> Color(0xFF6B7280)
     MockData.AppointmentStatus.CANCELADA -> Color(0xFFB3261E)
+}
+
+fun appointmentStatusLabel(status: AppointmentStatus): String = when (status) {
+    AppointmentStatus.SCHEDULED -> "Agendada"
+    AppointmentStatus.CONFIRMED -> "Confirmada"
+    AppointmentStatus.ATTENDED -> "Atendida"
+    AppointmentStatus.CANCELLED -> "Cancelada"
+}
+
+fun appointmentStatusColor(status: AppointmentStatus): Color = when (status) {
+    AppointmentStatus.SCHEDULED -> Color(0xFFB45309)
+    AppointmentStatus.CONFIRMED -> Color(0xFF13653F)
+    AppointmentStatus.ATTENDED -> Color(0xFF6B7280)
+    AppointmentStatus.CANCELLED -> Color(0xFFB3261E)
 }

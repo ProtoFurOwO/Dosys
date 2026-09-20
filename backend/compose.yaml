@@ -1,0 +1,56 @@
+name: dosys-local
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: dosys-db-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dosys}
+      POSTGRES_USER: ${POSTGRES_USER:-dosys}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+    container_name: dosys-api-local
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dosys}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-dosys}
+    command: >-
+      sh -c "alembic upgrade head &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    # Solo se expone en la propia computadora. El emulador Android usa 10.0.2.2.
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks:
+      - edge
+      - data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  postgres_data:
+
+networks:
+  edge:
+  # Solo api y db pueden entrar; PostgreSQL jamás publica un puerto al host.
+  data:
+    internal: true

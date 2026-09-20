@@ -2,8 +2,6 @@ package mx.unach.dosys.ui.record
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,23 +11,36 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import mx.unach.dosys.data.mock.MockData
+import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.unach.dosys.ui.components.ScreenScaffold
+import mx.unach.dosys.ui.format.formatClinicalDate
+import mx.unach.dosys.ui.format.formatClinicalDateTime
 
 /**
  * Expediente clínico del paciente (solo lectura).
- * Alergias, crónicas, antecedentes y consultas anteriores.
+ * Perfil y consultas desde la API; otros apartados se integrarán después.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun RecordScreen(onBack: () -> Unit) {
+fun RecordScreen(
+    onBack: () -> Unit,
+    viewModel: RecordViewModel = viewModel(),
+) {
+    val state by viewModel.state.collectAsState()
+
+    RecordContent(state = state, onBack = onBack)
+}
+
+@Composable
+private fun RecordContent(state: RecordUiState, onBack: () -> Unit) {
     ScreenScaffold(title = "Mi expediente", onBack = onBack) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -38,39 +49,47 @@ fun RecordScreen(onBack: () -> Unit) {
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("Datos del paciente", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.height(8.dp))
-                        InfoRow("Nombre", MockData.PATIENT_NAME)
-                        InfoRow("CURP", MockData.PATIENT_CURP)
-                        InfoRow("Nacimiento", "${MockData.BIRTH_DATE} (${MockData.AGE} años)")
-                        InfoRow("Tipo de sangre", MockData.BLOOD_TYPE)
-                        InfoRow("Contacto de emergencia", MockData.EMERGENCY_CONTACT)
+            if (state.isLoading) {
+                item {
+                    CircularProgressIndicator()
+                }
+            }
+            state.error?.let { error ->
+                item {
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+            state.profile?.let { profile ->
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text("Datos del paciente", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.height(8.dp))
+                            InfoRow("Nombre", profile.fullName)
+                            InfoRow("CURP", profile.curp ?: "No registrado")
+                            InfoRow("Nacimiento", formatClinicalDate(profile.birthDate))
+                            InfoRow("Tipo de sangre", profile.bloodType ?: "No registrado")
+                            InfoRow("Contacto de emergencia", profile.emergencyContact ?: "No registrado")
+                        }
                     }
                 }
             }
             item {
-                ChipSection(
-                    title = "Alergias",
-                    empty = "Sin alergias registradas",
-                    items = MockData.allergies,
-                )
-            }
-            item {
-                ChipSection(
-                    title = "Enfermedades crónicas",
-                    empty = "Sin enfermedades crónicas registradas",
-                    items = MockData.chronicConditions,
-                )
-            }
-            item {
-                ChipSection(
-                    title = "Antecedentes",
-                    empty = "Sin antecedentes",
-                    items = MockData.antecedents,
-                )
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("Alergias, antecedentes y diagnósticos crónicos", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Estos apartados se integrarán en una siguiente entrega. La información mostrada abajo proviene de la API.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
             item {
                 Text(
@@ -80,16 +99,24 @@ fun RecordScreen(onBack: () -> Unit) {
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
-            items(MockData.consultations.reversed()) { consultation ->
+            items(state.consultations, key = { it.id }) { consultation ->
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
-                        Text(consultation.date, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        Text(formatClinicalDateTime(consultation.createdAt), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                         Text(consultation.specialty, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text(consultation.doctor, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(consultation.doctorName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(8.dp))
                         InfoRow("Motivo", consultation.reason)
                         InfoRow("Diagnóstico", consultation.diagnosis)
                     }
+                }
+            }
+            if (!state.isLoading && state.error == null && state.consultations.isEmpty()) {
+                item {
+                    Text(
+                        text = "No hay consultas registradas.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
             }
             item {
@@ -108,23 +135,5 @@ private fun InfoRow(label: String, value: String) {
     Column(Modifier.padding(vertical = 2.dp)) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ChipSection(title: String, empty: String, items: List<String>) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(8.dp))
-            if (items.isEmpty()) {
-                Text(empty, style = MaterialTheme.typography.bodyMedium)
-            } else {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    items.forEach { SuggestionChip(onClick = {}, label = { Text(it) }) }
-                }
-            }
-        }
     }
 }

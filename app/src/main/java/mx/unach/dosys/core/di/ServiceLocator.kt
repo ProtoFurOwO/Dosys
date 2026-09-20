@@ -3,7 +3,10 @@ package mx.unach.dosys.core.di
 import android.content.Context
 import mx.unach.dosys.core.auth.SessionManager
 import mx.unach.dosys.data.repository.AuthRepository
-import mx.unach.dosys.data.repository.FakeAuthRepository
+import mx.unach.dosys.data.repository.PatientRepository
+import mx.unach.dosys.data.repository.RemoteAuthRepository
+import mx.unach.dosys.data.repository.RemotePatientRepository
+import mx.unach.dosys.data.remote.NetworkModule
 
 /**
  * Contenedor de dependencias sencillo (service locator).
@@ -17,12 +20,13 @@ object ServiceLocator {
     lateinit var authRepository: AuthRepository
         private set
 
+    lateinit var patientRepository: PatientRepository
+        private set
+
     fun init(context: Context) {
         sessionManager = SessionManager(context.applicationContext)
-
-        // Mientras el backend FastAPI no esté desplegado se usa la versión simulada.
-        // Para conectar la API real, cambiar por:
-        //   RemoteAuthRepository(NetworkModule.create(), sessionManager)
-        authRepository = FakeAuthRepository(sessionManager)
+        val api = NetworkModule.create()
+        authRepository = RemoteAuthRepository(api, sessionManager)
+        patientRepository = RemotePatientRepository(api, sessionManager)
     }
 }

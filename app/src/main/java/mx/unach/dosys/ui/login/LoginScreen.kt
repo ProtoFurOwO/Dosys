@@ -137,7 +137,7 @@ fun LoginScreen(
 
             Spacer(Modifier.height(20.dp))
             Text(
-                text = "Versión de demostración: cualquier usuario y una contraseña de 4 caracteres o más.",
+                text = "Demo local: usa paciente / Paciente123!. El acceso médico se realiza desde Swagger.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

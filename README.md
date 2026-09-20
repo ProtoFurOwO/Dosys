@@ -19,7 +19,7 @@ código QR para el check-in en el hospital.
 3. Espera a que termine de sincronizar Gradle (barra inferior).
 4. Arriba, en el selector de dispositivos, elige **DosysPhone** (o crea un emulador Pixel).
 5. Pulsa el botón verde **▶ Run**.
-6. En el login usa cualquier usuario y una contraseña de **4 caracteres o más** (demo). Ejemplo: `paciente` / `1234`.
+6. Primero inicia el backend local (`backend/README.md`); en el login usa `paciente` / `Paciente123!`.
 
 Si el emulador no aparece: **Device Manager** (icono de celular con una lupa) → el AVD `DosysPhone` ya está creado. Púlsalo ▶.
 
@@ -63,17 +63,15 @@ app/src/main/java/mx/unach/dosys/
    ├─ navigation · theme · components
 ```
 
-## Conectar el backend (FastAPI)
+## Backend local (FastAPI)
 
-Mientras el backend no exista, la app usa `FakeAuthRepository`.
-
-Para conectar la API real, en `core/di/ServiceLocator.kt`:
-
-```kotlin
-authRepository = RemoteAuthRepository(NetworkModule.create(), sessionManager)
-```
+La app ya usa el backend real para inicio de sesión, perfil, citas y consultas.
+El tutorial completo está en [`backend/README.md`](backend/README.md).
 
 En el emulador, `10.0.2.2` apunta a tu computadora (`API_BASE_URL` en `app/build.gradle.kts`).
+Primero levanta `backend/` y verifica `http://127.0.0.1:8000/health`.
+
+Los módulos de estudios, recetas y QR siguen mostrando datos demo hasta que se agreguen sus endpoints.
 
 ## Notas de seguridad
 

@@ -1,0 +1,62 @@
+package mx.unach.dosys.data.repository
+
+import kotlinx.coroutines.CancellationException
+import mx.unach.dosys.core.auth.SessionManager
+import mx.unach.dosys.data.model.PatientAppointment
+import mx.unach.dosys.data.model.PatientConsultation
+import mx.unach.dosys.data.model.PatientProfile
+import mx.unach.dosys.data.remote.ApiService
+import retrofit2.HttpException
+import java.io.IOException
+
+sealed interface ClinicalResult<out T> {
+    data class Success<T>(val value: T) : ClinicalResult<T>
+    data class Error(val message: String) : ClinicalResult<Nothing>
+}
+
+/** Datos clínicos visibles exclusivamente para el paciente autenticado. */
+interface PatientRepository {
+    suspend fun profile(): ClinicalResult<PatientProfile>
+    suspend fun consultations(): ClinicalResult<List<PatientConsultation>>
+    suspend fun appointments(): ClinicalResult<List<PatientAppointment>>
+}
+
+class RemotePatientRepository(
+    private val api: ApiService,
+    private val session: SessionManager,
+) : PatientRepository {
+
+    override suspend fun profile(): ClinicalResult<PatientProfile> = authorized { header ->
+        api.me(header)
+    }
+
+    override suspend fun consultations(): ClinicalResult<List<PatientConsultation>> = authorized { header ->
+        api.myConsultations(header)
+    }
+
+    override suspend fun appointments(): ClinicalResult<List<PatientAppointment>> = authorized { header ->
+        api.myAppointments(header)
+    }
+
+    private suspend fun <T> authorized(call: suspend (String) -> T): ClinicalResult<T> {
+        val token = session.currentToken()
+            ?: return ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
+
+        return try {
+            ClinicalResult.Success(call("Bearer $token"))
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: HttpException) {
+            if (error.code() == 401) {
+                session.clear()
+                ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
+            } else {
+                ClinicalResult.Error("No se pudo obtener la información clínica")
+            }
+        } catch (error: IOException) {
+            ClinicalResult.Error("No se pudo conectar con el servidor")
+        } catch (error: Exception) {
+            ClinicalResult.Error("No se pudo obtener la información clínica")
+        }
+    }
+}

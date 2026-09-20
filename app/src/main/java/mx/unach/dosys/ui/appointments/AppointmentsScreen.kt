@@ -12,21 +12,35 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import mx.unach.dosys.data.mock.MockData
+import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.unach.dosys.ui.components.ScreenScaffold
 import mx.unach.dosys.ui.components.StatusChip
 import mx.unach.dosys.ui.components.appointmentStatusColor
 import mx.unach.dosys.ui.components.appointmentStatusLabel
+import mx.unach.dosys.ui.format.formatClinicalDateTime
 
 @Composable
-fun AppointmentsScreen(onBack: () -> Unit) {
+fun AppointmentsScreen(
+    onBack: () -> Unit,
+    viewModel: AppointmentsViewModel = viewModel(),
+) {
+    val state by viewModel.state.collectAsState()
+
+    AppointmentsContent(state = state, onBack = onBack)
+}
+
+@Composable
+private fun AppointmentsContent(state: AppointmentsUiState, onBack: () -> Unit) {
     ScreenScaffold(title = "Mis citas", onBack = onBack) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -42,7 +56,19 @@ fun AppointmentsScreen(onBack: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            items(MockData.appointments, key = { it.id }) { appointment ->
+            if (state.isLoading) {
+                item { CircularProgressIndicator() }
+            }
+            state.error?.let { error ->
+                item {
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+            items(state.appointments, key = { it.id }) { appointment ->
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
                         Row(
@@ -54,14 +80,19 @@ fun AppointmentsScreen(onBack: () -> Unit) {
                             StatusChip(appointmentStatusLabel(appointment.status), appointmentStatusColor(appointment.status))
                         }
                         Spacer(Modifier.height(4.dp))
-                        Text(appointment.doctor, style = MaterialTheme.typography.bodyMedium)
-                        Text("${appointment.date} · ${appointment.time}", style = MaterialTheme.typography.bodyMedium)
-                        Text(appointment.place, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(appointment.doctorName ?: "Personal hospitalario", style = MaterialTheme.typography.bodyMedium)
+                        Text(formatClinicalDateTime(appointment.scheduledAt), style = MaterialTheme.typography.bodyMedium)
+                        Text(appointment.location, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         appointment.notes?.let {
                             Spacer(Modifier.height(8.dp))
                             Text(it, style = MaterialTheme.typography.bodySmall)
                         }
                     }
+                }
+            }
+            if (!state.isLoading && state.error == null && state.appointments.isEmpty()) {
+                item {
+                    Text("No tienes citas registradas.", style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
