@@ -2,6 +2,7 @@ package mx.unach.dosys.ui.format
 
 import java.time.LocalDate
 import java.time.OffsetDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -14,7 +15,10 @@ fun formatClinicalDate(value: String?): String = runCatching {
 }.getOrDefault("No registrado")
 
 fun formatClinicalDateTime(value: String): String = runCatching {
-    OffsetDateTime.parse(value).format(dateTimeFormatter)
+    // El backend envía la hora con zona horaria (UTC); se muestra en la del dispositivo.
+    OffsetDateTime.parse(value)
+        .atZoneSameInstant(ZoneId.systemDefault())
+        .format(dateTimeFormatter)
 }.getOrElse {
     value
 }
