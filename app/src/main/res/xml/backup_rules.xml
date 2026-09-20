@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Respaldos: excluimos el almacén de la sesión (token JWT).
+    Los datos clínicos nunca viven en el dispositivo: se consultan en línea.
+-->
+<full-backup-content>
+    <exclude domain="file" path="datastore/" />
+</full-backup-content>
