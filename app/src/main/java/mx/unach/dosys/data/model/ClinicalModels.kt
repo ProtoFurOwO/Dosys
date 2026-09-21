@@ -34,4 +34,11 @@ data class PatientAppointment(
     val location: String,
     val status: AppointmentStatus,
     val notes: String? = null,
+    @SerialName("checked_in_at") val checkedInAt: String? = null,
+)
+
+/** Código del QR de recepción para confirmar la llegada. */
+@Serializable
+data class CheckInRequest(
+    val code: String,
 )

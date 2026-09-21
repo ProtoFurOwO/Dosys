@@ -9,10 +9,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,15 +37,20 @@ import mx.unach.dosys.ui.format.formatClinicalDateTime
 @Composable
 fun AppointmentsScreen(
     onBack: () -> Unit,
+    onOpenCheckIn: () -> Unit,
     viewModel: AppointmentsViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
 
-    AppointmentsContent(state = state, onBack = onBack)
+    AppointmentsContent(state = state, onBack = onBack, onOpenCheckIn = onOpenCheckIn)
 }
 
 @Composable
-private fun AppointmentsContent(state: AppointmentsUiState, onBack: () -> Unit) {
+private fun AppointmentsContent(
+    state: AppointmentsUiState,
+    onBack: () -> Unit,
+    onOpenCheckIn: () -> Unit,
+) {
     ScreenScaffold(title = "Mis citas", onBack = onBack) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -49,6 +59,13 @@ private fun AppointmentsContent(state: AppointmentsUiState, onBack: () -> Unit) 
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item {
+                Button(onClick = onOpenCheckIn, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(8.dp))
+                    Text("Confirmar llegada con QR")
+                }
+            }
             item {
                 Text(
                     text = "El médico o recepción agenda la cita. Te llega el aviso aquí; tú no puedes crear una por tu cuenta.",

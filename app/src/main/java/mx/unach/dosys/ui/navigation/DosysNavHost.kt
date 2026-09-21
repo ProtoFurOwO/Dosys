@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import mx.unach.dosys.ui.appointments.AppointmentsScreen
+import mx.unach.dosys.ui.checkin.CheckInScreen
 import mx.unach.dosys.ui.home.HomeScreen
 import mx.unach.dosys.ui.login.LoginScreen
 import mx.unach.dosys.ui.prescriptions.PrescriptionsScreen
@@ -45,6 +46,7 @@ fun DosysNavHost() {
                 onOpenPrescriptions = { navController.navigate(Routes.PRESCRIPTIONS) },
                 onOpenQr = { navController.navigate(Routes.QR) },
                 onOpenAppointments = { navController.navigate(Routes.APPOINTMENTS) },
+                onOpenCheckIn = { navController.navigate(Routes.CHECKIN) },
             )
         }
         composable(Routes.RECORD) {
@@ -70,7 +72,13 @@ fun DosysNavHost() {
             QrScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.APPOINTMENTS) {
-            AppointmentsScreen(onBack = { navController.popBackStack() })
+            AppointmentsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenCheckIn = { navController.navigate(Routes.CHECKIN) },
+            )
+        }
+        composable(Routes.CHECKIN) {
+            CheckInScreen(onBack = { navController.popBackStack() })
         }
     }
 }

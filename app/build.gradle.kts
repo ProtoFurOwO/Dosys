@@ -5,6 +5,10 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// Permite compilar apuntando a otro backend sin tocar el código:
+//   .\gradlew.bat :app:assembleDebug -PapiBaseUrl=https://medicos.stolasimp.dev/api/v1/
+val apiBaseUrlOverride: String? = (project.findProperty("apiBaseUrl") as String?)?.takeIf { it.isNotBlank() }
+
 android {
     namespace = "mx.unach.dosys"
     compileSdk = 35
@@ -21,7 +25,8 @@ android {
     buildTypes {
         debug {
             // 10.0.2.2 = la PC anfitriona vista desde el emulador de Android
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000/api/v1/\"")
+            val defaultUrl = "http://10.0.2.2:8000/api/v1/"
+            buildConfigField("String", "API_BASE_URL", "\"${apiBaseUrlOverride ?: defaultUrl}\"")
         }
         release {
             isMinifyEnabled = false
@@ -29,8 +34,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // TODO: apuntar al dominio real del VPS cuando el backend esté desplegado
-            buildConfigField("String", "API_BASE_URL", "\"https://dosys.example.mx/api/v1/\"")
+            // Backend real del hospital académico (VPS con HTTPS).
+            val defaultUrl = "https://medicos.stolasimp.dev/api/v1/"
+            buildConfigField("String", "API_BASE_URL", "\"${apiBaseUrlOverride ?: defaultUrl}\"")
         }
     }
 
@@ -82,6 +88,13 @@ dependencies {
 
     // Generación del código QR del paciente
     implementation(libs.zxing.core)
+
+    // Escaneo de QR con la cámara (módulo del celular)
+    implementation(libs.zxing.android.embedded)
+
+    // Huella dactilar / bloqueo del dispositivo para abrir el expediente
+    implementation(libs.androidx.biometric)
+    implementation(libs.androidx.fragment.ktx)
 
     // Pruebas
     testImplementation(libs.junit)

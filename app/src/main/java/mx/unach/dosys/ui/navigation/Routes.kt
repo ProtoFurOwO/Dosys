@@ -13,6 +13,7 @@ object Routes {
     const val PRESCRIPTIONS = "prescriptions"
     const val QR = "qr"
     const val APPOINTMENTS = "appointments"
+    const val CHECKIN = "checkin"
 
     fun studyDetail(id: Int): String = "study/$id"
 }

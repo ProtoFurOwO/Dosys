@@ -1,8 +1,8 @@
 # D.O.S.Y.S — App Android (paciente)
 
-Aplicación móvil **nativa** del paciente (Kotlin + Jetpack Compose). Permite consultar
-información clínica en **modo solo lectura**, dar seguimiento a tratamientos y mostrar el
-código QR para el check-in en el hospital.
+Aplicación móvil **nativa** del paciente (Kotlin + Jetpack Compose). Consulta información
+clínica en **modo solo lectura**, da seguimiento a tratamientos, confirma la llegada con
+**cámara** (check-in QR) y protege el expediente con **huella**.
 
 ## Requisitos
 
@@ -30,15 +30,39 @@ Si el emulador no aparece: **Device Manager** (icono de celular con una lupa) �
 3. Conecta el cable. Acepta “¿Permitir depuración USB?”.
 4. En Android Studio el teléfono aparece en el selector. ▶ Run.
 
-### Opción C — Terminal
+### Opción C — APK de demostración (la que usarás con el profe)
+
+El APK ya viene compilado apuntando al backend real (`https://medicos.stolasimp.dev/api/v1/`):
+
+```
+Proyecto/dosys-demo-vps.apk
+```
+
+Cópialo al teléfono (cable, Drive o WhatsApp) e instálalo. Android pedirá permitir
+“instalar apps de origen desconocido” la primera vez. No necesita estar en la misma red:
+funciona con datos móviles porque todo va por HTTPS.
+
+### Opción D — Terminal
 
 ```powershell
-cd "C:\Users\josea\OneDrive\Documents\Septimo Semestre\Desarrolloweb\Proyecto\android"
+cd android
 .\gradlew.bat :app:installDebug
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell am start -n mx.unach.dosys/.MainActivity
+# APK apuntando a otro backend:
+.\gradlew.bat :app:assembleDebug -PapiBaseUrl=https://medicos.stolasimp.dev/api/v1/
 ```
 
 El emulador debe estar encendido (Android Studio o `emulator -avd DosysPhone`).
+
+## Módulos del celular (requisito de la materia)
+
+| Módulo | Dónde | Cómo se demuestra |
+|---|---|---|
+| **Cámara** | Check-in con QR | Recepción muestra el QR en el portal; el paciente lo escanea y confirma su llegada al backend |
+| **Huella** | Mi expediente | `BiometricPrompt` pide huella (o bloqueo del teléfono) antes de mostrar datos clínicos |
+| **GPS** | Check-in | Muestra la distancia al Hospital General (solo informativo; si no hay señal, la demo continúa) |
+
+La cámara está en el **celular del paciente** (que es la app del proyecto). El hospital solo
+**muestra** el QR en pantalla desde el portal; no necesita cámara ni permisos del navegador.
 
 ## Recorrido de la demo
 
@@ -46,9 +70,17 @@ El emulador debe estar encendido (Android Studio o `emulator -avd DosysPhone`).
 |---|---|
 | Próxima cita | Lista de citas (agendada / confirmada / atendida) |
 | Tratamiento activo / Recetas | Receta del médico + botón **Ya la tomé** |
-| Expediente | CURP, alergias, crónicas, consultas |
+| Expediente | **Pide huella** y luego muestra CURP, consultas reales del backend |
 | Estudios | Flujo Solicitado → En proceso → Listo (toca uno para el resultado) |
 | Mi QR | QR que expira en 3 min + código de respaldo `A7K9M2` |
+| **Check-in con QR** | **Abre la cámara**, escanea el QR de recepción y confirma la llegada |
+
+### Guion para la demo (dos dispositivos)
+
+1. En la laptop, portal → **Citas** → muestra el QR de la cita del paciente.
+2. En el celular: **Check-in con QR → Abrir cámara** → apunta al QR de la laptop.
+3. La app responde “Llegada confirmada”; el portal, al recargar, muestra “Llegó 16:32”.
+4. Extra: abre **Mi expediente** y desbloquea con la huella.
 
 ## Estructura
 
@@ -58,20 +90,18 @@ app/src/main/java/mx/unach/dosys/
 ├─ core/auth · core/di
 ├─ data/model · data/remote · data/repository · data/mock
 └─ ui/
-   ├─ login · home
+   ├─ login · home · checkin
    ├─ record · studies · prescriptions · appointments · qr
    ├─ navigation · theme · components
 ```
 
-## Backend local (FastAPI)
+## Backend (FastAPI)
 
-La app ya usa el backend real para inicio de sesión, perfil, citas y consultas.
+La app usa el backend real para inicio de sesión, perfil, citas, consultas y check-in.
 El tutorial completo está en [`backend/README.md`](backend/README.md).
 
-En el emulador, `10.0.2.2` apunta a tu computadora (`API_BASE_URL` en `app/build.gradle.kts`).
-Primero levanta `backend/` y verifica `http://127.0.0.1:8000/health`.
-
-Los módulos de estudios, recetas y QR siguen mostrando datos demo hasta que se agreguen sus endpoints.
+- Emulador: `http://10.0.2.2:8000/api/v1/` (apunta a tu PC).
+- Producción: `https://medicos.stolasimp.dev/api/v1/`.
 
 ### Si el emulador no tiene red
 
@@ -82,5 +112,5 @@ Comprueba dentro del emulador: `adb shell ping -c 1 10.0.2.2`. Si falla, reinici
 
 - Solo `MainActivity` está exportada (requisito del launcher).
 - El token de sesión **no** se incluye en respaldos.
-- Cleartext solo hacia `10.0.2.2` y `localhost`.
+- El expediente se protege con huella; si el teléfono no tiene biometría, se avisa y se deja continuar (decisión de demostración).
 - `SessionManager` pendiente de endurecer con Android Keystore.

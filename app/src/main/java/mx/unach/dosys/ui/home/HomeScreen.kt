@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -55,6 +56,7 @@ fun HomeScreen(
     onOpenPrescriptions: () -> Unit,
     onOpenQr: () -> Unit,
     onOpenAppointments: () -> Unit,
+    onOpenCheckIn: () -> Unit,
     viewModel: HomeViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -131,6 +133,9 @@ fun HomeScreen(
                     QuickAccess(Icons.Filled.Medication, "Recetas", Modifier.weight(1f), onOpenPrescriptions)
                     QuickAccess(Icons.Filled.QrCode, "Mi QR", Modifier.weight(1f), onOpenQr)
                 }
+            }
+            item {
+                QuickAccess(Icons.Filled.QrCodeScanner, "Check-in con QR", Modifier.fillMaxWidth(), onOpenCheckIn)
             }
             item {
                 Text(

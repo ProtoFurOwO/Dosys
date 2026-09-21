@@ -17,10 +17,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import mx.unach.dosys.ui.components.BiometricGate
 import mx.unach.dosys.ui.components.ScreenScaffold
 import mx.unach.dosys.ui.format.formatClinicalDate
 import mx.unach.dosys.ui.format.formatClinicalDateTime
@@ -35,8 +39,19 @@ fun RecordScreen(
     viewModel: RecordViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    // El expediente se desbloquea con huella en cada entrada a la pantalla.
+    var unlocked by remember { mutableStateOf(false) }
 
-    RecordContent(state = state, onBack = onBack)
+    if (unlocked) {
+        RecordContent(state = state, onBack = onBack)
+    } else {
+        ScreenScaffold(title = "Mi expediente", onBack = onBack) { padding ->
+            BiometricGate(
+                onUnlocked = { unlocked = true },
+                modifier = Modifier.padding(padding),
+            )
+        }
+    }
 }
 
 @Composable

@@ -2,6 +2,7 @@ package mx.unach.dosys.data.repository
 
 import kotlinx.coroutines.CancellationException
 import mx.unach.dosys.core.auth.SessionManager
+import mx.unach.dosys.data.model.CheckInRequest
 import mx.unach.dosys.data.model.PatientAppointment
 import mx.unach.dosys.data.model.PatientConsultation
 import mx.unach.dosys.data.model.PatientProfile
@@ -19,6 +20,7 @@ interface PatientRepository {
     suspend fun profile(): ClinicalResult<PatientProfile>
     suspend fun consultations(): ClinicalResult<List<PatientConsultation>>
     suspend fun appointments(): ClinicalResult<List<PatientAppointment>>
+    suspend fun checkIn(appointmentId: Int, code: String): ClinicalResult<PatientAppointment>
 }
 
 class RemotePatientRepository(
@@ -36,6 +38,32 @@ class RemotePatientRepository(
 
     override suspend fun appointments(): ClinicalResult<List<PatientAppointment>> = authorized { header ->
         api.myAppointments(header)
+    }
+
+    override suspend fun checkIn(appointmentId: Int, code: String): ClinicalResult<PatientAppointment> {
+        val token = session.currentToken()
+            ?: return ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
+
+        return try {
+            ClinicalResult.Success(api.checkIn("Bearer $token", appointmentId, CheckInRequest(code.trim().uppercase())))
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: HttpException) {
+            when (error.code()) {
+                400 -> ClinicalResult.Error("El código no corresponde a esta cita")
+                401 -> {
+                    session.clear()
+                    ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
+                }
+                404 -> ClinicalResult.Error("No encontramos esa cita en tu expediente")
+                409 -> ClinicalResult.Error("Esta cita todavía no tiene check-in habilitado")
+                else -> ClinicalResult.Error("No se pudo confirmar la llegada. Intenta más tarde")
+            }
+        } catch (error: IOException) {
+            ClinicalResult.Error("No se pudo conectar con el servidor")
+        } catch (error: Exception) {
+            ClinicalResult.Error("No se pudo confirmar la llegada. Intenta más tarde")
+        }
     }
 
     private suspend fun <T> authorized(call: suspend (String) -> T): ClinicalResult<T> {
