@@ -49,7 +49,11 @@ Abre `http://127.0.0.1:8000/portal` e inicia sesión con `medico` / `Medico123!`
 2. **Expediente**: datos del paciente e historial de consultas en orden cronológico.
 3. **Nueva consulta**: motivo, diagnóstico y notas; al guardar aparece en el expediente y
    en la app del paciente.
-4. **Citas**: agenda con el QR de check-in y su código de respaldo.
+4. **Agendar cita**: fecha, hora, especialidad y consultorio; el sistema genera un código
+   de check-in único por cita.
+5. **Citas**: agenda con el QR de check-in y su código de respaldo.
+
+Cada cita agendada desde el portal aparece también en la app del paciente.
 
 Credenciales exclusivamente locales/de demostración:
 
@@ -113,11 +117,40 @@ variante `release` el dominio HTTPS. Los endpoints del paciente son:
 
 Swagger queda desactivado en producción (`DOCS_ENABLED=false`); el personal usa el portal.
 
-## Límites conocidos antes de producción
+## Seguridad: estado y pendientes
 
-- Falta asociar médico-paciente para limitar la lista a los pacientes bajo su atención.
-- Faltan refresh tokens, revocación, recuperación de cuenta y cifrado con Android Keystore.
-- CSRF del portal cubierto con cookie `SameSite=Lax`; un token formal queda como mejora.
+**Ya implementado:** JWT de corta duración, contraseñas con Argon2, RBAC validado en
+servidor, bitácora de auditoría, HTTPS en producción, cookie del portal `HttpOnly` y
+`SameSite=Lax`, cabeceras de seguridad (CSP, X-Frame-Options), Swagger apagado en
+producción y PostgreSQL sin puertos públicos.
+
+**Falta antes de usar datos reales:**
+
+1. **Acceso**
+   - Refresh tokens con revocación y cierre de sesión por inactividad.
+   - Recuperación de contraseña, política de contraseñas y bloqueo por intentos fallidos.
+   - Segundo factor (MFA) para el personal médico.
+   - Restringir el portal a red interna o VPN, como pide el análisis inicial.
+   - Relación médico-paciente: hoy el médico ve a todos los pacientes del hospital.
+2. **Protección de datos**
+   - Guardar el token en el celular con Android Keystore (hoy va en DataStore).
+   - Cifrado en reposo de PostgreSQL y de los respaldos.
+   - Límite de peticiones (rate limiting) contra fuerza bruta en login y portal.
+   - Token CSRF formal en el portal (hoy la cookie `SameSite=Lax` cubre lo básico).
+   - Gestión de secretos con Vault/Doppler en lugar de archivos `.env`.
+   - Escaneo de dependencias (`pip-audit`) y de la imagen (`trivy`) en cada versión.
+3. **Infraestructura**
+   - Respaldos automáticos de la base y prueba de restauración.
+   - Monitoreo, alertas y rotación de logs del contenedor.
+   - Firewall del VPS (`ufw`) y `fail2ban` para SSH.
+   - Límites de CPU/memoria y filesystem de solo lectura en los contenedores.
+4. **Cumplimiento**
+   - Aviso de privacidad, consentimiento informado y política de retención de datos.
+   - Revisión contra NOM-024 y la normatividad aplicable antes de datos reales.
+   - Procedimiento de respuesta a incidentes y contacto de seguridad.
+
+## Límites conocidos de esta entrega
+
 - Estudios, recetas y recordatorios siguen como interfaz demo en la app.
-- Antes de usar datos reales se requiere revisión de seguridad, privacidad, retención,
-  respaldos, monitoreo y normatividad aplicable.
+- El GPS solo muestra la distancia informativa al hospital; no bloquea el check-in.
+- La huella protege el expediente en pantalla, pero no cifra los datos locales.

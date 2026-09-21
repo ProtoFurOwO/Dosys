@@ -1,0 +1,53 @@
+{% extends "panel.html" %}
+{% block title %}Agendar cita · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <a class="back-link" href="/portal/pacientes/{{ patient.id }}">Volver al expediente</a>
+    <h1>Agendar cita</h1>
+    <p class="meta-row">
+      <span><b>Paciente</b> {{ patient.full_name }}</span>
+      <span><b>CURP</b> {{ patient.curp }}</span>
+    </p>
+  </div>
+</header>
+
+<form class="form" method="post" action="/portal/pacientes/{{ patient.id }}/cita" novalidate>
+  <div class="field {% if errors.specialty %}has-error{% endif %}">
+    <label for="specialty">Especialidad o servicio</label>
+    <input id="specialty" name="specialty" maxlength="120" value="{{ values.specialty }}" required>
+    {% if errors.specialty %}<p class="error">{{ errors.specialty }}</p>{% endif %}
+  </div>
+
+  <div class="field-row">
+    <div class="field {% if errors.fecha %}has-error{% endif %}">
+      <label for="fecha">Fecha</label>
+      <input id="fecha" name="fecha" type="date" value="{{ values.fecha }}" required>
+      {% if errors.fecha %}<p class="error">{{ errors.fecha }}</p>{% endif %}
+    </div>
+    <div class="field {% if errors.hora %}has-error{% endif %}">
+      <label for="hora">Hora</label>
+      <input id="hora" name="hora" type="time" value="{{ values.hora }}" required>
+      {% if errors.hora %}<p class="error">{{ errors.hora }}</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="field {% if errors.location %}has-error{% endif %}">
+    <label for="location">Consultorio o ubicación</label>
+    <input id="location" name="location" maxlength="160" value="{{ values.location }}" required>
+    {% if errors.location %}<p class="error">{{ errors.location }}</p>{% endif %}
+  </div>
+
+  <div class="field {% if errors.notes %}has-error{% endif %}">
+    <label for="notes">Notas para el paciente</label>
+    <textarea id="notes" name="notes" rows="3" maxlength="4000">{{ values.notes }}</textarea>
+    <p class="help">Opcional. Indicaciones de preparación o motivo de la cita.</p>
+    {% if errors.notes %}<p class="error">{{ errors.notes }}</p>{% endif %}
+  </div>
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">Agendar cita</button>
+    <a class="btn btn-quiet" href="/portal/pacientes/{{ patient.id }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

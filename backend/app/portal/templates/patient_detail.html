@@ -11,7 +11,10 @@
       <span><b>Contacto de emergencia</b> {{ patient.emergency_contact or "No registrado" }}</span>
     </p>
   </div>
-  <a class="btn btn-primary" href="/portal/pacientes/{{ patient.id }}/consulta">Nueva consulta</a>
+  <div class="page-actions">
+    <a class="btn btn-line" href="/portal/pacientes/{{ patient.id }}/cita">Agendar cita</a>
+    <a class="btn btn-primary" href="/portal/pacientes/{{ patient.id }}/consulta">Nueva consulta</a>
+  </div>
 </header>
 
 {% if created %}

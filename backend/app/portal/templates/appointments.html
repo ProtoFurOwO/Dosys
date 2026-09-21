@@ -9,6 +9,12 @@
 </header>
 
 {% if appointments %}
+{% if created %}
+<div class="note note-ok" role="status">
+  <p>Cita agendada para {{ created.patient_name }} el {{ created.scheduled_at | fecha_hora }}.</p>
+  <p class="note-sub">El QR de check-in aparece abajo; el paciente también la verá en su app.</p>
+</div>
+{% endif %}
 <div class="appointments">
   {% for appointment in appointments %}
   <article class="appointment">
@@ -38,7 +44,7 @@
 {% else %}
 <div class="empty">
   <p class="empty-title">Todavía no hay citas agendadas</p>
-  <p>Cuando el hospital agende una cita, aquí aparecerá el código de check-in para el paciente.</p>
+  <p>Agenda una cita desde el expediente del paciente y aparecerá aquí con su código de check-in.</p>
 </div>
 {% endif %}
 {% endblock %}
