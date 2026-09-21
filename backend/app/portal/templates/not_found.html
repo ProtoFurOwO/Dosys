@@ -1,0 +1,15 @@
+{% extends "panel.html" %}
+{% block title %}No encontrado · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>No encontramos ese registro</h1>
+    <p class="page-note">Puede que el paciente ya no exista o que el enlace esté incompleto.</p>
+  </div>
+</header>
+<div class="empty">
+  <p class="empty-title">Revisa la lista de pacientes</p>
+  <p>Desde ahí puedes buscar por nombre o CURP y continuar con el seguimiento.</p>
+  <a class="btn btn-line" href="/portal">Ir a pacientes</a>
+</div>
+{% endblock %}

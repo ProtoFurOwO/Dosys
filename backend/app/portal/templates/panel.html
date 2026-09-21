@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block body_class %}console{% endblock %}
+{% block body %}
+<div class="shell">
+  <aside class="rail">
+    <div>
+      <a class="brand" href="/portal">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-text">
+          <strong>D.O.S.Y.S</strong>
+          <small>Portal clínico</small>
+        </span>
+      </a>
+      <nav class="nav" aria-label="Secciones">
+        <a class="nav-link {% if active == 'pacientes' %}is-active{% endif %}" href="/portal">Pacientes</a>
+        <a class="nav-link {% if active == 'citas' %}is-active{% endif %}" href="/portal/citas">Citas</a>
+      </nav>
+    </div>
+    <div class="rail-bottom">
+      <p class="who">En sesión<br><strong>{{ doctor_name }}</strong></p>
+      <form method="post" action="/portal/salir">
+        <button class="btn btn-quiet" type="submit">Cerrar sesión</button>
+      </form>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="content">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+</div>
+{% endblock %}

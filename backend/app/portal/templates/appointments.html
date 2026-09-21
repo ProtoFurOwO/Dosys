@@ -1,0 +1,44 @@
+{% extends "panel.html" %}
+{% block title %}Citas · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Citas</h1>
+    <p class="page-note">Agenda del hospital y código de check-in para recibir al paciente.</p>
+  </div>
+</header>
+
+{% if appointments %}
+<div class="appointments">
+  {% for appointment in appointments %}
+  <article class="appointment">
+    <div class="appointment-main">
+      <p class="appointment-when">{{ appointment.scheduled_at | fecha_hora }}</p>
+      <h2 class="appointment-patient">{{ appointment.patient_name }}</h2>
+      <p class="appointment-meta">
+        {{ appointment.specialty }}{% if appointment.doctor_name %}, {{ appointment.doctor_name }}{% endif %}. {{ appointment.location }}.
+      </p>
+      <p class="appointment-state">
+        <span class="chip chip-{{ appointment.status }}">{{ appointment.status_label }}</span>
+        {% if appointment.checked_in_at %}
+        <span class="chip chip-done">Llegó {{ appointment.checked_in_at | hora }}</span>
+        {% endif %}
+      </p>
+    </div>
+    {% if appointment.qr_svg %}
+    <div class="appointment-qr">
+      <div class="qr">{{ appointment.qr_svg | safe }}</div>
+      <p class="qr-help">El paciente escanea este código con la app para confirmar su llegada.</p>
+      <p class="qr-code">Código de respaldo: <span>{{ appointment.checkin_code }}</span></p>
+    </div>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+  <p class="empty-title">Todavía no hay citas agendadas</p>
+  <p>Cuando el hospital agende una cita, aquí aparecerá el código de check-in para el paciente.</p>
+</div>
+{% endif %}
+{% endblock %}

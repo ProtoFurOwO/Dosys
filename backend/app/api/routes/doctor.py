@@ -4,7 +4,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_roles
 from app.db.session import get_db
-from app.models.consultation import Consultation
 from app.models.doctor import Doctor
 from app.models.enums import UserRole
 from app.models.patient import Patient
@@ -12,6 +11,7 @@ from app.models.user import User
 from app.schemas.consultation import ConsultationCreateRequest, ConsultationResponse
 from app.schemas.patient import DoctorPatientSummary
 from app.services.audit import write_audit_event
+from app.services.consultations import create_consultation as create_consultation_record
 
 
 router = APIRouter(prefix="/doctor", tags=["Médico"])
@@ -64,15 +64,14 @@ async def create_consultation(
     if patient is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente no encontrado")
 
-    consultation = Consultation(
-        patient_id=patient.id,
-        doctor_id=doctor.id,
-        reason=payload.reason.strip(),
-        diagnosis=payload.diagnosis.strip(),
-        notes=payload.notes.strip() if payload.notes else None,
+    consultation = await create_consultation_record(
+        db,
+        doctor=doctor,
+        patient=patient,
+        reason=payload.reason,
+        diagnosis=payload.diagnosis,
+        notes=payload.notes,
     )
-    db.add(consultation)
-    await db.flush()
     await write_audit_event(
         db,
         user=current_user,

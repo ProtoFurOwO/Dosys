@@ -90,8 +90,12 @@ async def seed_demo_data() -> None:
                     scheduled_at=datetime(2026, 9, 24, 16, 30, tzinfo=timezone.utc),
                     location="Consultorio 3",
                     status=AppointmentStatus.CONFIRMED,
+                    checkin_code="A7K9M2",
                     notes="Control de hipertensión",
                 )
             )
+        elif not existing_appointment.checkin_code:
+            # Rellena el código de check-in en bases creadas antes de la migración.
+            existing_appointment.checkin_code = "A7K9M2"
 
         await db.commit()

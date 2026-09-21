@@ -1,12 +1,15 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.api.router import api_router
 from app.core.config import settings
 from app.db.session import SessionLocal, engine
+from app.portal.routes import router as portal_router
 from app.schemas.health import HealthResponse
 from app.services.seed import seed_demo_data
 
@@ -42,6 +45,27 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix=settings.api_v1_prefix)
+app.include_router(portal_router)
+app.mount(
+    "/portal/static",
+    StaticFiles(directory=str(Path(__file__).parent / "portal" / "static")),
+    name="portal-static",
+)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Cabeceras mínimas de seguridad para el HTML del personal médico."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    if request.url.path.startswith("/portal"):
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; img-src 'self' data:; style-src 'self'; form-action 'self'; frame-ancestors 'none'",
+        )
+    return response
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Infraestructura"])

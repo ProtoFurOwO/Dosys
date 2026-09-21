@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,7 +12,7 @@ from app.models.doctor import Doctor
 from app.models.enums import UserRole
 from app.models.patient import Patient
 from app.models.user import User
-from app.schemas.appointment import AppointmentResponse
+from app.schemas.appointment import AppointmentCheckInRequest, AppointmentResponse
 from app.schemas.consultation import ConsultationResponse
 from app.schemas.patient import PatientProfileResponse
 from app.services.audit import write_audit_event
@@ -105,6 +107,7 @@ async def get_my_appointments(
             location=appointment.location,
             status=appointment.status,
             notes=appointment.notes,
+            checked_in_at=appointment.checked_in_at,
         )
         for appointment, doctor in result.all()
     ]
@@ -118,3 +121,67 @@ async def get_my_appointments(
     )
     await db.commit()
     return appointments
+
+
+@router.post("/me/appointments/{appointment_id}/check-in", response_model=AppointmentResponse)
+async def check_in_appointment(
+    appointment_id: int,
+    payload: AppointmentCheckInRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.PATIENT)),
+) -> AppointmentResponse:
+    """Confirma la llegada del paciente con el código del QR de recepción."""
+    patient = await get_patient_for_user(db, current_user)
+    appointment = await db.scalar(
+        select(Appointment).where(Appointment.id == appointment_id, Appointment.patient_id == patient.id)
+    )
+    if appointment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no encontrada")
+
+    if not appointment.checkin_code:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Esta cita todavía no tiene check-in habilitado",
+        )
+
+    if appointment.checkin_code.strip().upper() != payload.code.strip().upper():
+        await write_audit_event(
+            db,
+            user=current_user,
+            action="patient_checkin_failed",
+            entity_type="appointment",
+            entity_id=appointment.id,
+            request=request,
+        )
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El código no corresponde a esta cita",
+        )
+
+    if appointment.checked_in_at is None:
+        appointment.checked_in_at = datetime.now(timezone.utc)
+        await write_audit_event(
+            db,
+            user=current_user,
+            action="patient_checkin",
+            entity_type="appointment",
+            entity_id=appointment.id,
+            request=request,
+            detail=f"patient_id={patient.id}",
+        )
+        await db.commit()
+        await db.refresh(appointment)
+
+    doctor = await db.get(Doctor, appointment.doctor_id) if appointment.doctor_id else None
+    return AppointmentResponse(
+        id=appointment.id,
+        specialty=appointment.specialty,
+        doctor_name=doctor.full_name if doctor else None,
+        scheduled_at=appointment.scheduled_at,
+        location=appointment.location,
+        status=appointment.status,
+        notes=appointment.notes,
+        checked_in_at=appointment.checked_in_at,
+    )

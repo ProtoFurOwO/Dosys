@@ -1,0 +1,42 @@
+{% extends "panel.html" %}
+{% block title %}Nueva consulta · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <a class="back-link" href="/portal/pacientes/{{ patient.id }}">Volver al expediente</a>
+    <h1>Nueva consulta</h1>
+    <p class="meta-row">
+      <span><b>Paciente</b> {{ patient.full_name }}</span>
+      <span><b>CURP</b> {{ patient.curp }}</span>
+    </p>
+  </div>
+</header>
+
+<form class="form" method="post" action="/portal/pacientes/{{ patient.id }}/consulta" novalidate>
+  <div class="field {% if errors.reason %}has-error{% endif %}">
+    <label for="reason">Motivo de la consulta</label>
+    <input id="reason" name="reason" maxlength="300" value="{{ values.reason }}" required aria-describedby="reason-help">
+    <p class="help" id="reason-help">Qué reporta el paciente o por qué acude.</p>
+    {% if errors.reason %}<p class="error">{{ errors.reason }}</p>{% endif %}
+  </div>
+
+  <div class="field {% if errors.diagnosis %}has-error{% endif %}">
+    <label for="diagnosis">Diagnóstico</label>
+    <textarea id="diagnosis" name="diagnosis" rows="3" maxlength="500" required aria-describedby="diagnosis-help">{{ values.diagnosis }}</textarea>
+    <p class="help" id="diagnosis-help">Conclusión clínica de esta consulta.</p>
+    {% if errors.diagnosis %}<p class="error">{{ errors.diagnosis }}</p>{% endif %}
+  </div>
+
+  <div class="field {% if errors.notes %}has-error{% endif %}">
+    <label for="notes">Notas para el seguimiento</label>
+    <textarea id="notes" name="notes" rows="4" maxlength="4000" aria-describedby="notes-help">{{ values.notes }}</textarea>
+    <p class="help" id="notes-help">Opcional. Indicaciones, estudios solicitados o acuerdos con el paciente.</p>
+    {% if errors.notes %}<p class="error">{{ errors.notes }}</p>{% endif %}
+  </div>
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">Guardar consulta</button>
+    <a class="btn btn-quiet" href="/portal/pacientes/{{ patient.id }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

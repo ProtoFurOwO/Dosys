@@ -1,6 +1,9 @@
-# Uso en el VPS con Nginx Proxy Manager ya instalado.
-# Ejecutar: docker compose -f compose.production.yaml up -d --build
-# NPM y la API deben compartir la red externa indicada por NPM_NETWORK en .env.
+# Despliegue en el VPS con Nginx Proxy Manager.
+# La API se publica en el puente de Docker y en localhost del host, de modo que
+# NPM (contenedor o servicio nativo) la alcance en http://172.17.0.1:8000
+# sin exponerla a internet. PostgreSQL nunca publica puertos.
+#
+# Uso:  sudo docker compose -f compose.production.yaml up -d --build
 name: dosys
 
 services:
@@ -37,18 +40,16 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    expose:
-      - "8000"
+    ports:
+      - "127.0.0.1:8000:8000"
+      - "172.17.0.1:8000:8000"
     networks:
       - data
-      npm
 
 volumes:
   postgres_data:
 
 networks:
+  # Solo api y db entran aquí; la base jamás es visible desde el host.
   data:
     internal: true
-  npm:
-    external: true
-    name: ${NPM_NETWORK:?Set NPM_NETWORK to the Docker network used by Nginx Proxy Manager}

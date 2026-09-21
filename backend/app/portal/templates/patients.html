@@ -1,0 +1,78 @@
+{% extends "panel.html" %}
+{% block title %}Pacientes · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Pacientes</h1>
+    <p class="page-note">
+      {% if search %}
+      Resultados para “{{ search }}”.
+      {% else %}
+      Personas registradas en el hospital.
+      {% endif %}
+    </p>
+  </div>
+  <form class="search" method="get" action="/portal">
+    <label class="field-label" for="buscar">Buscar por nombre o CURP</label>
+    <div class="search-row">
+      <input id="buscar" name="q" value="{{ search }}" autocomplete="off" placeholder="Ej. Matuz o MAAJ010415">
+      <button class="btn btn-line" type="submit">Buscar</button>
+    </div>
+  </form>
+</header>
+
+<section class="metrics" aria-label="Resumen del hospital">
+  <div class="metric">
+    <span class="metric-label">Pacientes</span>
+    <strong>{{ stats.patients }}</strong>
+  </div>
+  <div class="metric">
+    <span class="metric-label">Consultas registradas</span>
+    <strong>{{ stats.consultations }}</strong>
+  </div>
+  <div class="metric">
+    <span class="metric-label">Consultas de hoy</span>
+    <strong>{{ stats.today }}</strong>
+  </div>
+</section>
+
+{% if patients %}
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th scope="col">Paciente</th>
+        <th scope="col" class="hide-sm">CURP</th>
+        <th scope="col" class="hide-sm">Tipo de sangre</th>
+        <th scope="col">Última consulta</th>
+        <th scope="col" class="col-action"><span class="visually-hidden">Acciones</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for patient in patients %}
+      <tr>
+        <td><a class="link" href="/portal/pacientes/{{ patient.id }}">{{ patient.full_name }}</a></td>
+        <td class="hide-sm code">{{ patient.curp }}</td>
+        <td class="hide-sm">{{ patient.blood_type or "No registrado" }}</td>
+        <td class="nowrap">{{ latest_by_patient.get(patient.id) | ultima_visita }}</td>
+        <td class="col-action">
+          <a class="btn btn-line" href="/portal/pacientes/{{ patient.id }}/consulta">Registrar consulta</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  {% if search %}
+  <p class="empty-title">Sin resultados para “{{ search }}”</p>
+  <p>Prueba con otra parte del nombre o con la CURP completa. También puedes ver la lista completa.</p>
+  <a class="btn btn-line" href="/portal">Ver todos los pacientes</a>
+  {% else %}
+  <p class="empty-title">Todavía no hay pacientes registrados</p>
+  <p>Cuando el hospital registre pacientes, aparecerán aquí para consulta y seguimiento.</p>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

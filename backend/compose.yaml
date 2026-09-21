@@ -35,8 +35,9 @@ services:
       db:
         condition: service_healthy
     # Solo se expone en la propia computadora. El emulador Android usa 10.0.2.2.
+    # API_PORT permite cambiar el puerto local si el 8000 está ocupado.
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     networks:
       - edge
       - data

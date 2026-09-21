@@ -1,0 +1,60 @@
+{% extends "panel.html" %}
+{% block title %}{{ patient.full_name }} · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <a class="back-link" href="/portal">Volver a pacientes</a>
+    <h1>{{ patient.full_name }}</h1>
+    <p class="meta-row">
+      <span><b>CURP</b> {{ patient.curp }}</span>
+      <span><b>Tipo de sangre</b> {{ patient.blood_type or "No registrado" }}</span>
+      <span><b>Contacto de emergencia</b> {{ patient.emergency_contact or "No registrado" }}</span>
+    </p>
+  </div>
+  <a class="btn btn-primary" href="/portal/pacientes/{{ patient.id }}/consulta">Nueva consulta</a>
+</header>
+
+{% if created %}
+<div class="note note-ok" role="status">
+  <p>Consulta registrada el {{ created.created_at | fecha_hora }}.</p>
+  <p class="note-sub">Motivo: {{ created.reason }}. Diagnóstico: {{ created.diagnosis }}.</p>
+</div>
+{% endif %}
+
+<section class="chart">
+  <h2 class="section-title">Historial de consultas</h2>
+
+  {% if consultations %}
+  <ol class="chart-list">
+    {% for consultation in consultations %}
+    <li class="chart-item">
+      <p class="chart-when">{{ consultation.created_at | fecha_hora }}</p>
+      <p class="chart-who">{{ consultation.doctor_name }}, {{ consultation.specialty }}</p>
+      <dl class="chart-fields">
+        <div>
+          <dt>Motivo</dt>
+          <dd>{{ consultation.reason }}</dd>
+        </div>
+        <div>
+          <dt>Diagnóstico</dt>
+          <dd>{{ consultation.diagnosis }}</dd>
+        </div>
+        {% if consultation.notes %}
+        <div>
+          <dt>Notas</dt>
+          <dd>{{ consultation.notes }}</dd>
+        </div>
+        {% endif %}
+      </dl>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <div class="empty">
+    <p class="empty-title">Este paciente aún no tiene consultas</p>
+    <p>Registra la primera consulta para que aparezca también en la app del paciente.</p>
+    <a class="btn btn-line" href="/portal/pacientes/{{ patient.id }}/consulta">Registrar consulta</a>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
