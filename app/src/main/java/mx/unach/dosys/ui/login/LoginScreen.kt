@@ -137,7 +137,7 @@ fun LoginScreen(
 
             Spacer(Modifier.height(20.dp))
             Text(
-                text = "Demo local: usa paciente / Paciente123!. El acceso médico se realiza desde Swagger.",
+                text = "Demo local: usa paciente / Paciente123!. El acceso médico se realiza desde el portal clínico.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

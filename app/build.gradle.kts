@@ -65,6 +65,7 @@ dependencies {
     // Núcleo / ciclo de vida
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
 
@@ -95,6 +96,9 @@ dependencies {
     // Huella dactilar / bloqueo del dispositivo para abrir el expediente
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.fragment.ktx)
+
+    // Mapa del hospital (OpenStreetMap, sin API key)
+    implementation(libs.osmdroid.android)
 
     // Pruebas
     testImplementation(libs.junit)

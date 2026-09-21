@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Punto de la ubicación actual del paciente en el mapa. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="20dp"
+    android:height="20dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#F2F7F4"
+        android:pathData="M12,2a10,10 0 1,0 0,20a10,10 0 1,0 0,-20z" />
+    <path
+        android:fillColor="#1565C0"
+        android:pathData="M12,4.5a7.5,7.5 0 1,0 0,15a7.5,7.5 0 1,0 0,-15z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,7.5a4.5,4.5 0 1,0 0,9a4.5,4.5 0 1,0 0,-9z" />
+</vector>

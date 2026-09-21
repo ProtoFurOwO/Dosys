@@ -59,7 +59,10 @@ El emulador debe estar encendido (Android Studio o `emulator -avd DosysPhone`).
 |---|---|---|
 | **Cámara** | Check-in con QR | Recepción muestra el QR en el portal; el paciente lo escanea y confirma su llegada al backend |
 | **Huella** | Mi expediente | `BiometricPrompt` pide huella (o bloqueo del teléfono) antes de mostrar datos clínicos |
-| **GPS** | Check-in | Muestra la distancia al Hospital General (solo informativo; si no hay señal, la demo continúa) |
+| **GPS** | Check-in | Mapa real (OpenStreetMap) con el pin del hospital, tu ubicación y la distancia en metros |
+
+El mapa usa **OSMDroid + OpenStreetMap**: no necesita API key ni cuenta de Google.
+Las coordenadas del hospital de demostración son `16.755731, -93.136586` (Sanatorio en Tuxtla Gutiérrez).
 
 La cámara está en el **celular del paciente** (que es la app del proyecto). El hospital solo
 **muestra** el QR en pantalla desde el portal; no necesita cámara ni permisos del navegador.
