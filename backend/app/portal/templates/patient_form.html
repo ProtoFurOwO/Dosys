@@ -1,0 +1,113 @@
+{% extends "panel.html" %}
+{% block title %}{% if mode == 'create' %}Nuevo paciente{% else %}Editar paciente{% endif %} · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <a class="back-link" href="{% if mode == 'create' %}/portal{% else %}/portal/pacientes/{{ patient.id }}{% endif %}">
+      {% if mode == 'create' %}Volver a pacientes{% else %}Volver al expediente{% endif %}
+    </a>
+    <h1>{% if mode == 'create' %}Nuevo paciente{% else %}Editar paciente{% endif %}</h1>
+    <p class="page-note">
+      {% if mode == 'create' %}
+      Al guardar se genera la credencial para que pueda iniciar sesión en la app.
+      {% else %}
+      Los cambios se reflejan en el expediente y en la app del paciente.
+      {% endif %}
+    </p>
+  </div>
+</header>
+
+{% if errors.general %}
+<div class="note note-error" role="alert">{{ errors.general }}</div>
+{% endif %}
+
+<form class="form" method="post"
+      action="{% if mode == 'create' %}/portal/pacientes/nuevo{% else %}/portal/pacientes/{{ patient.id }}/editar{% endif %}"
+      novalidate>
+
+  <div class="field {% if errors.full_name %}has-error{% endif %}">
+    <label for="full_name">Nombre completo</label>
+    <input id="full_name" name="full_name" maxlength="160" value="{{ values.full_name }}" required>
+    {% if errors.full_name %}<p class="error">{{ errors.full_name }}</p>{% endif %}
+  </div>
+
+  <div class="field-row">
+    <div class="field {% if errors.curp %}has-error{% endif %}">
+      <label for="curp">CURP</label>
+      {% if mode == 'create' %}
+      <input id="curp" name="curp" class="uppercase" maxlength="18" value="{{ values.curp }}" required>
+      {% else %}
+      <input id="curp" value="{{ values.curp }}" disabled>
+      <p class="help">La CURP no se puede cambiar después del registro.</p>
+      {% endif %}
+      {% if errors.curp %}<p class="error">{{ errors.curp }}</p>{% endif %}
+    </div>
+    <div class="field {% if errors.birth_date %}has-error{% endif %}">
+      <label for="birth_date">Fecha de nacimiento</label>
+      <input id="birth_date" name="birth_date" type="date" value="{{ values.birth_date }}">
+      {% if errors.birth_date %}<p class="error">{{ errors.birth_date }}</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="field-row">
+    <div class="field {% if errors.blood_type %}has-error{% endif %}">
+      <label for="blood_type">Tipo de sangre</label>
+      <select id="blood_type" name="blood_type">
+        <option value="">Sin registrar</option>
+        {% for option in blood_types %}
+        <option value="{{ option }}" {% if values.blood_type == option %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+      {% if errors.blood_type %}<p class="error">{{ errors.blood_type }}</p>{% endif %}
+    </div>
+    <div class="field {% if errors.emergency_contact %}has-error{% endif %}">
+      <label for="emergency_contact">Contacto de emergencia</label>
+      <input id="emergency_contact" name="emergency_contact" maxlength="160" value="{{ values.emergency_contact }}"
+             placeholder="Nombre y teléfono">
+      {% if errors.emergency_contact %}<p class="error">{{ errors.emergency_contact }}</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="field {% if errors.email %}has-error{% endif %}">
+    <label for="email">Correo electrónico</label>
+    <input id="email" name="email" type="email" maxlength="160" value="{{ values.email }}" placeholder="paciente@correo.com">
+    <p class="help">Se usa para enviarle su credencial de acceso.</p>
+    {% if errors.email %}<p class="error">{{ errors.email }}</p>{% endif %}
+  </div>
+
+  {% if mode == 'create' %}
+  <div class="field {% if errors.username %}has-error{% endif %}">
+    <label for="username">Usuario para la app</label>
+    <input id="username" name="username" class="uppercase" maxlength="64" value="{{ values.username }}" autocomplete="off" required>
+    <p class="help">De 3 a 64 caracteres: letras minúsculas, números, punto, guion o guion bajo.</p>
+    {% if errors.username %}<p class="error">{{ errors.username }}</p>{% endif %}
+  </div>
+
+  <div class="field-row">
+    <div class="field {% if errors.password %}has-error{% endif %}">
+      <label for="password">Contraseña temporal</label>
+      <input id="password" name="password" type="text" minlength="8" maxlength="64" autocomplete="off" required>
+      <p class="help">Mínimo 8 caracteres, con letras y números.</p>
+      {% if errors.password %}<p class="error">{{ errors.password }}</p>{% endif %}
+    </div>
+    <div class="field {% if errors.password %}has-error{% endif %}">
+      <label for="password_confirm">Repetir contraseña</label>
+      <input id="password_confirm" name="password_confirm" type="text" minlength="8" maxlength="64" autocomplete="off" required>
+    </div>
+  </div>
+  {% else %}
+  <div class="field">
+    <label for="username">Usuario para la app</label>
+    <input id="username" value="{{ values.username }}" disabled class="uppercase">
+    <p class="help">El usuario de acceso no se cambia desde aquí; usa "Restablecer" para renovar la contraseña.</p>
+  </div>
+  {% endif %}
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">
+      {% if mode == 'create' %}Registrar paciente{% else %}Guardar cambios{% endif %}
+    </button>
+    <a class="btn btn-quiet" href="{% if mode == 'create' %}/portal{% else %}/portal/pacientes/{{ patient.id }}{% endif %}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

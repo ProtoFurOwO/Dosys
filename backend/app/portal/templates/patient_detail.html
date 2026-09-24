@@ -9,9 +9,11 @@
       <span><b>CURP</b> {{ patient.curp }}</span>
       <span><b>Tipo de sangre</b> {{ patient.blood_type or "No registrado" }}</span>
       <span><b>Contacto de emergencia</b> {{ patient.emergency_contact or "No registrado" }}</span>
+      <span><b>Correo</b> {{ patient.email or "No registrado" }}</span>
     </p>
   </div>
   <div class="page-actions">
+    <a class="btn btn-quiet" href="/portal/pacientes/{{ patient.id }}/editar">Editar datos</a>
     <a class="btn btn-line" href="/portal/pacientes/{{ patient.id }}/cita">Agendar cita</a>
     <a class="btn btn-primary" href="/portal/pacientes/{{ patient.id }}/consulta">Nueva consulta</a>
   </div>

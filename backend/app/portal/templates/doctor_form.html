@@ -1,0 +1,73 @@
+{% extends "panel.html" %}
+{% block title %}{% if mode == 'create' %}Nuevo médico{% else %}Editar médico{% endif %} · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <a class="back-link" href="/portal/usuarios">Volver a usuarios</a>
+    <h1>{% if mode == 'create' %}Nuevo médico{% else %}Editar médico{% endif %}</h1>
+    <p class="page-note">
+      {% if mode == 'create' %}
+      La cuenta da acceso al portal clínico y a la API del hospital.
+      {% else %}
+      Los cambios se ven de inmediato en el portal.
+      {% endif %}
+    </p>
+  </div>
+</header>
+
+{% if errors.general %}
+<div class="note note-error" role="alert">{{ errors.general }}</div>
+{% endif %}
+
+<form class="form" method="post"
+      action="{% if mode == 'create' %}/portal/usuarios/nuevo{% else %}/portal/usuarios/{{ user.id }}/editar{% endif %}"
+      novalidate>
+
+  <div class="field {% if errors.full_name %}has-error{% endif %}">
+    <label for="full_name">Nombre completo</label>
+    <input id="full_name" name="full_name" maxlength="160" value="{{ values.full_name }}" required>
+    {% if errors.full_name %}<p class="error">{{ errors.full_name }}</p>{% endif %}
+  </div>
+
+  <div class="field {% if errors.specialty %}has-error{% endif %}">
+    <label for="specialty">Especialidad</label>
+    <input id="specialty" name="specialty" maxlength="120" value="{{ values.specialty }}" placeholder="Ej. Medicina General">
+    {% if errors.specialty %}<p class="error">{{ errors.specialty }}</p>{% endif %}
+  </div>
+
+  {% if mode == 'create' %}
+  <div class="field {% if errors.username %}has-error{% endif %}">
+    <label for="username">Usuario</label>
+    <input id="username" name="username" class="uppercase" maxlength="64" value="{{ values.username }}" autocomplete="off" required>
+    <p class="help">De 3 a 64 caracteres: letras minúsculas, números, punto, guion o guion bajo.</p>
+    {% if errors.username %}<p class="error">{{ errors.username }}</p>{% endif %}
+  </div>
+
+  <div class="field-row">
+    <div class="field {% if errors.password %}has-error{% endif %}">
+      <label for="password">Contraseña temporal</label>
+      <input id="password" name="password" type="text" minlength="8" maxlength="64" autocomplete="off" required>
+      <p class="help">Mínimo 8 caracteres, con letras y números.</p>
+      {% if errors.password %}<p class="error">{{ errors.password }}</p>{% endif %}
+    </div>
+    <div class="field {% if errors.password %}has-error{% endif %}">
+      <label for="password_confirm">Repetir contraseña</label>
+      <input id="password_confirm" name="password_confirm" type="text" minlength="8" maxlength="64" autocomplete="off" required>
+    </div>
+  </div>
+  {% else %}
+  <div class="field">
+    <label for="username">Usuario</label>
+    <input id="username" value="{{ values.username }}" disabled class="uppercase">
+    <p class="help">Para renovar la contraseña usa "Restablecer" en la lista de usuarios.</p>
+  </div>
+  {% endif %}
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">
+      {% if mode == 'create' %}Registrar médico{% else %}Guardar cambios{% endif %}
+    </button>
+    <a class="btn btn-quiet" href="/portal/usuarios">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

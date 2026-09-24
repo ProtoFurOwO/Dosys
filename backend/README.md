@@ -11,9 +11,12 @@ Backend académico con **FastAPI + SQLAlchemy async + Alembic + PostgreSQL** y u
 - **API REST** para la app Android: login, perfil, citas y consultas del paciente; lista de
   pacientes y registro de consultas para el médico.
 - **Portal clínico** (`/portal`) para el personal médico: acceso, listado y búsqueda de
-  pacientes, expediente con historial y formulario de nueva consulta.
+  pacientes, expediente con historial, nueva consulta, alta y edición de pacientes,
+  agenda de citas con QR, gestión de usuarios (médicos) y bitácora de actividad.
 - **Check-in con QR**: el portal muestra un código por cita y la app del paciente lo
   escanea con la cámara para confirmar su llegada.
+- **Registro de cuentas**: el médico da de alta pacientes y médicos; el sistema genera la
+  credencial (se muestra una vez, se puede imprimir y se simula su envío por correo).
 - PostgreSQL aislado, migraciones Alembic versionadas y bitácora de auditoría de todos
   los accesos, sin guardar tokens ni texto clínico.
 
@@ -45,15 +48,21 @@ Para detener los servicios sin borrar la base local: `docker compose down`.
 
 Abre `http://127.0.0.1:8000/portal` e inicia sesión con `medico` / `Medico123!`.
 
-1. **Pacientes**: buscador por nombre o CURP, métricas reales y acceso al expediente.
+1. **Pacientes**: buscador por nombre o CURP, métricas reales, alta de pacientes con
+   credencial de acceso (mostrar una vez, imprimir y envío simulado por correo) y edición
+   de sus datos.
 2. **Expediente**: datos del paciente e historial de consultas en orden cronológico.
 3. **Nueva consulta**: motivo, diagnóstico y notas; al guardar aparece en el expediente y
    en la app del paciente.
 4. **Agendar cita**: fecha, hora, especialidad y consultorio; el sistema genera un código
    de check-in único por cita.
 5. **Citas**: agenda con el QR de check-in y su código de respaldo.
+6. **Usuarios**: alta y edición de médicos, activar/desactivar cuentas y restablecer
+   contraseñas (siempre mostrando la credencial una vez).
+7. **Actividad**: bitácora en solo lectura con filtros por acción y usuario.
 
-Cada cita agendada desde el portal aparece también en la app del paciente.
+Cada cita agendada desde el portal aparece también en la app del paciente, y cada paciente
+registrado puede iniciar sesión de inmediato en la app con la credencial que se genera.
 
 Credenciales exclusivamente locales/de demostración:
 
@@ -68,7 +77,7 @@ Con los contenedores levantados:
 
 ```powershell
 py -3.12 scripts\verify_vertical_slice.py   # API: médico crea, paciente lee, RBAC 401/403
-py -3.12 scripts\verify_portal.py           # Portal: login, listado, consulta, validación
+py -3.12 scripts\verify_portal.py           # Portal: pacientes, consultas, citas, usuarios, credenciales y bitácora
 py -3.12 scripts\verify_checkin.py          # Check-in: código incorrecto 400, correcto 200 e idempotente
 ```
 
@@ -120,21 +129,25 @@ Swagger queda desactivado en producción (`DOCS_ENABLED=false`); el personal usa
 ## Seguridad: estado y pendientes
 
 **Ya implementado:** JWT de corta duración, contraseñas con Argon2, RBAC validado en
-servidor, bitácora de auditoría, HTTPS en producción, cookie del portal `HttpOnly` y
-`SameSite=Lax`, cabeceras de seguridad (CSP, X-Frame-Options), Swagger apagado en
-producción y PostgreSQL sin puertos públicos.
+servidor, bitácora de auditoría visible desde el portal, HTTPS en producción, cookie del
+portal `HttpOnly` y `SameSite=Lax`, cabeceras de seguridad (CSP, X-Frame-Options), Swagger
+apagado en producción, PostgreSQL sin puertos públicos, alta de cuentas con contraseña
+temporal mostrada una sola vez y gestión de usuarios restringida al rol médico.
 
 **Falta antes de usar datos reales:**
 
 1. **Acceso**
+   - Rol `admin` dedicado para la gestión de usuarios (hoy lo hace cualquier médico).
+   - Cambio obligatorio de contraseña en el primer inicio de sesión.
    - Refresh tokens con revocación y cierre de sesión por inactividad.
-   - Recuperación de contraseña, política de contraseñas y bloqueo por intentos fallidos.
+   - Recuperación de contraseña y bloqueo por intentos fallidos.
    - Segundo factor (MFA) para el personal médico.
    - Restringir el portal a red interna o VPN, como pide el análisis inicial.
    - Relación médico-paciente: hoy el médico ve a todos los pacientes del hospital.
 2. **Protección de datos**
    - Guardar el token en el celular con Android Keystore (hoy va en DataStore).
    - Cifrado en reposo de PostgreSQL y de los respaldos.
+   - Envío real de credenciales por correo (hoy es una simulación con vista previa).
    - Límite de peticiones (rate limiting) contra fuerza bruta en login y portal.
    - Token CSRF formal en el portal (hoy la cookie `SameSite=Lax` cubre lo básico).
    - Gestión de secretos con Vault/Doppler en lugar de archivos `.env`.

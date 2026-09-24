@@ -9,6 +9,7 @@ from sqlalchemy import text
 from app.api.router import api_router
 from app.core.config import settings
 from app.db.session import SessionLocal, engine
+from app.portal.admin import router as portal_admin_router
 from app.portal.routes import router as portal_router
 from app.schemas.health import HealthResponse
 from app.services.seed import seed_demo_data
@@ -46,6 +47,7 @@ app.add_middleware(
 
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 app.include_router(portal_router)
+app.include_router(portal_admin_router)
 app.mount(
     "/portal/static",
     StaticFiles(directory=str(Path(__file__).parent / "portal" / "static")),

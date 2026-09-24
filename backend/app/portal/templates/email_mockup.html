@@ -1,0 +1,32 @@
+{% extends "panel.html" %}
+{% block title %}Correo enviado · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <a class="back-link" href="{{ back_url }}">{{ back_label }}</a>
+    <h1>Correo enviado (simulación)</h1>
+    <p class="page-note">Vista previa del mensaje que recibiría {{ to }}. El envío quedó registrado en la bitácora.</p>
+  </div>
+</header>
+
+<article class="email-preview">
+  <div class="email-head">
+    <p><b>Para:</b> {{ to }}</p>
+    <p><b>De:</b> portal@dosys.mx</p>
+    <p><b>Asunto:</b> Tu acceso a D.O.S.Y.S</p>
+  </div>
+  <div class="email-body">
+    <p>Hola {{ person_name }}:</p>
+    <p>Tu cuenta del hospital ya está lista. Descarga la app D.O.S.Y.S e inicia sesión con estos datos:</p>
+    <ul>
+      <li>Usuario: <span class="code">{{ username }}</span></li>
+      <li>Contraseña temporal: <span class="code">{{ password }}</span></li>
+    </ul>
+    <p>Por seguridad, no compartas este mensaje y cambia la contraseña después de tu primer acceso.</p>
+  </div>
+  <p class="email-foot">
+    Esta instalación académica simula el envío del correo; en producción se conectará el proveedor
+    de correo del hospital.
+  </p>
+</article>
+{% endblock %}

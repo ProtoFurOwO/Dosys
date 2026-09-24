@@ -5,11 +5,10 @@ validado en el servidor en cada petición, y bitácora de todos los accesos.
 """
 
 from datetime import datetime, timezone
-from pathlib import Path
+import re
 
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,18 +22,22 @@ from app.models.enums import AppointmentStatus, UserRole
 from app.models.patient import Patient
 from app.models.user import User
 from app.portal import deps
+from app.portal.labels import ROLE_LABELS
 from app.portal.qr import qr_svg
+from app.portal.templating import credential_context, templates
 from app.services.appointments import create_appointment
 from app.services.audit import write_audit_event
 from app.services.consultations import create_consultation
+from app.services.users import (
+    CURP_PATTERN,
+    EMAIL_PATTERN,
+    USERNAME_PATTERN,
+    AccountError,
+    create_patient_account,
+    password_policy_error,
+)
 
 router = APIRouter(prefix="/portal", tags=["Portal clínico"], include_in_schema=False)
-
-templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
-templates.env.filters["fecha_hora"] = deps.format_datetime
-templates.env.filters["fecha"] = deps.format_date
-templates.env.filters["ultima_visita"] = deps.format_last_visit
-templates.env.filters["hora"] = deps.format_time
 
 REASON_MIN, REASON_MAX = 3, 300
 DIAGNOSIS_MIN, DIAGNOSIS_MAX = 3, 500
@@ -48,6 +51,8 @@ STATUS_LABELS = {
     AppointmentStatus.ATTENDED: "Atendida",
     AppointmentStatus.CANCELLED: "Cancelada",
 }
+
+BLOOD_TYPES = ("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")
 
 
 def login_redirect() -> RedirectResponse:
@@ -215,7 +220,7 @@ async def dashboard(
     )
 
 
-@router.get("/pacientes/{patient_id}", response_class=HTMLResponse)
+@router.get("/pacientes/{patient_id:int}", response_class=HTMLResponse)
 async def patient_detail(
     patient_id: int,
     request: Request,
@@ -343,10 +348,303 @@ async def appointments_page(
     )
 
 
+# ── Registro y edición de pacientes ──────────────────────────────────────────
+
+
+def patient_form_context(
+    doctor_name: str,
+    *,
+    mode: str,
+    patient: Patient | None,
+    values: dict,
+    errors: dict,
+) -> dict:
+    return {
+        "doctor_name": doctor_name,
+        "active": "pacientes",
+        "mode": mode,
+        "patient": patient,
+        "values": values,
+        "errors": errors,
+        "blood_types": BLOOD_TYPES,
+    }
+
+
+@router.get("/pacientes/nuevo", response_class=HTMLResponse)
+async def patient_new_page(request: Request, db: AsyncSession = Depends(get_db)) -> HTMLResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await doctor_profile(db, user)
+    if doctor is None:
+        return login_redirect()
+
+    return templates.TemplateResponse(
+        request,
+        "patient_form.html",
+        patient_form_context(
+            doctor.full_name,
+            mode="create",
+            patient=None,
+            values={
+                "full_name": "",
+                "curp": "",
+                "birth_date": "",
+                "blood_type": "",
+                "emergency_contact": "",
+                "email": "",
+                "username": "",
+            },
+            errors={},
+        ),
+    )
+
+
+@router.post("/pacientes/nuevo", response_class=HTMLResponse)
+async def patient_new_submit(
+    request: Request,
+    full_name: str = Form(""),
+    curp: str = Form(""),
+    birth_date: str = Form(""),
+    blood_type: str = Form(""),
+    emergency_contact: str = Form(""),
+    email: str = Form(""),
+    username: str = Form(""),
+    password: str = Form(""),
+    password_confirm: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await doctor_profile(db, user)
+    if doctor is None:
+        return login_redirect()
+
+    values = {
+        "full_name": full_name.strip(),
+        "curp": curp.strip().upper(),
+        "birth_date": birth_date.strip(),
+        "blood_type": blood_type.strip().upper(),
+        "emergency_contact": emergency_contact.strip(),
+        "email": email.strip().lower(),
+        "username": username.strip().lower(),
+    }
+    errors: dict[str, str] = {}
+    parsed_birth = None
+
+    if not 5 <= len(values["full_name"]) <= 160:
+        errors["full_name"] = "Escribe el nombre completo (mínimo 5 caracteres)."
+    if not CURP_PATTERN.match(values["curp"]):
+        errors["curp"] = "La CURP debe tener 18 caracteres con el formato oficial (ej. MAAJ010415HCSRRN09)."
+    if values["birth_date"]:
+        try:
+            parsed_birth = datetime.strptime(values["birth_date"], "%Y-%m-%d").date()
+            if parsed_birth >= deps.clinic_now().date():
+                errors["birth_date"] = "La fecha de nacimiento debe ser anterior a hoy."
+        except ValueError:
+            errors["birth_date"] = "Elige una fecha válida."
+    if values["blood_type"] and values["blood_type"] not in BLOOD_TYPES:
+        errors["blood_type"] = "Elige un tipo de sangre de la lista."
+    if len(values["emergency_contact"]) > 160:
+        errors["emergency_contact"] = "El contacto de emergencia es demasiado largo."
+    if values["email"] and not EMAIL_PATTERN.match(values["email"]):
+        errors["email"] = "Escribe un correo válido."
+    if not USERNAME_PATTERN.match(values["username"]):
+        errors["username"] = (
+            "El usuario debe tener entre 3 y 64 caracteres: letras minúsculas, números, punto, guion o guion bajo."
+        )
+    password_error = password_policy_error(password, password_confirm)
+    if password_error:
+        errors["password"] = password_error
+
+    if errors:
+        return templates.TemplateResponse(
+            request,
+            "patient_form.html",
+            patient_form_context(doctor.full_name, mode="create", patient=None, values=values, errors=errors),
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    try:
+        account, patient = await create_patient_account(
+            db,
+            full_name=values["full_name"],
+            curp=values["curp"],
+            birth_date=parsed_birth,
+            blood_type=values["blood_type"] or None,
+            emergency_contact=values["emergency_contact"] or None,
+            email=values["email"] or None,
+            username=values["username"],
+            password=password,
+        )
+    except AccountError as error:
+        errors["general"] = str(error)
+        return templates.TemplateResponse(
+            request,
+            "patient_form.html",
+            patient_form_context(doctor.full_name, mode="create", patient=None, values=values, errors=errors),
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    await write_audit_event(
+        db,
+        user=user,
+        action="portal_create_patient",
+        entity_type="patient",
+        entity_id=patient.id,
+        request=request,
+        detail=f"username={account.username}",
+    )
+    await db.commit()
+
+    return templates.TemplateResponse(
+        request,
+        "credential.html",
+        credential_context(
+            doctor_name=doctor.full_name,
+            person_name=patient.full_name,
+            role_label=ROLE_LABELS[UserRole.PATIENT],
+            username=account.username,
+            password=password,
+            email=patient.email,
+            user_id=account.id,
+            back_url=f"/portal/pacientes/{patient.id}",
+            back_label="Ir al expediente del paciente",
+        ),
+        status_code=status.HTTP_201_CREATED,
+    )
+
+
+@router.get("/pacientes/{patient_id:int}/editar", response_class=HTMLResponse)
+async def patient_edit_page(
+    patient_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await doctor_profile(db, user)
+    if doctor is None:
+        return login_redirect()
+
+    patient = await db.get(Patient, patient_id)
+    if patient is None:
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": doctor.full_name}, status_code=status.HTTP_404_NOT_FOUND
+        )
+
+    account = await db.scalar(select(User).where(User.id == patient.user_id))
+    return templates.TemplateResponse(
+        request,
+        "patient_form.html",
+        patient_form_context(
+            doctor.full_name,
+            mode="edit",
+            patient=patient,
+            values={
+                "full_name": patient.full_name,
+                "curp": patient.curp,
+                "birth_date": patient.birth_date.isoformat() if patient.birth_date else "",
+                "blood_type": patient.blood_type or "",
+                "emergency_contact": patient.emergency_contact or "",
+                "email": patient.email or "",
+                "username": account.username if account else "",
+            },
+            errors={},
+        ),
+    )
+
+
+@router.post("/pacientes/{patient_id:int}/editar", response_class=HTMLResponse)
+async def patient_edit_submit(
+    patient_id: int,
+    request: Request,
+    full_name: str = Form(""),
+    birth_date: str = Form(""),
+    blood_type: str = Form(""),
+    emergency_contact: str = Form(""),
+    email: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await doctor_profile(db, user)
+    if doctor is None:
+        return login_redirect()
+
+    patient = await db.get(Patient, patient_id)
+    if patient is None:
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": doctor.full_name}, status_code=status.HTTP_404_NOT_FOUND
+        )
+
+    account = await db.scalar(select(User).where(User.id == patient.user_id))
+    values = {
+        "full_name": full_name.strip(),
+        "curp": patient.curp,
+        "birth_date": birth_date.strip(),
+        "blood_type": blood_type.strip().upper(),
+        "emergency_contact": emergency_contact.strip(),
+        "email": email.strip().lower(),
+        "username": account.username if account else "",
+    }
+    errors: dict[str, str] = {}
+    parsed_birth = None
+
+    if not 5 <= len(values["full_name"]) <= 160:
+        errors["full_name"] = "Escribe el nombre completo (mínimo 5 caracteres)."
+    if values["birth_date"]:
+        try:
+            parsed_birth = datetime.strptime(values["birth_date"], "%Y-%m-%d").date()
+            if parsed_birth >= deps.clinic_now().date():
+                errors["birth_date"] = "La fecha de nacimiento debe ser anterior a hoy."
+        except ValueError:
+            errors["birth_date"] = "Elige una fecha válida."
+    if values["blood_type"] and values["blood_type"] not in BLOOD_TYPES:
+        errors["blood_type"] = "Elige un tipo de sangre de la lista."
+    if len(values["emergency_contact"]) > 160:
+        errors["emergency_contact"] = "El contacto de emergencia es demasiado largo."
+    if values["email"] and not EMAIL_PATTERN.match(values["email"]):
+        errors["email"] = "Escribe un correo válido."
+
+    if errors:
+        return templates.TemplateResponse(
+            request,
+            "patient_form.html",
+            patient_form_context(doctor.full_name, mode="edit", patient=patient, values=values, errors=errors),
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    patient.full_name = values["full_name"]
+    patient.birth_date = parsed_birth
+    patient.blood_type = values["blood_type"] or None
+    patient.emergency_contact = values["emergency_contact"] or None
+    patient.email = values["email"] or None
+    await db.flush()
+
+    await write_audit_event(
+        db,
+        user=user,
+        action="portal_update_patient",
+        entity_type="patient",
+        entity_id=patient.id,
+        request=request,
+    )
+    await db.commit()
+
+    return RedirectResponse(
+        f"/portal/pacientes/{patient.id}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
 # ── Agendar cita ──────────────────────────────────────────────────────────────
 
 
-@router.get("/pacientes/{patient_id}/cita", response_class=HTMLResponse)
+@router.get("/pacientes/{patient_id:int}/cita", response_class=HTMLResponse)
 async def appointment_page(
     patient_id: int,
     request: Request,
@@ -384,7 +682,7 @@ async def appointment_page(
     )
 
 
-@router.post("/pacientes/{patient_id}/cita", response_class=HTMLResponse)
+@router.post("/pacientes/{patient_id:int}/cita", response_class=HTMLResponse)
 async def appointment_submit(
     patient_id: int,
     request: Request,
@@ -486,7 +784,7 @@ async def appointment_submit(
 # ── Consultas ─────────────────────────────────────────────────────────────────
 
 
-@router.get("/pacientes/{patient_id}/consulta", response_class=HTMLResponse)
+@router.get("/pacientes/{patient_id:int}/consulta", response_class=HTMLResponse)
 async def consultation_page(
     patient_id: int,
     request: Request,
@@ -518,7 +816,7 @@ async def consultation_page(
     )
 
 
-@router.post("/pacientes/{patient_id}/consulta", response_class=HTMLResponse)
+@router.post("/pacientes/{patient_id:int}/consulta", response_class=HTMLResponse)
 async def consultation_submit(
     patient_id: int,
     request: Request,

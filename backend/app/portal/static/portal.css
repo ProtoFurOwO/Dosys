@@ -481,6 +481,7 @@ a {
 
 .field input,
 .field textarea,
+.field select,
 .search-row input {
   display: block;
   width: 100%;
@@ -493,13 +494,23 @@ a {
   padding: 10px 12px;
 }
 
-.field textarea {
-  resize: vertical;
-  min-height: 84px;
+.field select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-muted) 50%),
+    linear-gradient(135deg, var(--ink-muted) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.field input:disabled {
+  background: var(--canvas);
+  color: var(--ink-muted);
 }
 
 .field input:focus,
 .field textarea:focus,
+.field select:focus,
 .search-row input:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
@@ -528,6 +539,187 @@ a {
   align-items: center;
   gap: 10px;
   padding-top: 6px;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.uppercase {
+  text-transform: uppercase;
+}
+
+.page-cta {
+  margin-top: 14px;
+}
+
+.row-sub {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.row-actions form {
+  display: inline;
+}
+
+.filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.filters .field {
+  margin-bottom: 0;
+  min-width: 220px;
+}
+
+.filters-actions {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 1px;
+}
+
+/* ── Credencial de acceso ──────────────────────────────────────────────────── */
+
+.credential {
+  max-width: 520px;
+  padding: 26px 28px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.credential-brand {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.credential-name {
+  margin: 12px 0 0;
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.credential-role {
+  margin: 4px 0 18px;
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+}
+
+.credential-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.credential-fields dt {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+.credential-fields dd {
+  margin: 4px 0 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.credential-note {
+  margin: 20px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+}
+
+.credential-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+  max-width: 520px;
+  margin-top: 20px;
+}
+
+.credential-mail {
+  flex: 1;
+  min-width: 260px;
+}
+
+.credential-mail .help {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+/* ── Correo simulado ───────────────────────────────────────────────────────── */
+
+.email-preview {
+  max-width: 620px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.email-head {
+  padding: 16px 22px;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--line);
+}
+
+.email-head p {
+  margin: 2px 0;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.email-body {
+  padding: 22px;
+  font-size: 0.9375rem;
+}
+
+.email-body p {
+  margin: 0 0 12px;
+}
+
+.email-body ul {
+  margin: 0 0 14px;
+  padding-left: 20px;
+}
+
+.email-body li {
+  margin-bottom: 6px;
+}
+
+.email-foot {
+  margin: 0;
+  padding: 14px 22px;
+  border-top: 1px solid var(--line);
+  background: var(--canvas);
+  font-size: 0.75rem;
+  color: var(--ink-muted);
 }
 
 /* ── Avisos ────────────────────────────────────────────────────────────────── */
@@ -940,5 +1132,36 @@ body.login {
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
+  }
+}
+
+/* ── Impresión: la credencial sale limpia en una hoja ──────────────────────── */
+
+@media print {
+  .rail,
+  .page-head,
+  .credential-actions,
+  .note,
+  .filters {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  .shell {
+    display: block;
+    min-height: auto;
+  }
+
+  .content {
+    max-width: none;
+    padding: 0;
+  }
+
+  .credential {
+    max-width: none;
+    border: 1px solid #6a7871;
   }
 }

@@ -134,6 +134,119 @@ def main() -> None:
     )
     assert status == 422 and "futuras" in html, "El portal debe rechazar citas en el pasado"
 
+    def find_user_id(html: str, username: str) -> int:
+        for row in html.split("<tr>"):
+            if username in row:
+                match = re.search(r"/portal/usuarios/(\d+)/editar", row)
+                if match:
+                    return int(match.group(1))
+        raise AssertionError("No encontramos el usuario en la lista")
+
+    # 8. Registrar un paciente y probar que entra a la app con la credencial.
+    suffix = datetime.now().strftime("%H%M%S")
+    patient_username = f"prueba_pac_{suffix}"
+    patient_password = "Prueba1234"
+    status, html = form_request(
+        opener,
+        "/portal/pacientes/nuevo",
+        {
+            "full_name": "Paciente de Prueba",
+            "curp": f"TEST{suffix}HCSRRN09",
+            "birth_date": "2000-01-15",
+            "blood_type": "O+",
+            "emergency_contact": "Contacto de prueba 961 000 0000",
+            "email": f"{patient_username}@correo.com",
+            "username": patient_username,
+            "password": patient_password,
+            "password_confirm": patient_password,
+        },
+    )
+    assert status == 201 and patient_username in html and patient_password in html, "Debe mostrarse la credencial"
+
+    status, html = form_request(
+        opener,
+        "/portal/credencial/correo",
+        {
+            "user_id": "0",
+            "person_name": "Paciente de Prueba",
+            "role_label": "Paciente",
+            "username": patient_username,
+            "password": patient_password,
+            "email": f"{patient_username}@correo.com",
+            "back_url": "/portal",
+            "back_label": "Volver",
+        },
+    )
+    assert status == 200 and "Correo enviado" in html, "El envío simulado debe mostrar la vista previa"
+
+    status, login = api(
+        "/api/v1/auth/login", method="POST", body={"username": patient_username, "password": patient_password}
+    )
+    assert status == 200 and login["role"] == "patient", "El paciente registrado debe entrar a la app"
+    status, profile = api("/api/v1/patients/me", token=login["access_token"])
+    assert status == 200 and profile["full_name"] == "Paciente de Prueba", "La app debe ver su perfil nuevo"
+
+    # 9. Registrar un médico, desactivarlo y restablecer su contraseña.
+    doctor_username = f"prueba_med_{suffix}"
+    status, html = form_request(
+        opener,
+        "/portal/usuarios/nuevo",
+        {
+            "full_name": "Dra. Prueba Sánchez",
+            "specialty": "Pediatría",
+            "username": doctor_username,
+            "password": patient_password,
+            "password_confirm": patient_password,
+        },
+    )
+    assert status == 201 and doctor_username in html, "Debe mostrarse la credencial del médico"
+
+    status, html = get(opener, "/portal/usuarios")
+    assert status == 200 and "Pediatría" in html, "El médico nuevo debe aparecer en la lista"
+    doctor_user_id = find_user_id(html, doctor_username)
+
+    status, login = api(
+        "/api/v1/auth/login", method="POST", body={"username": doctor_username, "password": patient_password}
+    )
+    assert status == 200 and login["role"] == "doctor", "El médico nuevo debe entrar a la API"
+
+    status, _ = form_request(opener, f"/portal/usuarios/{doctor_user_id}/estado", {})
+    try:
+        api("/api/v1/auth/login", method="POST", body={"username": doctor_username, "password": patient_password})
+        raise AssertionError("Un usuario desactivado no debe poder entrar")
+    except HTTPError as error:
+        assert error.code == 401
+
+    status, _ = form_request(opener, f"/portal/usuarios/{doctor_user_id}/estado", {})
+    status, login = api(
+        "/api/v1/auth/login", method="POST", body={"username": doctor_username, "password": patient_password}
+    )
+    assert status == 200, "Al reactivarlo debe poder entrar otra vez"
+
+    status, html = form_request(opener, f"/portal/usuarios/{doctor_user_id}/reset", {})
+    assert status == 200, "El restablecimiento debe mostrar la credencial nueva"
+    match = re.search(r'id="credential-password">([A-Za-z0-9]+)<', html)
+    assert match, "La credencial debe traer la contraseña nueva"
+    new_password = match.group(1)
+
+    status, login = api("/api/v1/auth/login", method="POST", body={"username": doctor_username, "password": new_password})
+    assert status == 200, "Debe entrar con la contraseña restablecida"
+
+    # 10. Editar datos y revisar la bitácora.
+    status, html = form_request(
+        opener,
+        f"/portal/usuarios/{doctor_user_id}/editar",
+        {"full_name": "Dra. Prueba Sánchez", "specialty": "Pediatría General"},
+    )
+    assert status == 200 and "Pediatría General" in html, "La edición del médico debe guardarse"
+
+    status, html = get(opener, "/portal/actividad")
+    assert status == 200 and "Paciente registrado" in html, "La bitácora debe mostrar el registro del paciente"
+    assert "Usuario desactivado" in html and "Contraseña restablecida" in html, "La bitácora debe registrar los cambios"
+
+    status, html = get(opener, "/portal/actividad?accion=medico")
+    assert status == 200 and "Médico registrado" in html, "El filtro de la bitácora debe funcionar"
+
     # 11. Cierre de sesión.
     status, html = form_request(opener, "/portal/salir", {})
     assert "Inicia sesión" in html, "Cerrar sesión debe regresar al acceso"
@@ -146,6 +259,12 @@ def main() -> None:
                 "consultation_marker": marker,
                 "appointment_created": "Cardiología",
                 "appointment_visible_para_paciente": True,
+                "patient_registered": patient_username,
+                "patient_login_en_app": True,
+                "doctor_registered": doctor_username,
+                "doctor_deactivated_blocked": 401,
+                "password_reset_ok": True,
+                "audit_view": True,
                 "invalid_credentials": 401,
                 "patient_role_denied": 403,
                 "form_validation": 422,

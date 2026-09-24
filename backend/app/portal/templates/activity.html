@@ -1,0 +1,61 @@
+{% extends "panel.html" %}
+{% block title %}Actividad · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Actividad</h1>
+    <p class="page-note">Bitácora del sistema: quién accedió a qué y cuándo. Solo lectura.</p>
+  </div>
+</header>
+
+<form class="filters" method="get" action="/portal/actividad">
+  <div class="field">
+    <label for="accion">Acción</label>
+    <input id="accion" name="accion" value="{{ accion }}" placeholder="Ej. Paciente registrado">
+  </div>
+  <div class="field">
+    <label for="usuario">Usuario</label>
+    <input id="usuario" name="usuario" value="{{ usuario }}" placeholder="Ej. medico">
+  </div>
+  <div class="filters-actions">
+    <button class="btn btn-line" type="submit">Filtrar</button>
+    <a class="btn btn-quiet" href="/portal/actividad">Limpiar</a>
+  </div>
+</form>
+
+{% if entries %}
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th scope="col">Fecha</th>
+        <th scope="col">Usuario</th>
+        <th scope="col">Acción</th>
+        <th scope="col" class="hide-sm">Entidad</th>
+        <th scope="col" class="hide-sm">IP</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in entries %}
+      <tr>
+        <td class="nowrap">{{ entry.created_at | fecha_hora }}</td>
+        <td class="code">{{ entry.username }}</td>
+        <td>
+          {{ entry.label }}
+          {% if entry.detail %}<span class="row-sub">{{ entry.detail }}</span>{% endif %}
+        </td>
+        <td class="hide-sm">{{ entry.entity_type }}{% if entry.entity_id %} #{{ entry.entity_id }}{% endif %}</td>
+        <td class="hide-sm code">{{ entry.ip }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  <p class="empty-title">Sin actividad para ese filtro</p>
+  <p>Prueba con otra palabra o limpia el filtro para ver los últimos movimientos.</p>
+  <a class="btn btn-line" href="/portal/actividad">Limpiar filtros</a>
+</div>
+{% endif %}
+{% endblock %}

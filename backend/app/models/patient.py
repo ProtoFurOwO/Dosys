@@ -24,6 +24,7 @@ class Patient(Base):
     blood_type: Mapped[str | None] = mapped_column(String(3), nullable=True)
     birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     emergency_contact: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(160), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="patient")
     consultations: Mapped[list[Consultation]] = relationship(back_populates="patient")
