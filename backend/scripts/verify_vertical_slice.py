@@ -47,6 +47,8 @@ def main() -> None:
     doctor = login("medico", "Medico123!")
     _, patients = request("/api/v1/doctor/patients", token=doctor["access_token"])
     assert patients, "La semilla debe incluir un paciente ficticio"
+    # El paciente sembrado puede no ser el primero de la lista si hay más registros.
+    target = next((item for item in patients if item["full_name"] == "José Antonio Matuz"), patients[0])
 
     marker = f"VALIDACION-E2E-{datetime.now():%Y%m%d%H%M%S}"
     created_status, created = request(
@@ -54,7 +56,7 @@ def main() -> None:
         method="POST",
         token=doctor["access_token"],
         body={
-            "patient_id": patients[0]["id"],
+            "patient_id": target["id"],
             "reason": marker,
             "diagnosis": "Consulta registrada por la prueba de aceptación",
             "notes": "Dato ficticio de validación local.",
