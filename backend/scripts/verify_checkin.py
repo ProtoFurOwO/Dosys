@@ -13,13 +13,16 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 BASE_URL = os.getenv("DOSYS_API_URL", "http://127.0.0.1:8000").rstrip("/")
+USER_AGENT = "D.O.S.Y.S/1.0 (verificacion academica)"
 PATIENT = {"username": "paciente", "password": "Paciente123!"}
 EXPECTED_CODE = "A7K9M2"
 
 
 def request(path: str, *, method: str = "GET", body: dict | None = None, token: str | None = None):
     data = json.dumps(body, ensure_ascii=False).encode("utf-8") if body is not None else None
-    headers = {"Content-Type": "application/json"} if data else {}
+    headers = {"User-Agent": USER_AGENT}
+    if data:
+        headers["Content-Type"] = "application/json"
     if token:
         headers["Authorization"] = f"Bearer {token}"
     http_request = Request(f"{BASE_URL}{path}", data=data, headers=headers, method=method)
