@@ -181,6 +181,16 @@ def main() -> None:
     status, status_body = api("/api/v1/auth/2fa/status", token=recovered["access_token"])
     assert status_body["recovery_codes_remaining"] == 7, "Debe quedar un código de recuperación menos"
 
+    # 8. Reinicio del 2FA desde el expediente (soporte: perdió teléfono y códigos).
+    status, body_text = portal_request(portal, f"/portal/pacientes/{patient_id}/reiniciar-2fa", {})
+    assert status == 200, f"el reinicio de 2FA respondio {status}: {body_text[:120]}"
+
+    status, login = api("/api/v1/auth/login", method="POST", body={"username": username, "password": password})
+    assert status == 200 and "access_token" in login, "Tras reiniciar el 2FA debe entrar solo con la contraseña"
+
+    status, status_body = api("/api/v1/auth/2fa/status", token=login["access_token"])
+    assert status_body["enabled"] is False, "El 2FA debe quedar apagado tras el reinicio"
+
     print(
         json.dumps(
             {
@@ -192,6 +202,7 @@ def main() -> None:
                 "codigo_incorrecto": 401,
                 "codigo_recuperacion_un_solo_uso": True,
                 "recovery_codes_restantes": status_body["recovery_codes_remaining"],
+                "reset_2fa_por_soporte": True,
             },
             ensure_ascii=False,
         )

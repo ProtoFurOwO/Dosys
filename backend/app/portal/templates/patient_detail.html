@@ -36,6 +36,19 @@
 </div>
 {% endif %}
 
+{% if totp_enabled %}
+<div class="note note-info" role="status">
+  <p>Este paciente tiene activado el segundo factor (2FA).</p>
+  <p class="note-sub">
+    Si perdió su teléfono y sus códigos de recuperación, reinícialo aquí: podrá entrar de nuevo
+    y activarlo desde la app.
+  </p>
+  <form method="post" action="/portal/pacientes/{{ patient.id }}/reiniciar-2fa" class="note-action">
+    <button class="btn btn-line" type="submit">Reiniciar 2FA</button>
+  </form>
+</div>
+{% endif %}
+
 <section class="chart">
   <h2 class="section-title">Historial de consultas</h2>
 

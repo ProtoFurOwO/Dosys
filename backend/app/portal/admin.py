@@ -15,7 +15,7 @@ from app.models.user import User
 from app.portal import deps
 from app.portal.labels import ROLE_LABELS, action_label
 from app.portal.templating import credential_context, templates
-from app.services import login_security
+from app.services import login_security, two_factor
 from app.services.audit import write_audit_event
 from app.services.users import (
     EMAIL_PATTERN,
@@ -372,6 +372,36 @@ async def user_unlock(
         db,
         user=current_user,
         action="account_unlocked",
+        entity_type="user",
+        entity_id=account.id,
+        request=request,
+        detail=f"username={account.username}",
+    )
+    await db.commit()
+    return users_redirect()
+
+
+@router.post("/usuarios/{user_id:int}/reset-2fa")
+async def user_reset_two_factor(
+    user_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Apaga el segundo factor de otra cuenta (soporte: perdió el teléfono y los códigos)."""
+    session = await require_staff(request, db)
+    if session is None:
+        return login_redirect()
+    current_user, _ = session
+
+    account = await db.get(User, user_id)
+    if account is None:
+        return users_redirect("no-encontrado")
+
+    await two_factor.clear_two_factor(db, account)
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="portal_reset_two_factor",
         entity_type="user",
         entity_id=account.id,
         request=request,

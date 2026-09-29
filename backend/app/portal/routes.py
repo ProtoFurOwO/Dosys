@@ -615,6 +615,7 @@ async def patient_detail(
             "created": created,
             "locked": login_security.is_locked(account) if account else False,
             "lock_minutes": login_security.lock_minutes_left(account) if account else 0,
+            "totp_enabled": bool(account.totp_enabled) if account else False,
         },
     )
 
@@ -641,6 +642,38 @@ async def patient_unlock(
             db,
             user=user,
             action="account_unlocked",
+            entity_type="user",
+            entity_id=account.id,
+            request=request,
+            detail=f"username={account.username}",
+        )
+        await db.commit()
+
+    return RedirectResponse(f"/portal/pacientes/{patient.id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/pacientes/{patient_id:int}/reiniciar-2fa")
+async def patient_reset_two_factor(
+    patient_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Apaga el 2FA del paciente (soporte: perdió el teléfono y sus códigos de recuperación)."""
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+
+    patient = await db.get(Patient, patient_id)
+    if patient is None:
+        return RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER)
+
+    account = await db.scalar(select(User).where(User.id == patient.user_id))
+    if account is not None:
+        await two_factor.clear_two_factor(db, account)
+        await write_audit_event(
+            db,
+            user=user,
+            action="portal_reset_two_factor",
             entity_type="user",
             entity_id=account.id,
             request=request,

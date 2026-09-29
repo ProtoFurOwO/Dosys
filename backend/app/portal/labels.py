@@ -39,6 +39,7 @@ ACTION_LABELS = {
     "login_2fa_failed": "Segundo factor incorrecto",
     "two_factor_enabled": "Segundo factor activado",
     "two_factor_disabled": "Segundo factor desactivado",
+    "portal_reset_two_factor": "Segundo factor reiniciado (soporte)",
     "recovery_code_used": "Código de recuperación usado",
 }
 
