@@ -42,9 +42,16 @@
         <td class="code">{{ entry.username }}</td>
         <td>
           {{ entry.label }}
-          {% if entry.detail %}<span class="row-sub">{{ entry.detail }}</span>{% endif %}
+          {% set pairs = entry.detail | detalle %}
+          {% if pairs %}
+          <span class="detail-pairs">
+            {% for key, value in pairs %}
+            <span>{% if key %}<b>{{ key }}:</b> {% endif %}{{ value }}</span>
+            {% endfor %}
+          </span>
+          {% endif %}
         </td>
-        <td class="hide-sm">{{ entry.entity_type }}{% if entry.entity_id %} #{{ entry.entity_id }}{% endif %}</td>
+        <td class="hide-sm">{{ entry.entity_type | entidad(entry.entity_id) }}</td>
         <td class="hide-sm code">{{ entry.ip }}</td>
       </tr>
       {% endfor %}

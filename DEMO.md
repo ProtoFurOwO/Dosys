@@ -55,7 +55,8 @@ Demostración de 7 a 10 minutos con dos dispositivos: **laptop** (portal clínic
 ### 4. Agendar la cita con QR (30 s)
 
 - En el expediente o en **Citas**: **Agendar cita** (Cardiología, mañana 11:30).
-- Al guardar, el portal muestra la cita con **su QR de check-in** y el código de respaldo.
+- Vuelve a **Citas**, busca al paciente y pulsa **Ver QR**: se abre el código a pantalla
+  grande con su código de respaldo.
 
 ### 5. La app con la cuenta recién creada (1 min)
 

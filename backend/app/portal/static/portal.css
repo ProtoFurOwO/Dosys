@@ -387,6 +387,29 @@ a {
   background: #fafbfa;
 }
 
+.table tbody tr:nth-child(even) {
+  background: #fcfdfc;
+}
+
+.table tbody tr:nth-child(even):hover {
+  background: #f8faf9;
+}
+
+.chip-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.col-role {
+  width: 200px;
+}
+
+.col-small {
+  width: 130px;
+}
+
 .table .col-action {
   text-align: right;
 }
@@ -651,6 +674,10 @@ a {
   letter-spacing: 0;
   word-break: break-all;
   line-height: 1.5;
+}
+
+.credential-fields.one-column {
+  grid-template-columns: 1fr;
 }
 
 .document-form {
@@ -1069,6 +1096,27 @@ body.login {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   padding: 6px 8px;
+  min-width: 132px;
+}
+
+.role-form .btn-inline {
+  padding: 5px 8px;
+}
+
+.detail-pairs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.detail-pairs span {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.detail-pairs b {
+  font-weight: 600;
+  color: var(--ink-muted);
 }
 
 .permissions {
@@ -1161,6 +1209,50 @@ body.login {
 .login-cancel {
   margin-top: 16px;
   text-align: center;
+}
+
+/* ── Check-in a pantalla completa ──────────────────────────────────────────── */
+
+.checkin-panel {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 36px;
+  align-items: center;
+  max-width: 820px;
+  padding: 28px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.qr-large {
+  width: 320px;
+  height: 320px;
+  padding: 16px;
+}
+
+.checkin-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.checkin-help {
+  margin: 10px 0 0;
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+}
+
+.checkin-code {
+  margin: 16px 0 0;
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+}
+
+.checkin-code strong {
+  font-size: 1.375rem;
+  letter-spacing: 0.12em;
+  color: var(--ink);
 }
 
 /* ── Responsive ────────────────────────────────────────────────────────────── */
@@ -1260,6 +1352,17 @@ body.login {
 
   .security-setup {
     grid-template-columns: 1fr;
+  }
+
+  .checkin-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .qr-large {
+    width: 100%;
+    max-width: 320px;
+    height: auto;
+    aspect-ratio: 1;
   }
 }
 

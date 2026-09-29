@@ -1,0 +1,43 @@
+{% extends "panel.html" %}
+{% block title %}Check-in de {{ patient.full_name }} · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <a class="back-link" href="/portal/citas">Volver a citas</a>
+    <h1>{{ patient.full_name }}</h1>
+    <p class="meta-row">
+      <span><b>CURP</b> {{ patient.curp }}</span>
+      <span><b>Cita</b> {{ appointment.scheduled_at | fecha_hora }}</span>
+      <span><b>Servicio</b> {{ appointment.specialty }}{% if attending %}, {{ attending.full_name }}{% endif %}</span>
+      <span><b>Lugar</b> {{ appointment.location }}</span>
+    </p>
+  </div>
+  <span class="chip chip-confirmed">{{ status_label }}</span>
+</header>
+
+{% if appointment.checked_in_at %}
+<div class="note note-ok" role="status">
+  <p>Este paciente ya confirmó su llegada a las {{ appointment.checked_in_at | hora }}.</p>
+</div>
+{% endif %}
+
+<div class="checkin-panel">
+  {% if qr_svg %}
+  <div class="qr qr-large">{{ qr_svg | safe }}</div>
+  <div class="checkin-info">
+    <p class="checkin-title">Código de check-in</p>
+    <p class="checkin-help">
+      Pídele al paciente que lo escanee con la app desde <strong>Check-in con QR</strong>.
+    </p>
+    <p class="checkin-code">Código de respaldo: <strong>{{ checkin_code }}</strong></p>
+    {% if appointment.checked_in_at %}
+    <p class="checkin-help">Llegada confirmada a las {{ appointment.checked_in_at | fecha_hora }}.</p>
+    {% else %}
+    <p class="checkin-help">Aún no confirma su llegada.</p>
+    {% endif %}
+  </div>
+  {% else %}
+  <p class="page-note">Esta cita no tiene check-in habilitado.</p>
+  {% endif %}
+</div>
+{% endblock %}

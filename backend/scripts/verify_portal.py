@@ -163,8 +163,11 @@ def main() -> None:
             "notes": "Acude con ayuno de 8 horas.",
         },
     )
-    assert status == 200 and "Cita agendada" in html and "Cardiología" in html, "La cita debe aparecer en el portal"
-    assert "qr" in html.lower(), "La cita nueva debe mostrar su QR de check-in"
+    assert status == 200 and "Cita agendada" in html, "La cita debe registrarse en el portal"
+    match = re.search(r'href="/portal/citas/(\d+)"', html)
+    assert match, "La lista debe ofrecer el botón Ver QR"
+    status, qr_html = get(opener, f"/portal/citas/{match.group(1)}")
+    assert status == 200 and "Código de check-in" in qr_html and "Código de respaldo" in qr_html, "El QR debe verse"
 
     # 9. El paciente ve la cita desde la API de la app.
     _, patient_login = api("/api/v1/auth/login", method="POST", body=PATIENT)

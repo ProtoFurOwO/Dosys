@@ -53,17 +53,19 @@
           </form>
         </td>
         <td>
-          {% if person.active %}
-          <span class="chip chip-confirmed">Activo</span>
-          {% else %}
-          <span class="chip chip-cancelled">Inactivo</span>
-          {% endif %}
-          {% if person.totp_enabled %}
-          <span class="chip chip-done">2FA</span>
-          {% endif %}
-          {% if person.locked %}
-          <span class="chip chip-cancelled">Bloqueada {{ person.lock_minutes }} min</span>
-          {% endif %}
+          <span class="chip-row">
+            {% if person.active %}
+            <span class="chip chip-confirmed">Activo</span>
+            {% else %}
+            <span class="chip chip-cancelled">Inactivo</span>
+            {% endif %}
+            {% if person.totp_enabled %}
+            <span class="chip chip-done">2FA</span>
+            {% endif %}
+            {% if person.locked %}
+            <span class="chip chip-cancelled">Bloqueada {{ person.lock_minutes }} min</span>
+            {% endif %}
+          </span>
         </td>
         <td class="hide-sm nowrap">{{ person.last_access | fecha_hora }}</td>
         <td class="col-action">

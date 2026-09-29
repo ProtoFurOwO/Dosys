@@ -1,50 +1,79 @@
 {% extends "panel.html" %}
 {% block title %}Citas · D.O.S.Y.S Portal clínico{% endblock %}
 {% block content %}
+{% set perms = request.state.permissions or [] %}
 <header class="page-head">
   <div>
     <h1>Citas</h1>
-    <p class="page-note">Agenda del hospital y código de check-in para recibir al paciente.</p>
+    <p class="page-note">Busca al paciente para mostrar su código de check-in o agendarle una cita.</p>
   </div>
+  <form class="search" method="get" action="/portal/citas">
+    <label class="field-label" for="buscar">Buscar por nombre o CURP</label>
+    <div class="search-row">
+      <input id="buscar" name="q" value="{{ search }}" autocomplete="off" placeholder="Ej. Matuz o MAAJ010415">
+      <button class="btn btn-line" type="submit">Buscar</button>
+    </div>
+  </form>
 </header>
 
-{% if appointments %}
-{% if created %}
+{% if created_id %}
 <div class="note note-ok" role="status">
-  <p>Cita agendada para {{ created.patient_name }} el {{ created.scheduled_at | fecha_hora }}.</p>
-  <p class="note-sub">El QR de check-in aparece abajo; el paciente también la verá en su app.</p>
+  <p>Cita agendada. Búscala en la lista para mostrar su código de check-in.</p>
 </div>
 {% endif %}
-<div class="appointments">
-  {% for appointment in appointments %}
-  <article class="appointment">
-    <div class="appointment-main">
-      <p class="appointment-when">{{ appointment.scheduled_at | fecha_hora }}</p>
-      <h2 class="appointment-patient">{{ appointment.patient_name }}</h2>
-      <p class="appointment-meta">
-        {{ appointment.specialty }}{% if appointment.doctor_name %}, {{ appointment.doctor_name }}{% endif %}. {{ appointment.location }}.
-      </p>
-      <p class="appointment-state">
-        <span class="chip chip-{{ appointment.status }}">{{ appointment.status_label }}</span>
-        {% if appointment.checked_in_at %}
-        <span class="chip chip-done">Llegó {{ appointment.checked_in_at | hora }}</span>
-        {% endif %}
-      </p>
-    </div>
-    {% if appointment.qr_svg %}
-    <div class="appointment-qr">
-      <div class="qr">{{ appointment.qr_svg | safe }}</div>
-      <p class="qr-help">El paciente escanea este código con la app para confirmar su llegada.</p>
-      <p class="qr-code">Código de respaldo: <span>{{ appointment.checkin_code }}</span></p>
-    </div>
-    {% endif %}
-  </article>
-  {% endfor %}
+
+{% if patients %}
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th scope="col">Paciente</th>
+        <th scope="col" class="hide-sm">CURP</th>
+        <th scope="col">Próxima cita</th>
+        <th scope="col" class="col-action"><span class="visually-hidden">Acciones</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for patient in patients %}
+      {% set appointment = pending.get(patient.id) %}
+      <tr>
+        <td><a class="link" href="/portal/pacientes/{{ patient.id }}">{{ patient.full_name }}</a></td>
+        <td class="hide-sm code">{{ patient.curp }}</td>
+        <td>
+          {% if appointment %}
+          {{ appointment.scheduled_at | fecha_hora }}
+          <span class="row-sub">
+            {{ appointment.specialty }}{% if appointment.doctor_name %}, {{ appointment.doctor_name }}{% endif %}
+            · {{ appointment.location }} · {{ appointment.status_label }}{% if appointment.checked_in_at %} · Llegó {{ appointment.checked_in_at | hora }}{% endif %}
+          </span>
+          {% else %}
+          <span class="row-sub">Sin cita pendiente</span>
+          {% endif %}
+        </td>
+        <td class="col-action">
+          <div class="row-actions">
+            {% if appointment %}
+            <a class="btn btn-primary" href="/portal/citas/{{ appointment.id }}">Ver QR</a>
+            {% elif 'appointments:write' in perms %}
+            <a class="btn btn-line" href="/portal/pacientes/{{ patient.id }}/cita">Agendar cita</a>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 {% else %}
 <div class="empty">
-  <p class="empty-title">Todavía no hay citas agendadas</p>
-  <p>Agenda una cita desde el expediente del paciente y aparecerá aquí con su código de check-in.</p>
+  {% if search %}
+  <p class="empty-title">Sin resultados para “{{ search }}”</p>
+  <p>Prueba con otra parte del nombre o con la CURP completa.</p>
+  <a class="btn btn-line" href="/portal/citas">Ver todos los pacientes</a>
+  {% else %}
+  <p class="empty-title">Todavía no hay pacientes registrados</p>
+  <p>Registra a un paciente para poder agendarle una cita.</p>
+  {% endif %}
 </div>
 {% endif %}
 {% endblock %}

@@ -728,6 +728,7 @@ async def patient_reset_two_factor(
 @router.get("/citas", response_class=HTMLResponse)
 async def appointments_page(
     request: Request,
+    q: str = "",
     creada: int | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
@@ -738,33 +739,39 @@ async def appointments_page(
     if not has_permission(user, "appointments:read"):
         return forbidden(request, doctor.full_name, "Tu rol no puede consultar la agenda.")
 
-    rows = (
-        await db.execute(
-            select(Appointment, Patient, Doctor)
-            .join(Patient, Appointment.patient_id == Patient.id)
-            .outerjoin(Doctor, Appointment.doctor_id == Doctor.id)
-            .order_by(Appointment.scheduled_at.desc())
-        )
-    ).all()
+    search = q.strip()
+    query = select(Patient).order_by(Patient.full_name.asc())
+    if search:
+        pattern = f"%{search}%"
+        query = query.where(or_(Patient.full_name.ilike(pattern), Patient.curp.ilike(pattern)))
+    patients = list((await db.scalars(query)).all())
 
-    appointments = []
-    for appointment, patient, doctor_row in rows:
-        code = appointment.checkin_code
-        appointments.append(
-            {
-                "id": appointment.id,
-                "patient_name": patient.full_name,
-                "specialty": appointment.specialty,
-                "doctor_name": doctor_row.full_name if doctor_row else None,
-                "scheduled_at": appointment.scheduled_at,
-                "location": appointment.location,
-                "status": appointment.status.value,
-                "status_label": STATUS_LABELS.get(appointment.status, appointment.status.value),
-                "checked_in_at": appointment.checked_in_at,
-                "checkin_code": code,
-                "qr_svg": qr_svg(f"DOSYS-CHECKIN|{appointment.id}|{code}") if code else None,
-            }
-        )
+    pending_by_patient: dict[int, dict] = {}
+    if patients:
+        rows = (
+            await db.execute(
+                select(Appointment, Doctor)
+                .outerjoin(Doctor, Appointment.doctor_id == Doctor.id)
+                .where(
+                    Appointment.patient_id.in_([patient.id for patient in patients]),
+                    Appointment.status.in_([AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED]),
+                )
+                .order_by(Appointment.scheduled_at.asc())
+            )
+        ).all()
+        for appointment, doctor_row in rows:
+            pending_by_patient.setdefault(
+                appointment.patient_id,
+                {
+                    "id": appointment.id,
+                    "specialty": appointment.specialty,
+                    "doctor_name": doctor_row.full_name if doctor_row else None,
+                    "scheduled_at": appointment.scheduled_at,
+                    "location": appointment.location,
+                    "status_label": STATUS_LABELS.get(appointment.status, appointment.status.value),
+                    "checked_in_at": appointment.checked_in_at,
+                },
+            )
 
     await write_audit_event(
         db,
@@ -776,12 +783,73 @@ async def appointments_page(
     )
     await db.commit()
 
-    created = next((item for item in appointments if item["id"] == creada), None)
-
     return templates.TemplateResponse(
         request,
         "appointments.html",
-        {"doctor_name": doctor.full_name, "active": "citas", "appointments": appointments, "created": created},
+        {
+            "doctor_name": doctor.full_name,
+            "active": "citas",
+            "patients": patients,
+            "pending": pending_by_patient,
+            "search": search,
+            "created_id": creada,
+        },
+    )
+
+
+@router.get("/citas/{appointment_id:int}", response_class=HTMLResponse)
+async def appointment_qr_page(
+    appointment_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await portal_staff(db, user)
+    if not has_permission(user, "appointments:read"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede consultar la agenda.")
+
+    row = (
+        await db.execute(
+            select(Appointment, Patient, Doctor)
+            .join(Patient, Appointment.patient_id == Patient.id)
+            .outerjoin(Doctor, Appointment.doctor_id == Doctor.id)
+            .where(Appointment.id == appointment_id)
+        )
+    ).first()
+    if row is None:
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": doctor.full_name}, status_code=status.HTTP_404_NOT_FOUND
+        )
+
+    appointment, patient, doctor_row = row
+    code = appointment.checkin_code
+
+    await write_audit_event(
+        db,
+        user=user,
+        action="portal_read_appointments",
+        entity_type="appointment",
+        entity_id=appointment.id,
+        request=request,
+        detail="pantalla=qr",
+    )
+    await db.commit()
+
+    return templates.TemplateResponse(
+        request,
+        "appointment_qr.html",
+        {
+            "doctor_name": doctor.full_name,
+            "active": "citas",
+            "appointment": appointment,
+            "patient": patient,
+            "attending": doctor_row,
+            "status_label": STATUS_LABELS.get(appointment.status, appointment.status.value),
+            "checkin_code": code,
+            "qr_svg": qr_svg(f"DOSYS-CHECKIN|{appointment.id}|{code}") if code else None,
+        },
     )
 
 

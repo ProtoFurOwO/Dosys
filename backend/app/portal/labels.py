@@ -57,6 +57,66 @@ def action_label(action: str) -> str:
     return ACTION_LABELS.get(action, action)
 
 
+ENTITY_LABELS = {
+    "authentication": "Acceso",
+    "patient": "Paciente",
+    "consultation": "Consulta",
+    "appointment": "Cita",
+    "document": "Documento",
+    "user": "Usuario",
+    "role": "Rol",
+}
+
+DETAIL_KEYS = {
+    "username": "usuario",
+    "role": "rol",
+    "patient_id": "paciente",
+    "sha256": "huella",
+    "resultado": "verificación",
+    "intentos": "intentos",
+    "bloqueo_min": "bloqueo (min)",
+    "search": "búsqueda",
+    "to": "correo",
+    "code": "código",
+    "permisos": "permisos",
+    "specialty": "especialidad",
+}
+
+DETAIL_VALUES = {
+    "intacto": "correcta",
+    "alterado": "alterada",
+}
+
+DETAIL_SEPARATORS = ("·", "|")
+
+
+def entity_label(entity_type: str, entity_id: str | None) -> str:
+    """Nombre legible de la entidad afectada, con su identificador."""
+    base = ENTITY_LABELS.get(entity_type, entity_type)
+    return f"{base} #{entity_id}" if entity_id else base
+
+
+def detail_pairs(detail: str | None) -> list[tuple[str, str]]:
+    """Convierte 'clave=valor clave2=valor2' en pares legibles."""
+    if not detail:
+        return []
+
+    raw = detail
+    for separator in DETAIL_SEPARATORS:
+        raw = raw.replace(separator, " ")
+
+    pairs: list[tuple[str, str]] = []
+    for chunk in raw.split():
+        if "=" not in chunk:
+            pairs.append(("", chunk))
+            continue
+        key, value = chunk.split("=", 1)
+        if key == "sha256" and len(value) > 16:
+            value = f"{value[:12]}…"
+        pairs.append((DETAIL_KEYS.get(key, key), DETAIL_VALUES.get(value, value)))
+    return pairs
+
+
 ROLE_LABELS = {
     "admin": "Administrador",
     "doctor": "Médico",
