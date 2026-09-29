@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -31,6 +32,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -144,11 +147,7 @@ fun SecurityScreen(
                                 modifier = Modifier.size(220.dp),
                             )
                             Spacer(Modifier.height(10.dp))
-                            Text(
-                                text = "Secreto manual: ${setup.secret}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            SecretRow(secret = setup.secret)
                             Spacer(Modifier.height(16.dp))
                             ConfirmCodeForm(isSubmitting = state.isSubmitting, onConfirm = viewModel::confirm)
                         }
@@ -189,6 +188,35 @@ fun SecurityScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SecretRow(secret: String) {
+    val clipboard = LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "Secreto manual (si no puedes escanear)",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        OutlinedButton(
+            onClick = {
+                clipboard.setText(AnnotatedString(secret))
+                copied = true
+            },
+        ) {
+            Text(if (copied) "¡Copiado!" else "Copiar secreto")
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = secret,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

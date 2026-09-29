@@ -62,7 +62,10 @@
   <div class="security-qr">
     <div class="qr">{{ qr | safe }}</div>
     <p class="qr-help">Escanea con Google Authenticator, Microsoft Authenticator o cualquier app TOTP.</p>
-    <p class="qr-code">Secreto manual: <span>{{ secret }}</span></p>
+    <p class="qr-code">
+      Secreto manual: <span>{{ secret }}</span>
+      <button class="btn btn-quiet btn-inline" type="button" data-copy="{{ secret }}">Copiar</button>
+    </p>
   </div>
   <form class="form security-form" method="post" action="/portal/seguridad/confirmar">
     <div class="field">

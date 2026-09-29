@@ -1024,6 +1024,13 @@ body.login {
   letter-spacing: 0.08em;
 }
 
+.btn-inline {
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 /* ── Mi seguridad (2FA) ────────────────────────────────────────────────────── */
 
 .block {
