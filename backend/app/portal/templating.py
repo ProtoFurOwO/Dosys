@@ -6,6 +6,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.portal import deps
 from app.portal.labels import action_label
+from app.services.documents import human_size
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 templates.env.filters["fecha_hora"] = deps.format_datetime
@@ -13,6 +14,7 @@ templates.env.filters["fecha"] = deps.format_date
 templates.env.filters["ultima_visita"] = deps.format_last_visit
 templates.env.filters["hora"] = deps.format_time
 templates.env.filters["accion"] = action_label
+templates.env.filters["tamano"] = human_size
 
 
 def credential_context(

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -59,6 +60,7 @@ fun HomeScreen(
     onOpenAppointments: () -> Unit,
     onOpenCheckIn: () -> Unit,
     onOpenSecurity: () -> Unit,
+    onOpenDocuments: () -> Unit,
     viewModel: HomeViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -141,6 +143,9 @@ fun HomeScreen(
                     QuickAccess(Icons.Filled.QrCodeScanner, "Check-in con QR", Modifier.weight(1f), onOpenCheckIn)
                     QuickAccess(Icons.Filled.Shield, "Mi seguridad", Modifier.weight(1f), onOpenSecurity)
                 }
+            }
+            item {
+                QuickAccess(Icons.Filled.FolderOpen, "Mis documentos", Modifier.fillMaxWidth(), onOpenDocuments)
             }
             item {
                 Text(

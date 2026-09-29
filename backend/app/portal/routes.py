@@ -6,9 +6,10 @@ validado en el servidor en cada petición, y bitácora de todos los accesos.
 
 from datetime import datetime, timezone
 import re
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,7 +25,8 @@ from app.db.session import get_db
 from app.models.appointment import Appointment
 from app.models.consultation import Consultation
 from app.models.doctor import Doctor
-from app.models.enums import AppointmentStatus, UserRole
+from app.models.document import Document
+from app.models.enums import AppointmentStatus
 from app.models.patient import Patient
 from app.models.user import User
 from app.portal import deps
@@ -35,6 +37,15 @@ from app.services import login_security, two_factor
 from app.services.appointments import create_appointment
 from app.services.audit import write_audit_event
 from app.services.consultations import create_consultation
+from app.services.documents import (
+    CATEGORIES,
+    DocumentError,
+    check_integrity,
+    document_path,
+    human_size,
+    store_document,
+)
+from app.services.permissions import has_permission, permission_codes
 from app.services.users import (
     CURP_PATTERN,
     EMAIL_PATTERN,
@@ -70,6 +81,28 @@ def login_redirect() -> RedirectResponse:
 
 async def doctor_profile(db: AsyncSession, user: User) -> Doctor | None:
     return await db.scalar(select(Doctor).where(Doctor.user_id == user.id))
+
+
+class StaffDisplay:
+    """Perfil mostrable para cuentas sin ficha de médico (administración, etc.)."""
+
+    def __init__(self, user: User) -> None:
+        self.id = 0
+        self.full_name = user.username
+        self.specialty = ""
+
+
+async def portal_staff(db: AsyncSession, user: User) -> Doctor | StaffDisplay:
+    return await doctor_profile(db, user) or StaffDisplay(user)
+
+
+def forbidden(request: Request, doctor_name: str, detail: str) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "forbidden.html",
+        {"doctor_name": doctor_name, "active": "", "detail": detail},
+        status_code=status.HTTP_403_FORBIDDEN,
+    )
 
 
 def render_login(request: Request, *, error: str | None, username: str = "", code: int = 200) -> HTMLResponse:
@@ -163,7 +196,7 @@ async def login_submit(
             code=status.HTTP_401_UNAUTHORIZED,
         )
 
-    if user.role is not UserRole.DOCTOR:
+    if not has_permission(user, "portal:access"):
         await write_audit_event(
             db,
             user=user,
@@ -171,12 +204,12 @@ async def login_submit(
             entity_type="authentication",
             entity_id=user.id,
             request=request,
-            detail=f"role={user.role.value}",
+            detail=f"role={user.role.code}",
         )
         await db.commit()
         return render_login(
             request,
-            error="Este portal es exclusivo del personal médico.",
+            error="Este portal es para personal autorizado.",
             username=username.strip(),
             code=status.HTTP_403_FORBIDDEN,
         )
@@ -207,7 +240,7 @@ async def login_submit(
         )
         return response
 
-    token, expires_in = create_access_token(user.id, user.role)
+    token, expires_in = create_access_token(user.id, user.role.code, sorted(permission_codes(user)))
     await write_audit_event(
         db,
         user=user,
@@ -294,7 +327,7 @@ async def two_factor_submit(
             request=request,
         )
 
-    token, expires_in = create_access_token(user.id, user.role)
+    token, expires_in = create_access_token(user.id, user.role.code, sorted(permission_codes(user)))
     await write_audit_event(
         db,
         user=user,
@@ -350,9 +383,7 @@ async def security_page(request: Request, db: AsyncSession = Depends(get_db)) ->
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
-    doctor = await doctor_profile(db, user)
-    if doctor is None:
-        return login_redirect()
+    doctor = await portal_staff(db, user)
 
     enabled = user.totp_enabled
     pending = bool(user.totp_secret) and not enabled
@@ -391,9 +422,7 @@ async def security_confirm(
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
-    doctor = await doctor_profile(db, user)
-    if doctor is None:
-        return login_redirect()
+    doctor = await portal_staff(db, user)
 
     if not user.totp_secret:
         return RedirectResponse("/portal/seguridad", status_code=status.HTTP_303_SEE_OTHER)
@@ -450,9 +479,7 @@ async def security_disable(
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
-    doctor = await doctor_profile(db, user)
-    if doctor is None:
-        return login_redirect()
+    doctor = await portal_staff(db, user)
 
     if not verify_password(password, user.password_hash):
         return templates.TemplateResponse(
@@ -501,9 +528,9 @@ async def dashboard(
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
-    doctor = await doctor_profile(db, user)
-    if doctor is None:
-        return login_redirect()
+    doctor = await portal_staff(db, user)
+    if not has_permission(user, "patients:read"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede consultar pacientes.")
 
     search = q.strip()
     query = select(Patient).order_by(Patient.full_name.asc())
@@ -556,14 +583,16 @@ async def patient_detail(
     patient_id: int,
     request: Request,
     creada: int | None = None,
+    documento: int | None = None,
+    documento_error: str | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
-    doctor = await doctor_profile(db, user)
-    if doctor is None:
-        return login_redirect()
+    doctor = await portal_staff(db, user)
+    if not has_permission(user, "patients:read"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede consultar expedientes.")
 
     patient = await db.get(Patient, patient_id)
     if patient is None:
@@ -593,6 +622,11 @@ async def patient_detail(
         for consultation, doctor_row in rows
     ]
     created = next((item for item in consultations if item["id"] == creada), None)
+    documents = (
+        await db.scalars(
+            select(Document).where(Document.patient_id == patient.id).order_by(Document.created_at.desc())
+        )
+    ).all()
 
     await write_audit_event(
         db,
@@ -616,6 +650,10 @@ async def patient_detail(
             "locked": login_security.is_locked(account) if account else False,
             "lock_minutes": login_security.lock_minutes_left(account) if account else 0,
             "totp_enabled": bool(account.totp_enabled) if account else False,
+            "documents": documents,
+            "categories": CATEGORIES,
+            "documento": documento,
+            "documento_error": documento_error,
         },
     )
 
@@ -696,9 +734,9 @@ async def appointments_page(
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
-    doctor = await doctor_profile(db, user)
-    if doctor is None:
-        return login_redirect()
+    doctor = await portal_staff(db, user)
+    if not has_permission(user, "appointments:read"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede consultar la agenda.")
 
     rows = (
         await db.execute(
@@ -774,9 +812,9 @@ async def patient_new_page(request: Request, db: AsyncSession = Depends(get_db))
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
-    doctor = await doctor_profile(db, user)
-    if doctor is None:
-        return login_redirect()
+    doctor = await portal_staff(db, user)
+    if not has_permission(user, "patients:write"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede registrar pacientes.")
 
     return templates.TemplateResponse(
         request,
@@ -816,9 +854,7 @@ async def patient_new_submit(
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
-    doctor = await doctor_profile(db, user)
-    if doctor is None:
-        return login_redirect()
+    doctor = await portal_staff(db, user)
 
     values = {
         "full_name": full_name.strip(),
@@ -903,7 +939,7 @@ async def patient_new_submit(
         credential_context(
             doctor_name=doctor.full_name,
             person_name=patient.full_name,
-            role_label=ROLE_LABELS[UserRole.PATIENT],
+            role_label=ROLE_LABELS["patient"],
             username=account.username,
             password=password,
             email=patient.email,
@@ -924,9 +960,9 @@ async def patient_edit_page(
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
-    doctor = await doctor_profile(db, user)
-    if doctor is None:
-        return login_redirect()
+    doctor = await portal_staff(db, user)
+    if not has_permission(user, "patients:write"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede editar pacientes.")
 
     patient = await db.get(Patient, patient_id)
     if patient is None:
@@ -970,9 +1006,9 @@ async def patient_edit_submit(
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
-    doctor = await doctor_profile(db, user)
-    if doctor is None:
-        return login_redirect()
+    doctor = await portal_staff(db, user)
+    if not has_permission(user, "patients:read"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede consultar expedientes.")
 
     patient = await db.get(Patient, patient_id)
     if patient is None:
@@ -1040,6 +1076,179 @@ async def patient_edit_submit(
     )
 
 
+# ── Documentos del expediente ─────────────────────────────────────────────────
+
+
+@router.post("/pacientes/{patient_id:int}/documentos")
+async def document_upload(
+    patient_id: int,
+    request: Request,
+    title: str = Form(""),
+    category: str = Form("estudio"),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    if not has_permission(user, "documents:write"):
+        return RedirectResponse(f"/portal/pacientes/{patient_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+    patient = await db.get(Patient, patient_id)
+    if patient is None:
+        return RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER)
+
+    valid_categories = {code for code, _ in CATEGORIES}
+    clean_title = title.strip() or (file.filename or "Documento")
+    try:
+        document = await store_document(
+            db,
+            patient=patient,
+            uploader=user,
+            title=clean_title[:160],
+            category=category if category in valid_categories else "otro",
+            upload=file,
+        )
+    except DocumentError as error:
+        return RedirectResponse(
+            f"/portal/pacientes/{patient.id}?documento_error={quote(str(error))}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    await write_audit_event(
+        db,
+        user=user,
+        action="portal_upload_document",
+        entity_type="document",
+        entity_id=document.id,
+        request=request,
+        detail=f"patient_id={patient.id} sha256={document.sha256[:16]}",
+    )
+    await db.commit()
+    return RedirectResponse(
+        f"/portal/pacientes/{patient.id}?documento={document.id}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.get("/documentos/{document_id:int}/archivo")
+async def document_download(
+    document_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    if not has_permission(user, "documents:read"):
+        return forbidden(request, user.username, "Tu rol no puede descargar documentos.")
+
+    document = await db.get(Document, document_id)
+    if document is None:
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": user.username}, status_code=status.HTTP_404_NOT_FOUND
+        )
+
+    path = document_path(document)
+    if not path.exists():
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": user.username}, status_code=status.HTTP_410_GONE
+        )
+
+    await write_audit_event(
+        db,
+        user=user,
+        action="portal_download_document",
+        entity_type="document",
+        entity_id=document.id,
+        request=request,
+    )
+    await db.commit()
+    return FileResponse(path, media_type=document.content_type, filename=document.original_name)
+
+
+@router.post("/documentos/{document_id:int}/verificar", response_class=HTMLResponse)
+async def document_verify(
+    document_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    if not has_permission(user, "documents:read"):
+        return forbidden(request, user.username, "Tu rol no puede consultar documentos.")
+
+    document = await db.get(Document, document_id)
+    if document is None:
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": user.username}, status_code=status.HTTP_404_NOT_FOUND
+        )
+
+    intact, current_hash = check_integrity(document)
+    patient = await db.get(Patient, document.patient_id)
+    uploader = await db.get(User, document.uploaded_by_user_id) if document.uploaded_by_user_id else None
+
+    await write_audit_event(
+        db,
+        user=user,
+        action="portal_verify_document",
+        entity_type="document",
+        entity_id=document.id,
+        request=request,
+        detail="resultado=intacto" if intact else "resultado=alterado",
+    )
+    await db.commit()
+
+    return templates.TemplateResponse(
+        request,
+        "document_verify.html",
+        {
+            "doctor_name": user.username,
+            "active": "pacientes",
+            "document": document,
+            "patient": patient,
+            "uploader": uploader,
+            "intact": intact,
+            "current_hash": current_hash,
+            "size": human_size(document.size_bytes),
+            "category_label": dict(CATEGORIES).get(document.category, document.category),
+        },
+    )
+
+
+@router.post("/documentos/{document_id:int}/eliminar")
+async def document_delete(
+    document_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    if not has_permission(user, "documents:delete"):
+        return RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER)
+
+    document = await db.get(Document, document_id)
+    if document is None:
+        return RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER)
+
+    patient_id = document.patient_id
+    document_path(document).unlink(missing_ok=True)
+    await db.delete(document)
+    await write_audit_event(
+        db,
+        user=user,
+        action="portal_delete_document",
+        entity_type="document",
+        entity_id=document_id,
+        request=request,
+        detail=f"patient_id={patient_id}",
+    )
+    await db.commit()
+    return RedirectResponse(f"/portal/pacientes/{patient_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
 # ── Agendar cita ──────────────────────────────────────────────────────────────
 
 
@@ -1052,9 +1261,7 @@ async def appointment_page(
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
-    doctor = await doctor_profile(db, user)
-    if doctor is None:
-        return login_redirect()
+    doctor = await portal_staff(db, user)
 
     patient = await db.get(Patient, patient_id)
     if patient is None:
@@ -1095,9 +1302,9 @@ async def appointment_submit(
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
-    doctor = await doctor_profile(db, user)
-    if doctor is None:
-        return login_redirect()
+    doctor = await portal_staff(db, user)
+    if not isinstance(doctor, Doctor):
+        return forbidden(request, doctor.full_name, "Tu cuenta no tiene ficha de médico para agendar citas.")
 
     patient = await db.get(Patient, patient_id)
     if patient is None:
@@ -1192,9 +1399,9 @@ async def consultation_page(
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
-    doctor = await doctor_profile(db, user)
-    if doctor is None:
-        return login_redirect()
+    doctor = await portal_staff(db, user)
+    if not has_permission(user, "consultations:write"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede registrar consultas.")
 
     patient = await db.get(Patient, patient_id)
     if patient is None:
@@ -1227,9 +1434,9 @@ async def consultation_submit(
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
-    doctor = await doctor_profile(db, user)
-    if doctor is None:
-        return login_redirect()
+    doctor = await portal_staff(db, user)
+    if not has_permission(user, "consultations:write"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede registrar consultas.")
 
     patient = await db.get(Patient, patient_id)
     if patient is None:

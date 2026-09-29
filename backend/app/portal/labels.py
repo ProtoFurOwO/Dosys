@@ -1,7 +1,5 @@
 """Nombres legibles de las acciones de la bitácora."""
 
-from app.models.enums import UserRole
-
 ACTION_LABELS = {
     # API
     "login_success": "Acceso correcto (API)",
@@ -41,6 +39,17 @@ ACTION_LABELS = {
     "two_factor_disabled": "Segundo factor desactivado",
     "portal_reset_two_factor": "Segundo factor reiniciado (soporte)",
     "recovery_code_used": "Código de recuperación usado",
+    # Roles y permisos
+    "portal_create_role": "Rol creado",
+    "portal_update_role": "Permisos del rol actualizados",
+    "portal_assign_role": "Rol asignado a un usuario",
+    # Documentos
+    "read_documents": "Documentos consultados (app del paciente)",
+    "download_document": "Documento descargado (app del paciente)",
+    "portal_upload_document": "Documento agregado al expediente",
+    "portal_download_document": "Documento descargado del expediente",
+    "portal_verify_document": "Integridad de documento verificada",
+    "portal_delete_document": "Documento eliminado del expediente",
 }
 
 
@@ -49,8 +58,9 @@ def action_label(action: str) -> str:
 
 
 ROLE_LABELS = {
-    UserRole.DOCTOR: "Médico",
-    UserRole.LABORATORY: "Laboratorio",
-    UserRole.RECEPTION: "Recepción",
-    UserRole.PATIENT: "Paciente",
+    "admin": "Administrador",
+    "doctor": "Médico",
+    "laboratory": "Laboratorio",
+    "reception": "Recepción",
+    "patient": "Paciente",
 }

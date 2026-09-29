@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     totp_issuer: str = "D.O.S.Y.S"
     two_factor_challenge_minutes: int = Field(default=5, ge=1, le=15)
 
+    # Documentos clínicos.
+    documents_dir: str = "/data/documents"
+    documents_max_mb: int = Field(default=10, ge=1, le=50)
+    documents_signing_key: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

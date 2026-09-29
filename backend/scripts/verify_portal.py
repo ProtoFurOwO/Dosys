@@ -21,6 +21,7 @@ BASE_URL = os.getenv("DOSYS_API_URL", "http://127.0.0.1:8000").rstrip("/")
 # Cloudflare bloquea el User-Agent por defecto de Python (error 1010).
 USER_AGENT = "D.O.S.Y.S/1.0 (verificacion academica)"
 DOCTOR = {"username": "medico", "password": "Medico123!"}
+ADMIN = {"username": "admin", "password": "Admin123!"}
 PATIENT = {"username": "paciente", "password": "Paciente123!"}
 
 
@@ -37,7 +38,7 @@ def api(path: str, *, method: str = "GET", body: dict | None = None, token: str 
 
 
 def form_request(opener, path: str, fields: dict) -> tuple[int, str]:
-    data = urlencode(fields).encode()
+    data = urlencode(fields, doseq=True).encode()
     request = Request(f"{BASE_URL}{path}", data=data, headers={"User-Agent": USER_AGENT}, method="POST")
     try:
         with opener.open(request, timeout=15) as response:
@@ -50,6 +51,40 @@ def get(opener, path: str) -> tuple[int, str]:
     request = Request(f"{BASE_URL}{path}", headers={"User-Agent": USER_AGENT}, method="GET")
     try:
         with opener.open(request, timeout=15) as response:
+            return response.status, response.read().decode("utf-8")
+    except HTTPError as error:
+        return error.code, error.read().decode("utf-8")
+
+
+def upload_request(
+    opener,
+    path: str,
+    fields: dict,
+    filename: str,
+    content: bytes,
+    content_type: str = "application/pdf",
+) -> tuple[int, str]:
+    boundary = "----dosysboundary"
+    parts = [
+        f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'
+        for name, value in fields.items()
+    ]
+    parts.append(
+        f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+        f"Content-Type: {content_type}\r\n\r\n"
+    )
+    body = "".join(parts).encode("utf-8") + content + f"\r\n--{boundary}--\r\n".encode("utf-8")
+    request = Request(
+        f"{BASE_URL}{path}",
+        data=body,
+        headers={
+            "User-Agent": USER_AGENT,
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        },
+        method="POST",
+    )
+    try:
+        with opener.open(request, timeout=20) as response:
             return response.status, response.read().decode("utf-8")
     except HTTPError as error:
         return error.code, error.read().decode("utf-8")
@@ -196,10 +231,14 @@ def main() -> None:
     status, profile = api("/api/v1/patients/me", token=login["access_token"])
     assert status == 200 and profile["full_name"] == "Paciente de Prueba", "La app debe ver su perfil nuevo"
 
-    # 9. Registrar un médico, desactivarlo y restablecer su contraseña.
+    # 9. Registrar un médico (lo hace el administrador), desactivarlo y restablecer su contraseña.
+    admin = new_session()
+    status, html = form_request(admin, "/portal/login", ADMIN)
+    assert status == 200, "El administrador debe entrar al portal"
+
     doctor_username = f"prueba_med_{suffix}"
     status, html = form_request(
-        opener,
+        admin,
         "/portal/usuarios/nuevo",
         {
             "full_name": "Dra. Prueba Sánchez",
@@ -211,7 +250,7 @@ def main() -> None:
     )
     assert status == 201 and doctor_username in html, "Debe mostrarse la credencial del médico"
 
-    status, html = get(opener, "/portal/usuarios")
+    status, html = get(admin, "/portal/usuarios")
     assert status == 200 and "Pediatría" in html, "El médico nuevo debe aparecer en la lista"
     doctor_user_id = find_user_id(html, doctor_username)
 
@@ -220,20 +259,20 @@ def main() -> None:
     )
     assert status == 200 and login["role"] == "doctor", "El médico nuevo debe entrar a la API"
 
-    status, _ = form_request(opener, f"/portal/usuarios/{doctor_user_id}/estado", {})
+    status, _ = form_request(admin, f"/portal/usuarios/{doctor_user_id}/estado", {})
     try:
         api("/api/v1/auth/login", method="POST", body={"username": doctor_username, "password": patient_password})
         raise AssertionError("Un usuario desactivado no debe poder entrar")
     except HTTPError as error:
         assert error.code == 401
 
-    status, _ = form_request(opener, f"/portal/usuarios/{doctor_user_id}/estado", {})
+    status, _ = form_request(admin, f"/portal/usuarios/{doctor_user_id}/estado", {})
     status, login = api(
         "/api/v1/auth/login", method="POST", body={"username": doctor_username, "password": patient_password}
     )
     assert status == 200, "Al reactivarlo debe poder entrar otra vez"
 
-    status, html = form_request(opener, f"/portal/usuarios/{doctor_user_id}/reset", {})
+    status, html = form_request(admin, f"/portal/usuarios/{doctor_user_id}/reset", {})
     assert status == 200, "El restablecimiento debe mostrar la credencial nueva"
     match = re.search(r'id="credential-password">([A-Za-z0-9]+)<', html)
     assert match, "La credencial debe traer la contraseña nueva"
@@ -242,19 +281,95 @@ def main() -> None:
     status, login = api("/api/v1/auth/login", method="POST", body={"username": doctor_username, "password": new_password})
     assert status == 200, "Debe entrar con la contraseña restablecida"
 
+    # 9b. Un médico no puede entrar a la gestión de usuarios (control por permisos).
+    doctor_portal = new_session()
+    status, _ = form_request(doctor_portal, "/portal/login", {"username": doctor_username, "password": new_password})
+    assert status == 200, "El médico entra al portal"
+    status, _ = get(doctor_portal, "/portal/usuarios")
+    assert status == 403, f"Un médico no debe ver la gestión de usuarios (fue {status})"
+
+    # 9c. Roles: crear uno nuevo, asignarlo y comprobar el efecto en el acceso.
+    role_html = get(admin, "/portal/roles")
+    assert role_html[0] == 200 and "Roles y permisos" in role_html[1], "La página de roles debe abrir"
+
+    role_code = f"enfermeria_{suffix}"
+    status, html = form_request(
+        admin,
+        "/portal/roles/nuevo",
+        {
+            "code": role_code,
+            "name": "Enfermería de prueba",
+            "description": "Acceso de solo lectura al expediente",
+            "permissions": ["portal:access", "patients:read"],
+        },
+    )
+    assert status == 200 and role_code in html, "El rol nuevo debe crearse y aparecer"
+
+    match = re.search(rf'/portal/roles/(\d+)/editar[^>]*>\s*Editar permisos', html)
+    role_ids = [int(item) for item in re.findall(r"/portal/roles/(\d+)/editar", html)]
+    assert role_ids, "Debe existir el enlace de edición de roles"
+    new_role_id = max(role_ids)
+
+    status, _ = form_request(admin, f"/portal/usuarios/{doctor_user_id}/rol", {"role_id": new_role_id})
+    assert status == 200, "El rol debe asignarse"
+
+    status, login = api("/api/v1/auth/login", method="POST", body={"username": doctor_username, "password": new_password})
+    token_after = login["access_token"]
+
+    status, _ = get(doctor_portal, "/portal")  # el médico ya no tiene patients:read? sí lo tiene
+    status, _ = get(doctor_portal, "/portal/citas")
+    assert status == 403, f"El rol de enfermería no debe ver la agenda (fue {status})"
+
+    status, _ = get(doctor_portal, "/portal/pacientes/1/consulta")
+    assert status == 403, "El rol de enfermería no debe registrar consultas"
+
+    status, login = api("/api/v1/auth/login", method="POST", body={"username": doctor_username, "password": new_password})
+    assert login["role"] == role_code, "El rol del token debe ser el nuevo"
+    try:
+        api("/api/v1/doctor/consultations", method="POST", token=login["access_token"], body={
+            "patient_id": patient_id,
+            "reason": "Intento sin permiso",
+            "diagnosis": "No debe permitirse",
+        })
+        raise AssertionError("Sin consultations:write la API debe rechazar")
+    except HTTPError as error:
+        assert error.code == 403, f"La API debe responder 403 (fue {error.code})"
+
+    # 9d. Documentos: subir al expediente, verificar la huella y verlo desde la app.
+    pdf_bytes = b"%PDF-1.4\n% documento de prueba\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n"
+    status, html = upload_request(
+        opener,
+        f"/portal/pacientes/{patient_id}/documentos",
+        {"title": "Estudio de prueba", "category": "estudio"},
+        "estudio_prueba.pdf",
+        pdf_bytes,
+    )
+    assert status == 200 and "Documento agregado al expediente" in html, "El documento debe subirse"
+    match = re.search(r"/portal/documentos/(\d+)/verificar", html)
+    assert match, "El expediente debe listar el documento con su verificación"
+    document_id = int(match.group(1))
+
+    status, html = form_request(opener, f"/portal/documentos/{document_id}/verificar", {})
+    assert status == 200 and "coincide con la huella registrada" in html, "La verificación debe dar intacto"
+
+    _, patient_login = api("/api/v1/auth/login", method="POST", body=PATIENT)
+    _, documents_api = api("/api/v1/patients/me/documents", token=patient_login["access_token"])
+    assert any(item["id"] == document_id for item in documents_api), "El paciente debe ver su documento"
+
     # 10. Editar datos y revisar la bitácora.
     status, html = form_request(
-        opener,
+        admin,
         f"/portal/usuarios/{doctor_user_id}/editar",
         {"full_name": "Dra. Prueba Sánchez", "specialty": "Pediatría General"},
     )
     assert status == 200 and "Pediatría General" in html, "La edición del médico debe guardarse"
 
-    status, html = get(opener, "/portal/actividad")
+    status, html = get(admin, "/portal/actividad")
     assert status == 200 and "Paciente registrado" in html, "La bitácora debe mostrar el registro del paciente"
     assert "Usuario desactivado" in html and "Contraseña restablecida" in html, "La bitácora debe registrar los cambios"
+    assert "Rol creado" in html, "La bitácora debe registrar el rol nuevo"
 
-    status, html = get(opener, "/portal/actividad?accion=medico")
+    status, html = get(admin, "/portal/actividad?accion=medico")
     assert status == 200 and "Médico registrado" in html, "El filtro de la bitácora debe funcionar"
 
     # 11. Cierre de sesión.

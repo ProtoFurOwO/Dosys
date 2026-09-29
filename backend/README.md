@@ -175,3 +175,41 @@ usuarios restringida al rol médico.
 - Estudios, recetas y recordatorios siguen como interfaz demo en la app.
 - El GPS solo muestra la distancia informativa al hospital; no bloquea el check-in.
 - La huella protege el expediente en pantalla, pero no cifra los datos locales.
+
+## Cumplimiento del caso práctico (Seguridad en Cómputo)
+
+| Requisito | Estado |
+|---|---|
+| Registro de usuarios (nombre, correo, contraseña) | ✅ alta de pacientes y personal con credencial |
+| Inicio de sesión | ✅ con bloqueo y segundo factor |
+| Cambio de contraseña propio y recuperación | ⏳ siguiente iteración (la recuperación usará el envío simulado) |
+| Roles predeterminados (administrador / editor / usuario regular) | ✅ en base de datos: Administrador, Médico (editor), Laboratorio, Recepción y Paciente (lectura) |
+| Permisos por acción (lectura, escritura, eliminación) | ✅ catálogo con área, acción y descripción |
+| Asignar permisos a los roles dinámicamente | ✅ panel de Roles |
+| Control de acceso por permisos | ✅ el servidor valida rol y permisos en cada petición |
+| Historial de acceso | ✅ bitácora con usuario, fecha, IP y acción |
+| Dashboard: usuarios, asignar/revocar roles, crear roles, auditoría | ✅ |
+| Frontend web + API REST | ✅ portal web; la API REST la consume la app Android y queda documentada en OpenAPI |
+| JWT: firma, expiración y datos (rol y permisos) | ✅ 30 min, HS256, claims `role`, `permissions`, `purpose` |
+| Refresh tokens | ⏳ siguiente iteración |
+| Contraseñas con hash seguro (salt) | ✅ Argon2 |
+| HTTPS/TLS | ✅ producción con Let's Encrypt |
+| Cookie HttpOnly, Secure y SameSite | ✅ portal |
+| Validación y sanitización de entradas | ✅ Pydantic + ORM (sin SQL crudo) + autoescape de plantillas |
+| Fuerza bruta: bloqueo temporal | ✅ 5 intentos → 15 minutos, con desbloqueo desde el portal |
+| Rate limiting | ⏳ siguiente iteración |
+| Auditoría inmutable desde la aplicación | ✅ la bitácora es de solo lectura |
+| CORS restringido a orígenes autorizados | ✅ |
+| Principio de mínimo privilegio | ✅ permisos por rol; el paciente solo ve sus propios datos |
+| Errores sin fuga de información | ✅ mensajes genéricos, sin trazas ni detalles internos |
+| Documentos clínicos íntegros | ✅ huella SHA-256 + sello HMAC y verificación en el portal |
+
+## Documentos clínicos
+
+- El médico sube PDF o imágenes (≤10 MB) al expediente desde el portal; el paciente los
+  consulta y descarga desde la app.
+- Cada archivo se guarda en un volumen Docker y se registra con su **huella SHA-256** y un
+  **sello HMAC** del servidor.
+- La pantalla **Verificar** recalcula la huella y valida el sello: si el contenido cambió,
+  lo advierte en lugar de mostrarlo como válido.
+- Toda subida, descarga, verificación y eliminación queda en la bitácora.

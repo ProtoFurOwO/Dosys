@@ -1,0 +1,15 @@
+{% extends "panel.html" %}
+{% block title %}Sin permiso · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Sin permiso</h1>
+    <p class="page-note">{{ detail }}</p>
+  </div>
+</header>
+<div class="empty">
+  <p class="empty-title">Pide acceso a un administrador</p>
+  <p>Un administrador puede ajustar los permisos de tu rol desde el panel.</p>
+  <a class="btn btn-line" href="/portal">Volver al inicio</a>
+</div>
+{% endblock %}

@@ -15,7 +15,9 @@ COPY alembic.ini ./
 COPY alembic ./alembic
 COPY app ./app
 
-RUN chown -R dosys:dosys /app
+# Los documentos se guardan en un volumen; la carpeta nace con el usuario de la app
+# para que el contenedor pueda escribir en él sin privilegios.
+RUN mkdir -p /data/documents && chown -R dosys:dosys /data && chown -R dosys:dosys /app
 USER dosys
 
 EXPOSE 8000

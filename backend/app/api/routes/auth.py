@@ -29,6 +29,7 @@ from app.schemas.auth import (
 )
 from app.services import login_security, two_factor
 from app.services.audit import write_audit_event
+from app.services.permissions import permission_codes
 
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
 
@@ -106,7 +107,7 @@ async def login(
         await db.commit()
         return TwoFactorChallengeResponse(challenge_token=challenge)
 
-    token, expires_in = create_access_token(user.id, user.role)
+    token, expires_in = create_access_token(user.id, user.role.code, sorted(permission_codes(user)))
     await write_audit_event(
         db,
         user=user,
@@ -116,7 +117,7 @@ async def login(
         request=request,
     )
     await db.commit()
-    return TokenResponse(access_token=token, expires_in=expires_in, role=user.role)
+    return TokenResponse(access_token=token, expires_in=expires_in, role=user.role.code)
 
 
 @router.post("/2fa/verify", response_model=TokenResponse)
@@ -173,7 +174,7 @@ async def verify_two_factor(
             request=request,
         )
 
-    token, expires_in = create_access_token(user.id, user.role)
+    token, expires_in = create_access_token(user.id, user.role.code, sorted(permission_codes(user)))
     await write_audit_event(
         db,
         user=user,
@@ -183,7 +184,7 @@ async def verify_two_factor(
         request=request,
     )
     await db.commit()
-    return TokenResponse(access_token=token, expires_in=expires_in, role=user.role)
+    return TokenResponse(access_token=token, expires_in=expires_in, role=user.role.code)
 
 
 @router.get("/2fa/status", response_model=TwoFactorStatusResponse)

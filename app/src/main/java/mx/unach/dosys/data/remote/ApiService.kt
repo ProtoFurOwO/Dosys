@@ -5,6 +5,7 @@ import mx.unach.dosys.data.model.LoginRequest
 import mx.unach.dosys.data.model.LoginResponse
 import mx.unach.dosys.data.model.PatientAppointment
 import mx.unach.dosys.data.model.PatientConsultation
+import mx.unach.dosys.data.model.PatientDocument
 import mx.unach.dosys.data.model.PatientProfile
 import mx.unach.dosys.data.model.TwoFactorConfirmRequest
 import mx.unach.dosys.data.model.TwoFactorDisableRequest
@@ -12,11 +13,13 @@ import mx.unach.dosys.data.model.TwoFactorEnableResult
 import mx.unach.dosys.data.model.TwoFactorSetup
 import mx.unach.dosys.data.model.TwoFactorStatus
 import mx.unach.dosys.data.model.TwoFactorVerifyRequest
+import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Streaming
 
 /**
  * Contrato de la API REST (backend en FastAPI).
@@ -59,6 +62,16 @@ interface ApiService {
 
     @GET("patients/me/appointments")
     suspend fun myAppointments(@Header("Authorization") authorization: String): List<PatientAppointment>
+
+    @GET("patients/me/documents")
+    suspend fun myDocuments(@Header("Authorization") authorization: String): List<PatientDocument>
+
+    @Streaming
+    @GET("patients/me/documents/{id}/file")
+    suspend fun documentFile(
+        @Header("Authorization") authorization: String,
+        @Path("id") documentId: Int,
+    ): ResponseBody
 
     @POST("patients/me/appointments/{id}/check-in")
     suspend fun checkIn(

@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
 from app.models.doctor import Doctor
-from app.models.enums import UserRole
 from app.models.patient import Patient
+from app.models.role import Role
 from app.models.user import User
 
 PASSWORD_MIN_LENGTH = 8
@@ -59,6 +59,13 @@ async def _ensure_username_free(db: AsyncSession, username: str) -> None:
         raise AccountError("Ese usuario ya está en uso. Elige otro.")
 
 
+async def _role_id(db: AsyncSession, code: str) -> int:
+    role = await db.scalar(select(Role).where(Role.code == code))
+    if role is None:
+        raise AccountError("Falta configurar el rol base en el sistema.")
+    return role.id
+
+
 async def create_patient_account(
     db: AsyncSession,
     *,
@@ -79,7 +86,7 @@ async def create_patient_account(
     user = User(
         username=username,
         password_hash=hash_password(password),
-        role=UserRole.PATIENT,
+        role_id=await _role_id(db, "patient"),
     )
     db.add(user)
     await db.flush()
@@ -111,7 +118,7 @@ async def create_doctor_account(
     user = User(
         username=username,
         password_hash=hash_password(password),
-        role=UserRole.DOCTOR,
+        role_id=await _role_id(db, "doctor"),
     )
     db.add(user)
     await db.flush()
@@ -134,5 +141,5 @@ async def reset_user_password(db: AsyncSession, user: User) -> str:
     return new_password
 
 
-def account_created_detail(username: str, role: UserRole) -> str:
-    return f"username={username} role={role.value} at={datetime.now(timezone.utc).isoformat(timespec='seconds')}"
+def account_created_detail(username: str, role_code: str) -> str:
+    return f"username={username} role={role_code} at={datetime.now(timezone.utc).isoformat(timespec='seconds')}"

@@ -12,10 +12,20 @@
         </span>
       </a>
       <nav class="nav" aria-label="Secciones">
+        {% set perms = request.state.permissions or [] %}
         <a class="nav-link {% if active == 'pacientes' %}is-active{% endif %}" href="/portal">Pacientes</a>
+        {% if 'appointments:read' in perms %}
         <a class="nav-link {% if active == 'citas' %}is-active{% endif %}" href="/portal/citas">Citas</a>
+        {% endif %}
+        {% if 'users:manage' in perms %}
         <a class="nav-link {% if active == 'usuarios' %}is-active{% endif %}" href="/portal/usuarios">Usuarios</a>
+        {% endif %}
+        {% if 'roles:manage' in perms %}
+        <a class="nav-link {% if active == 'roles' %}is-active{% endif %}" href="/portal/roles">Roles</a>
+        {% endif %}
+        {% if 'audit:read' in perms %}
         <a class="nav-link {% if active == 'actividad' %}is-active{% endif %}" href="/portal/actividad">Actividad</a>
+        {% endif %}
         <a class="nav-link {% if active == 'seguridad' %}is-active{% endif %}" href="/portal/seguridad">Mi seguridad</a>
       </nav>
     </div>

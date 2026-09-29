@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,13 +10,16 @@ from app.db.session import get_db
 from app.models.appointment import Appointment
 from app.models.consultation import Consultation
 from app.models.doctor import Doctor
+from app.models.document import Document
 from app.models.enums import UserRole
 from app.models.patient import Patient
 from app.models.user import User
 from app.schemas.appointment import AppointmentCheckInRequest, AppointmentResponse
 from app.schemas.consultation import ConsultationResponse
+from app.schemas.document import DocumentResponse
 from app.schemas.patient import PatientProfileResponse
 from app.services.audit import write_audit_event
+from app.services.documents import document_path
 
 
 router = APIRouter(prefix="/patients", tags=["Paciente"])
@@ -121,6 +125,62 @@ async def get_my_appointments(
     )
     await db.commit()
     return appointments
+
+
+@router.get("/me/documents", response_model=list[DocumentResponse])
+async def get_my_documents(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.PATIENT)),
+) -> list[DocumentResponse]:
+    """Documentos del expediente visibles para el paciente (solo lectura)."""
+    patient = await get_patient_for_user(db, current_user)
+    documents = (
+        await db.scalars(
+            select(Document).where(Document.patient_id == patient.id).order_by(Document.created_at.desc())
+        )
+    ).all()
+
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="read_documents",
+        entity_type="patient",
+        entity_id=patient.id,
+        request=request,
+    )
+    await db.commit()
+    return [DocumentResponse.model_validate(document) for document in documents]
+
+
+@router.get("/me/documents/{document_id}/file")
+async def download_my_document(
+    document_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.PATIENT)),
+):
+    patient = await get_patient_for_user(db, current_user)
+    document = await db.scalar(
+        select(Document).where(Document.id == document_id, Document.patient_id == patient.id)
+    )
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado")
+
+    path = document_path(document)
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="El archivo ya no está disponible")
+
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="download_document",
+        entity_type="document",
+        entity_id=document.id,
+        request=request,
+    )
+    await db.commit()
+    return FileResponse(path, media_type=document.content_type, filename=document.original_name)
 
 
 @router.post("/me/appointments/{appointment_id}/check-in", response_model=AppointmentResponse)

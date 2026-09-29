@@ -1,0 +1,48 @@
+{% extends "panel.html" %}
+{% block title %}Verificación de documento · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <a class="back-link" href="/portal/pacientes/{{ patient.id }}">Volver al expediente</a>
+    <h1>Verificación de integridad</h1>
+    <p class="page-note">{{ document.title }} · {{ patient.full_name }}</p>
+  </div>
+</header>
+
+{% if intact %}
+<div class="note note-ok" role="status">
+  <p>El archivo coincide con la huella registrada.</p>
+  <p class="note-sub">Puedes entregarlo o descargarlo con confianza: no se modificó desde que se subió.</p>
+</div>
+{% else %}
+<div class="note note-error" role="alert">
+  <p>El archivo no coincide con la huella registrada.</p>
+  <p class="note-sub">El contenido cambió después de subirlo. No lo uses como evidencia y vuelve a cargarlo.</p>
+</div>
+{% endif %}
+
+<article class="credential" id="credencial">
+  <p class="credential-brand">D.O.S.Y.S · Documento clínico</p>
+  <h2 class="credential-name">{{ document.title }}</h2>
+  <p class="credential-role">{{ category_label }} · {{ document.original_name }} · {{ size }}</p>
+  <dl class="credential-fields">
+    <div>
+      <dt>Huella registrada (SHA-256)</dt>
+      <dd class="hash">{{ document.sha256 }}</dd>
+    </div>
+    <div>
+      <dt>Huella calculada ahora</dt>
+      <dd class="hash">{{ current_hash or "Archivo no disponible" }}</dd>
+    </div>
+  </dl>
+  <p class="credential-note">
+    Sello del servidor: <span class="code">{{ document.seal[:24] }}…</span><br>
+    Subido por {{ uploader.username if uploader else "—" }} el {{ document.created_at | fecha_hora }}.
+  </p>
+</article>
+
+<div class="credential-actions">
+  <a class="btn btn-line" href="/portal/documentos/{{ document.id }}/archivo">Descargar</a>
+  <button class="btn btn-quiet" type="button" data-print>Imprimir resultado</button>
+</div>
+{% endblock %}

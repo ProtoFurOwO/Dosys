@@ -2,10 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_roles
+from app.api.deps import require_permission
 from app.db.session import get_db
 from app.models.doctor import Doctor
-from app.models.enums import UserRole
 from app.models.patient import Patient
 from app.models.user import User
 from app.schemas.consultation import ConsultationCreateRequest, ConsultationResponse
@@ -28,7 +27,7 @@ async def get_doctor_for_user(db: AsyncSession, user: User) -> Doctor:
 async def list_patients(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(UserRole.DOCTOR)),
+    current_user: User = Depends(require_permission("patients:read")),
 ) -> list[DoctorPatientSummary]:
     patients = (await db.scalars(select(Patient).order_by(Patient.full_name.asc()))).all()
     await write_audit_event(
@@ -56,7 +55,7 @@ async def create_consultation(
     payload: ConsultationCreateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(UserRole.DOCTOR)),
+    current_user: User = Depends(require_permission("consultations:write")),
 ) -> ConsultationResponse:
     """Primer flujo médico funcional: registra una consulta para un paciente."""
     doctor = await get_doctor_for_user(db, current_user)

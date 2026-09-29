@@ -42,3 +42,16 @@ data class PatientAppointment(
 data class CheckInRequest(
     val code: String,
 )
+
+/** Documento del expediente visible para el paciente. */
+@Serializable
+data class PatientDocument(
+    val id: Int,
+    val title: String,
+    val category: String,
+    @SerialName("original_name") val originalName: String,
+    @SerialName("content_type") val contentType: String,
+    @SerialName("size_bytes") val sizeBytes: Long,
+    val sha256: String,
+    @SerialName("created_at") val createdAt: String,
+)

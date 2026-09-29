@@ -1,6 +1,7 @@
 {% extends "panel.html" %}
 {% block title %}{{ patient.full_name }} · D.O.S.Y.S Portal clínico{% endblock %}
 {% block content %}
+{% set perms = request.state.permissions or [] %}
 <header class="page-head">
   <div>
     <a class="back-link" href="/portal">Volver a pacientes</a>
@@ -26,6 +27,18 @@
 </div>
 {% endif %}
 
+{% if documento %}
+<div class="note note-ok" role="status">
+  <p>Documento agregado al expediente.</p>
+</div>
+{% endif %}
+
+{% if documento_error %}
+<div class="note note-error" role="alert">
+  <p>{{ documento_error }}</p>
+</div>
+{% endif %}
+
 {% if locked %}
 <div class="note note-error" role="alert">
   <p>El acceso de este paciente está bloqueado por intentos fallidos ({{ lock_minutes }} min restantes).</p>
@@ -48,6 +61,82 @@
   </form>
 </div>
 {% endif %}
+
+<section class="chart">
+  <h2 class="section-title">Documentos</h2>
+
+  {% if documents %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th scope="col">Documento</th>
+          <th scope="col" class="hide-sm">Huella SHA-256</th>
+          <th scope="col" class="hide-sm">Tamaño</th>
+          <th scope="col">Fecha</th>
+          <th scope="col" class="col-action"><span class="visually-hidden">Acciones</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for document in documents %}
+        <tr>
+          <td>
+            {{ document.title }}
+            <span class="row-sub">{{ document.original_name }} · {{ document.category }}</span>
+          </td>
+          <td class="hide-sm code">{{ document.sha256[:16] }}…</td>
+          <td class="hide-sm">{{ document.size_bytes | tamano }}</td>
+          <td class="nowrap">{{ document.created_at | fecha_hora }}</td>
+          <td class="col-action">
+            <div class="row-actions">
+              <a class="btn btn-line" href="/portal/documentos/{{ document.id }}/archivo">Descargar</a>
+              <form method="post" action="/portal/documentos/{{ document.id }}/verificar">
+                <button class="btn btn-quiet" type="submit">Verificar</button>
+              </form>
+              {% if 'documents:delete' in perms %}
+              <form method="post" action="/portal/documentos/{{ document.id }}/eliminar">
+                <button class="btn btn-quiet" type="submit">Eliminar</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="page-note">Todavía no hay documentos en este expediente.</p>
+  {% endif %}
+
+  {% if 'documents:write' in perms %}
+  <form class="form document-form" method="post" action="/portal/pacientes/{{ patient.id }}/documentos"
+        enctype="multipart/form-data">
+    <div class="field-row">
+      <div class="field">
+        <label for="title">Título</label>
+        <input id="title" name="title" maxlength="160" placeholder="Biometría hemática" required>
+      </div>
+      <div class="field">
+        <label for="category">Tipo</label>
+        <select id="category" name="category">
+          {% for code, label in categories %}
+          <option value="{{ code }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="file">Archivo</label>
+      <input id="file" name="file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" required>
+      <p class="help">PDF o imagen, hasta 10 MB. Se guarda la huella SHA-256 del contenido.</p>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">Agregar documento</button>
+    </div>
+  </form>
+  {% endif %}
+</section>
 
 <section class="chart">
   <h2 class="section-title">Historial de consultas</h2>

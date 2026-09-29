@@ -645,6 +645,25 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
+.credential-fields dd.hash {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.document-form {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.field input[type="file"] {
+  padding: 8px 10px;
+  font-size: 0.875rem;
+}
+
 .credential-note {
   margin: 20px 0 0;
   padding-top: 14px;
@@ -1034,6 +1053,67 @@ body.login {
   font-size: 0.75rem;
   margin-left: 6px;
   vertical-align: middle;
+}
+
+.role-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.role-form select {
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+}
+
+.permissions {
+  margin: 8px 0 24px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.permissions legend {
+  padding: 0 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.permission-area + .permission-area {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.permission-area-title {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.permission {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.permission input {
+  margin-top: 2px;
+}
+
+.permission small {
+  color: var(--ink-muted);
 }
 
 /* ── Mi seguridad (2FA) ────────────────────────────────────────────────────── */

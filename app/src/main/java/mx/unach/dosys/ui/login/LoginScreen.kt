@@ -29,6 +29,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -162,6 +165,8 @@ private fun CredentialsStep(state: LoginUiState, viewModel: LoginViewModel) {
 
 @Composable
 private fun TwoFactorStep(state: LoginUiState, viewModel: LoginViewModel) {
+    var recoveryMode by remember { mutableStateOf(false) }
+
     Icon(
         imageVector = Icons.Filled.Shield,
         contentDescription = null,
@@ -187,11 +192,11 @@ private fun TwoFactorStep(state: LoginUiState, viewModel: LoginViewModel) {
     OutlinedTextField(
         value = state.code,
         onValueChange = viewModel::onCodeChange,
-        label = { Text("Código de 6 dígitos") },
+        label = { Text(if (recoveryMode) "Código de recuperación" else "Código de 6 dígitos") },
         leadingIcon = { Icon(Icons.Filled.Shield, contentDescription = null) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.NumberPassword,
+            keyboardType = if (recoveryMode) KeyboardType.Text else KeyboardType.NumberPassword,
             imeAction = ImeAction.Done,
         ),
         keyboardActions = KeyboardActions(onDone = { viewModel.verifyCode() }),
@@ -199,11 +204,21 @@ private fun TwoFactorStep(state: LoginUiState, viewModel: LoginViewModel) {
     )
     Spacer(Modifier.height(6.dp))
     Text(
-        text = "Si perdiste el teléfono, escribe uno de tus códigos de recuperación (XXXX-XXXX).",
+        text = if (recoveryMode) {
+            "Escribe uno de tus códigos de recuperación, con guion (XXXX-XXXX)."
+        } else {
+            "Abre tu app autenticadora y escribe el código de 6 dígitos."
+        },
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
     )
+    TextButton(onClick = {
+        recoveryMode = !recoveryMode
+        viewModel.onCodeChange("")
+    }) {
+        Text(if (recoveryMode) "Usar el código de la app" else "Usar un código de recuperación")
+    }
 
     state.error?.let { message ->
         Spacer(Modifier.height(10.dp))

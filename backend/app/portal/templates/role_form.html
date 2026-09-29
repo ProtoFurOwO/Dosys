@@ -1,0 +1,63 @@
+{% extends "panel.html" %}
+{% block title %}{% if mode == 'create' %}Nuevo rol{% else %}Permisos del rol{% endif %} · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <a class="back-link" href="/portal/roles">Volver a roles</a>
+    <h1>{% if mode == 'create' %}Nuevo rol{% else %}Permisos de {{ role.name }}{% endif %}</h1>
+    <p class="page-note">Marca lo que este rol puede hacer. El servidor valida los permisos en cada petición.</p>
+  </div>
+</header>
+
+{% if error %}
+<div class="note note-error" role="alert">{{ error }}</div>
+{% endif %}
+
+<form class="form" method="post"
+      action="{% if mode == 'create' %}/portal/roles/nuevo{% else %}/portal/roles/{{ role.id }}/editar{% endif %}"
+      novalidate>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="code">Código</label>
+      {% if mode == 'create' %}
+      <input id="code" name="code" maxlength="40" value="{{ values.code }}" class="uppercase" required>
+      <p class="help">Minúsculas, números y guion bajo. Ej. enfermeria.</p>
+      {% else %}
+      <input id="code" value="{{ values.code }}" disabled>
+      <p class="help">El código no se cambia después de crear el rol.</p>
+      {% endif %}
+    </div>
+    <div class="field">
+      <label for="name">Nombre</label>
+      <input id="name" name="name" maxlength="80" value="{{ values.name }}" required>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="description">Descripción</label>
+    <input id="description" name="description" maxlength="200" value="{{ values.description }}">
+  </div>
+
+  <fieldset class="permissions">
+    <legend>Permisos</legend>
+    {% for area in permissions | map(attribute='area') | unique %}
+    <div class="permission-area">
+      <p class="permission-area-title">{{ area }}</p>
+      {% for permission in permissions if permission.area == area %}
+      <label class="permission">
+        <input type="checkbox" name="permissions" value="{{ permission.code }}"
+               {% if permission.code in selected %}checked{% endif %}>
+        <span>{{ permission.description }} <small>{{ permission.action }}</small></span>
+      </label>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </fieldset>
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">Guardar rol</button>
+    <a class="btn btn-quiet" href="/portal/roles">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

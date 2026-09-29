@@ -9,8 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import ACCESS_PURPOSE, decode_token
-from app.models.enums import UserRole
 from app.models.user import User
+from app.services.permissions import permission_codes
 
 COOKIE_NAME = "dosys_portal"
 CLINIC_TIMEZONE = ZoneInfo("America/Mexico_City")
@@ -32,7 +32,7 @@ MESES = (
 
 
 async def current_doctor(request: Request, db: AsyncSession) -> User | None:
-    """Devuelve al médico autenticado o None; la cookie viaja solo en /portal."""
+    """Usuario autenticado del portal, con sus permisos en request.state."""
     token = request.cookies.get(COOKIE_NAME)
     if not token:
         return None
@@ -44,8 +44,14 @@ async def current_doctor(request: Request, db: AsyncSession) -> User | None:
         return None
 
     user = await db.scalar(select(User).where(User.id == user_id))
-    if user is None or not user.is_active or user.role is not UserRole.DOCTOR:
+    if user is None or not user.is_active:
         return None
+
+    granted = permission_codes(user)
+    if "portal:access" not in granted:
+        return None
+
+    request.state.permissions = granted
     return user
 
 

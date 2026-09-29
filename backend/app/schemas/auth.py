@@ -1,7 +1,5 @@
 from pydantic import BaseModel, Field
 
-from app.models.enums import UserRole
-
 
 class LoginRequest(BaseModel):
     username: str = Field(min_length=3, max_length=64, examples=["paciente"])
@@ -12,7 +10,7 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
-    role: UserRole
+    role: str
 
 
 class TwoFactorChallengeResponse(BaseModel):

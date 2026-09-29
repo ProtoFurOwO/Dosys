@@ -101,7 +101,6 @@ Demostración de 7 a 10 minutos con dos dispositivos: **laptop** (portal clínic
   correo, respaldos y monitoreo (está en el README del backend).
 
 ## Demo de seguridad (login + 2FA)
-
 ### A. Bloqueo por intentos fallidos (2 min)
 
 1. En el portal, cierra sesión y en el login escribe el usuario `maria.argueta` con una
@@ -159,6 +158,32 @@ Qué decir al mostrar el resultado:
 - **Errores genéricos**: usuario inexistente y contraseña mala dan el mismo mensaje.
 - Cookie del portal **HttpOnly** (DevTools → no es legible por JavaScript).
 - HTTPS + Cloudflare (candado) y **HSTS**; Swagger apagado en producción.
+
+## Demo de roles, permisos y documentos
+
+### E. Roles y permisos (panel de administración)
+
+Usa la cuenta `admin` / `Admin123!` (el rol médico no ve esta sección: así se muestra el
+control por permisos).
+
+1. **Roles**: se ven los cinco roles del sistema con su número de permisos y usuarios.
+2. **Nuevo rol**: código `enfermeria`, permisos *Ingresar al portal* y *Ver pacientes*.
+3. **Usuarios**: con el selector de la fila, cambia el rol de un médico de prueba.
+4. Entra con esa cuenta: ve Pacientes, pero **no** Citas, **no** Usuarios; al intentar
+   registrar una consulta el servidor responde *Sin permiso*.
+5. Devuélvele su rol y muestra en **Actividad**: *Rol creado* y *Rol asignado a un usuario*.
+
+### F. Documentos con huella SHA-256
+
+1. Como `medico`, entra al expediente → **Documentos** → elige un PDF o imagen (≤10 MB) →
+   **Agregar documento**.
+2. Aparece con su **huella SHA-256** y los botones Descargar / Verificar / Eliminar.
+3. **Verificar** → pantalla con *"El archivo coincide con la huella registrada"*, la huella
+   registrada, la calculada ahora y el sello del servidor.
+4. En la app del paciente: **Mis documentos** → **Abrir documento** (se descarga y se abre
+   con la app que elijas: visor de PDF, galería…).
+5. *Opcional (si quieres el efecto "wow")*: altera el archivo en el servidor y vuelve a
+   **Verificar** → *"El archivo no coincide con la huella registrada"*.
 
 ## Frases que ayudan a explicar
 

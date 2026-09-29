@@ -5,6 +5,7 @@ import mx.unach.dosys.core.auth.SessionManager
 import mx.unach.dosys.data.model.CheckInRequest
 import mx.unach.dosys.data.model.PatientAppointment
 import mx.unach.dosys.data.model.PatientConsultation
+import mx.unach.dosys.data.model.PatientDocument
 import mx.unach.dosys.data.model.PatientProfile
 import mx.unach.dosys.data.remote.ApiService
 import retrofit2.HttpException
@@ -20,6 +21,8 @@ interface PatientRepository {
     suspend fun profile(): ClinicalResult<PatientProfile>
     suspend fun consultations(): ClinicalResult<List<PatientConsultation>>
     suspend fun appointments(): ClinicalResult<List<PatientAppointment>>
+    suspend fun documents(): ClinicalResult<List<PatientDocument>>
+    suspend fun documentFile(documentId: Int): ClinicalResult<ByteArray>
     suspend fun checkIn(appointmentId: Int, code: String): ClinicalResult<PatientAppointment>
 }
 
@@ -38,6 +41,32 @@ class RemotePatientRepository(
 
     override suspend fun appointments(): ClinicalResult<List<PatientAppointment>> = authorized { header ->
         api.myAppointments(header)
+    }
+
+    override suspend fun documents(): ClinicalResult<List<PatientDocument>> = authorized { header ->
+        api.myDocuments(header)
+    }
+
+    override suspend fun documentFile(documentId: Int): ClinicalResult<ByteArray> {
+        val token = session.currentToken()
+            ?: return ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
+
+        return try {
+            ClinicalResult.Success(api.documentFile("Bearer $token", documentId).bytes())
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: HttpException) {
+            if (error.code() == 401) {
+                session.clear()
+                ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
+            } else {
+                ClinicalResult.Error("No se pudo descargar el documento")
+            }
+        } catch (error: IOException) {
+            ClinicalResult.Error("No se pudo conectar con el servidor")
+        } catch (error: Exception) {
+            ClinicalResult.Error("No se pudo descargar el documento")
+        }
     }
 
     override suspend fun checkIn(appointmentId: Int, code: String): ClinicalResult<PatientAppointment> {

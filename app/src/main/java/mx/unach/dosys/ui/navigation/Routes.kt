@@ -15,6 +15,7 @@ object Routes {
     const val APPOINTMENTS = "appointments"
     const val CHECKIN = "checkin"
     const val SECURITY = "security"
+    const val DOCUMENTS = "documents"
 
     fun studyDetail(id: Int): String = "study/$id"
 }

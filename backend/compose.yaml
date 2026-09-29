@@ -34,6 +34,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Los documentos clínicos viven en un volumen propio, fuera de la base.
+    volumes:
+      - documents_data:/data/documents
     # Solo se expone en la propia computadora. El emulador Android usa 10.0.2.2.
     # API_PORT permite cambiar el puerto local si el 8000 está ocupado.
     ports:
@@ -49,6 +52,7 @@ services:
 
 volumes:
   postgres_data:
+  documents_data:
 
 networks:
   edge:

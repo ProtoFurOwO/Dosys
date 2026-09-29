@@ -5,7 +5,6 @@ import jwt
 from pwdlib import PasswordHash
 
 from app.core.config import settings
-from app.models.enums import UserRole
 
 
 password_hash = PasswordHash.recommended()
@@ -27,13 +26,14 @@ def _encode(payload: dict[str, Any], expires_in: int) -> str:
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
-def create_access_token(user_id: int, role: UserRole) -> tuple[str, int]:
-    """Crea un JWT breve que contiene identidad y rol, no información clínica."""
+def create_access_token(user_id: int, role_code: str, permissions: list[str]) -> tuple[str, int]:
+    """Crea un JWT breve con identidad, rol y permisos, sin información clínica."""
     expires_in = settings.jwt_access_token_expire_minutes * 60
     now = datetime.now(timezone.utc)
     payload: dict[str, Any] = {
         "sub": str(user_id),
-        "role": role.value,
+        "role": role_code,
+        "permissions": permissions,
         "purpose": ACCESS_PURPOSE,
         "iat": now,
         "exp": now + timedelta(seconds=expires_in),

@@ -1,5 +1,6 @@
 """Administración del portal: personal del hospital, credenciales y bitácora."""
 
+import re
 import unicodedata
 
 from fastapi import APIRouter, Depends, Form, Request, status
@@ -10,13 +11,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
 from app.models.doctor import Doctor
-from app.models.enums import UserRole
+from app.models.permission import Permission
+from app.models.role import Role
 from app.models.user import User
 from app.portal import deps
 from app.portal.labels import ROLE_LABELS, action_label
+from app.portal.routes import forbidden, portal_staff
 from app.portal.templating import credential_context, templates
 from app.services import login_security, two_factor
 from app.services.audit import write_audit_event
+from app.services.permissions import has_permission
 from app.services.users import (
     EMAIL_PATTERN,
     USERNAME_PATTERN,
@@ -47,18 +51,13 @@ def users_redirect(aviso: str | None = None) -> RedirectResponse:
     return RedirectResponse(target, status_code=status.HTTP_303_SEE_OTHER)
 
 
-async def doctor_profile(db: AsyncSession, user: User) -> Doctor | None:
-    return await db.scalar(select(Doctor).where(Doctor.user_id == user.id))
-
-
-async def require_staff(request: Request, db: AsyncSession) -> tuple[User, Doctor] | None:
+async def require_staff(
+    request: Request, db: AsyncSession
+) -> tuple[User, Doctor | object] | None:
     user = await deps.current_doctor(request, db)
     if user is None:
         return None
-    doctor = await doctor_profile(db, user)
-    if doctor is None:
-        return None
-    return user, doctor
+    return user, await portal_staff(db, user)
 
 
 def doctor_form_context(doctor_name: str, *, mode: str, user: User | None, values: dict, errors: dict) -> dict:
@@ -81,12 +80,13 @@ async def users_page(request: Request, aviso: str = "", db: AsyncSession = Depen
     if session is None:
         return login_redirect()
     current_user, doctor = session
+    if not has_permission(current_user, "users:manage"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede gestionar usuarios.")
 
     rows = (
         await db.execute(
             select(User, Doctor)
             .outerjoin(Doctor, Doctor.user_id == User.id)
-            .where(User.role != UserRole.PATIENT)
             .order_by(User.username.asc())
         )
     ).all()
@@ -96,12 +96,14 @@ async def users_page(request: Request, aviso: str = "", db: AsyncSession = Depen
         .group_by(AuditLog.user_id)
     )
     last_access = {user_id: moment for user_id, moment in last_access_rows.all()}
+    roles = list((await db.scalars(select(Role).order_by(Role.code.asc()))).all())
 
     staff = [
         {
             "id": account.id,
             "username": account.username,
-            "role_label": ROLE_LABELS.get(account.role, account.role.value),
+            "role_code": account.role.code,
+            "role_label": account.role.name,
             "active": account.is_active,
             "full_name": profile.full_name if profile else account.username,
             "specialty": profile.specialty if profile else None,
@@ -121,6 +123,7 @@ async def users_page(request: Request, aviso: str = "", db: AsyncSession = Depen
             "doctor_name": doctor.full_name,
             "active": "usuarios",
             "staff": staff,
+            "roles_catalog": roles,
             "aviso": aviso,
         },
     )
@@ -222,7 +225,7 @@ async def doctor_new_submit(
         credential_context(
             doctor_name=doctor.full_name,
             person_name=profile.full_name,
-            role_label=ROLE_LABELS[UserRole.DOCTOR],
+            role_label=ROLE_LABELS["doctor"],
             username=account.username,
             password=password,
             email=None,
@@ -330,6 +333,8 @@ async def user_toggle_state(
     if session is None:
         return login_redirect()
     current_user, _ = session
+    if not has_permission(current_user, "users:manage"):
+        return users_redirect("permiso")
 
     account = await db.get(User, user_id)
     if account is None:
@@ -362,6 +367,8 @@ async def user_unlock(
     if session is None:
         return login_redirect()
     current_user, _ = session
+    if not has_permission(current_user, "users:manage"):
+        return users_redirect("permiso")
 
     account = await db.get(User, user_id)
     if account is None:
@@ -392,6 +399,8 @@ async def user_reset_two_factor(
     if session is None:
         return login_redirect()
     current_user, _ = session
+    if not has_permission(current_user, "users:manage"):
+        return users_redirect("permiso")
 
     account = await db.get(User, user_id)
     if account is None:
@@ -421,6 +430,8 @@ async def user_reset_password(
     if session is None:
         return login_redirect()
     current_user, doctor = session
+    if not has_permission(current_user, "users:manage"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede gestionar usuarios.")
 
     account = await db.get(User, user_id)
     if account is None:
@@ -447,7 +458,7 @@ async def user_reset_password(
         credential_context(
             doctor_name=doctor.full_name,
             person_name=profile.full_name if profile else account.username,
-            role_label=ROLE_LABELS.get(account.role, account.role.value),
+            role_label=ROLE_LABELS.get(account.role.code, account.role.name),
             username=account.username,
             password=new_password,
             email=None,
@@ -457,6 +468,281 @@ async def user_reset_password(
         ),
         status_code=status.HTTP_200_OK,
     )
+
+
+# ── Roles y permisos ──────────────────────────────────────────────────────────
+
+
+def roles_context(doctor_name: str, *, roles: list, permissions: list, error: str | None = None) -> dict:
+    return {
+        "doctor_name": doctor_name,
+        "active": "roles",
+        "roles": roles,
+        "permissions": permissions,
+        "error": error,
+    }
+
+
+def role_form_context(
+    doctor_name: str,
+    *,
+    mode: str,
+    role: Role | None,
+    values: dict,
+    permissions: list,
+    selected: list[str],
+    error: str | None = None,
+) -> dict:
+    return {
+        "doctor_name": doctor_name,
+        "active": "roles",
+        "mode": mode,
+        "role": role,
+        "values": values,
+        "permissions": permissions,
+        "selected": selected,
+        "error": error,
+    }
+
+
+async def permission_catalog(db: AsyncSession) -> list[Permission]:
+    return list((await db.scalars(select(Permission).order_by(Permission.area.asc(), Permission.action.asc()))).all())
+
+
+@router.get("/roles", response_class=HTMLResponse)
+async def roles_page(request: Request, db: AsyncSession = Depends(get_db)) -> HTMLResponse:
+    session = await require_staff(request, db)
+    if session is None:
+        return login_redirect()
+    current_user, doctor = session
+    if not has_permission(current_user, "roles:manage"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede gestionar roles.")
+
+    roles = list((await db.scalars(select(Role).order_by(Role.code.asc()))).all())
+    counts = (await db.execute(select(User.role_id, func.count(User.id)).group_by(User.role_id))).all()
+    context = roles_context(doctor.full_name, roles=roles, permissions=await permission_catalog(db))
+    context["user_counts"] = {role_id: total for role_id, total in counts}
+    return templates.TemplateResponse(request, "roles.html", context)
+
+
+@router.get("/roles/nuevo", response_class=HTMLResponse)
+async def role_new_page(request: Request, db: AsyncSession = Depends(get_db)) -> HTMLResponse:
+    session = await require_staff(request, db)
+    if session is None:
+        return login_redirect()
+    current_user, doctor = session
+    if not has_permission(current_user, "roles:manage"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede gestionar roles.")
+
+    return templates.TemplateResponse(
+        request,
+        "role_form.html",
+        role_form_context(
+            doctor.full_name,
+            mode="create",
+            role=None,
+            values={"code": "", "name": "", "description": ""},
+            permissions=await permission_catalog(db),
+            selected=[],
+        ),
+    )
+
+
+@router.post("/roles/nuevo", response_class=HTMLResponse)
+async def role_new_submit(
+    request: Request,
+    code: str = Form(""),
+    name: str = Form(""),
+    description: str = Form(""),
+    permissions: list[str] = Form([]),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    session = await require_staff(request, db)
+    if session is None:
+        return login_redirect()
+    current_user, doctor = session
+    if not has_permission(current_user, "roles:manage"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede gestionar roles.")
+
+    values = {"code": code.strip().lower(), "name": name.strip(), "description": description.strip()}
+    catalog = await permission_catalog(db)
+    valid = {permission.code for permission in catalog}
+    selected = [item for item in permissions if item in valid]
+    error = None
+
+    if not re.fullmatch(r"[a-z0-9_]{3,40}", values["code"]):
+        error = "El código del rol solo admite minúsculas, números y guion bajo (3 a 40 caracteres)."
+    elif not 3 <= len(values["name"]) <= 80:
+        error = "Escribe el nombre del rol (3 a 80 caracteres)."
+    elif await db.scalar(select(Role).where(Role.code == values["code"])) is not None:
+        error = "Ya existe un rol con ese código."
+
+    if error:
+        return templates.TemplateResponse(
+            request,
+            "role_form.html",
+            role_form_context(
+                doctor.full_name,
+                mode="create",
+                role=None,
+                values=values,
+                permissions=catalog,
+                selected=selected,
+                error=error,
+            ),
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    role = Role(code=values["code"], name=values["name"], description=values["description"] or None, is_system=False)
+    role.permissions = [permission for permission in catalog if permission.code in selected]
+    db.add(role)
+    await db.flush()
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="portal_create_role",
+        entity_type="role",
+        entity_id=role.id,
+        request=request,
+        detail=f"code={role.code} permisos={len(selected)}",
+    )
+    await db.commit()
+    return RedirectResponse("/portal/roles", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/roles/{role_id:int}/editar", response_class=HTMLResponse)
+async def role_edit_page(
+    role_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    session = await require_staff(request, db)
+    if session is None:
+        return login_redirect()
+    current_user, doctor = session
+    if not has_permission(current_user, "roles:manage"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede gestionar roles.")
+
+    role = await db.get(Role, role_id)
+    if role is None:
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": doctor.full_name}, status_code=status.HTTP_404_NOT_FOUND
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "role_form.html",
+        role_form_context(
+            doctor.full_name,
+            mode="edit",
+            role=role,
+            values={"code": role.code, "name": role.name, "description": role.description or ""},
+            permissions=await permission_catalog(db),
+            selected=[permission.code for permission in role.permissions],
+        ),
+    )
+
+
+@router.post("/roles/{role_id:int}/editar", response_class=HTMLResponse)
+async def role_edit_submit(
+    role_id: int,
+    request: Request,
+    name: str = Form(""),
+    description: str = Form(""),
+    permissions: list[str] = Form([]),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    session = await require_staff(request, db)
+    if session is None:
+        return login_redirect()
+    current_user, doctor = session
+    if not has_permission(current_user, "roles:manage"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede gestionar roles.")
+
+    role = await db.get(Role, role_id)
+    if role is None:
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": doctor.full_name}, status_code=status.HTTP_404_NOT_FOUND
+        )
+
+    catalog = await permission_catalog(db)
+    valid = {permission.code for permission in catalog}
+    selected = [item for item in permissions if item in valid]
+    values = {"code": role.code, "name": name.strip(), "description": description.strip()}
+    error = None
+
+    if not 3 <= len(values["name"]) <= 80:
+        error = "Escribe el nombre del rol (3 a 80 caracteres)."
+    elif role.code == "admin" and "users:manage" not in selected:
+        error = "El rol Administrador debe conservar la gestión de usuarios."
+
+    if error:
+        return templates.TemplateResponse(
+            request,
+            "role_form.html",
+            role_form_context(
+                doctor.full_name,
+                mode="edit",
+                role=role,
+                values=values,
+                permissions=catalog,
+                selected=selected,
+                error=error,
+            ),
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    role.name = values["name"]
+    role.description = values["description"] or None
+    role.permissions = [permission for permission in catalog if permission.code in selected]
+    await db.flush()
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="portal_update_role",
+        entity_type="role",
+        entity_id=role.id,
+        request=request,
+        detail=f"code={role.code} permisos={len(selected)}",
+    )
+    await db.commit()
+    return RedirectResponse("/portal/roles", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/usuarios/{user_id:int}/rol")
+async def user_assign_role(
+    user_id: int,
+    request: Request,
+    role_id: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    session = await require_staff(request, db)
+    if session is None:
+        return login_redirect()
+    current_user, _ = session
+    if not has_permission(current_user, "users:manage"):
+        return users_redirect("permiso")
+
+    account = await db.get(User, user_id)
+    role = await db.get(Role, role_id)
+    if account is None or role is None:
+        return users_redirect("no-encontrado")
+    if account.id == current_user.id:
+        return users_redirect("propio")
+
+    account.role_id = role.id
+    await db.flush()
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="portal_assign_role",
+        entity_type="user",
+        entity_id=account.id,
+        request=request,
+        detail=f"username={account.username} role={role.code}",
+    )
+    await db.commit()
+    return users_redirect()
 
 
 # ── Envío simulado de credenciales ────────────────────────────────────────────
@@ -537,7 +823,9 @@ async def activity_page(
     session = await require_staff(request, db)
     if session is None:
         return login_redirect()
-    _, doctor = session
+    current_user, doctor = session
+    if not has_permission(current_user, "audit:read"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede consultar la bitácora.")
 
     query = (
         select(AuditLog, User)
