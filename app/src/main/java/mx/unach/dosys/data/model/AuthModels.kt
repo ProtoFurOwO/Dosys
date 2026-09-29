@@ -10,13 +10,25 @@ data class LoginRequest(
     @SerialName("password") val password: String,
 )
 
-/** Respuesta del backend con los tokens JWT. */
+/**
+ * Respuesta del backend: tokens JWT, o bien el desafío del segundo factor
+ * cuando la cuenta tiene 2FA activo (requires_2fa = true).
+ */
 @Serializable
 data class LoginResponse(
-    @SerialName("access_token") val accessToken: String,
+    @SerialName("access_token") val accessToken: String? = null,
     @SerialName("refresh_token") val refreshToken: String? = null,
     @SerialName("token_type") val tokenType: String = "bearer",
     val role: String = "",
+    @SerialName("requires_2fa") val requires2fa: Boolean = false,
+    @SerialName("challenge_token") val challengeToken: String? = null,
+)
+
+/** Verificación del segundo factor (código TOTP o código de recuperación). */
+@Serializable
+data class TwoFactorVerifyRequest(
+    @SerialName("challenge_token") val challengeToken: String,
+    val code: String,
 )
 
 /** Datos básicos del paciente autenticado (solo lectura). */
@@ -28,4 +40,35 @@ data class PatientProfile(
     @SerialName("blood_type") val bloodType: String? = null,
     @SerialName("birth_date") val birthDate: String? = null,
     @SerialName("emergency_contact") val emergencyContact: String? = null,
+)
+
+// ── Segundo factor (Mi seguridad) ─────────────────────────────────────────────
+
+@Serializable
+data class TwoFactorStatus(
+    val enabled: Boolean = false,
+    @SerialName("recovery_codes_remaining") val recoveryCodesRemaining: Int = 0,
+)
+
+@Serializable
+data class TwoFactorSetup(
+    val secret: String,
+    @SerialName("otpauth_uri") val otpauthUri: String,
+    val issuer: String = "",
+)
+
+@Serializable
+data class TwoFactorConfirmRequest(
+    val code: String,
+)
+
+@Serializable
+data class TwoFactorEnableResult(
+    val enabled: Boolean = false,
+    @SerialName("recovery_codes") val recoveryCodes: List<String> = emptyList(),
+)
+
+@Serializable
+data class TwoFactorDisableRequest(
+    val password: String,
 )

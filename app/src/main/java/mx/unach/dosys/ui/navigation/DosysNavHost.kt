@@ -13,6 +13,7 @@ import mx.unach.dosys.ui.login.LoginScreen
 import mx.unach.dosys.ui.prescriptions.PrescriptionsScreen
 import mx.unach.dosys.ui.qr.QrScreen
 import mx.unach.dosys.ui.record.RecordScreen
+import mx.unach.dosys.ui.security.SecurityScreen
 import mx.unach.dosys.ui.studies.StudiesScreen
 import mx.unach.dosys.ui.studies.StudyDetailScreen
 
@@ -47,6 +48,7 @@ fun DosysNavHost() {
                 onOpenQr = { navController.navigate(Routes.QR) },
                 onOpenAppointments = { navController.navigate(Routes.APPOINTMENTS) },
                 onOpenCheckIn = { navController.navigate(Routes.CHECKIN) },
+                onOpenSecurity = { navController.navigate(Routes.SECURITY) },
             )
         }
         composable(Routes.RECORD) {
@@ -79,6 +81,9 @@ fun DosysNavHost() {
         }
         composable(Routes.CHECKIN) {
             CheckInScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.SECURITY) {
+            SecurityScreen(onBack = { navController.popBackStack() })
         }
     }
 }

@@ -1,9 +1,12 @@
 package mx.unach.dosys.data.repository
 
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import mx.unach.dosys.core.auth.SessionManager
 import mx.unach.dosys.data.model.LoginRequest
+import mx.unach.dosys.data.model.TwoFactorVerifyRequest
 import mx.unach.dosys.data.remote.ApiService
 import retrofit2.HttpException
 import java.io.IOException
@@ -12,11 +15,24 @@ import java.io.IOException
 sealed interface AuthResult {
     data class Success(val token: String) : AuthResult
     data class Error(val message: String) : AuthResult
+
+    /** La contraseña es correcta pero falta el segundo factor. */
+    data class NeedsTwoFactor(val challengeToken: String) : AuthResult
 }
 
 /** Contrato del repositorio de autenticación. */
 interface AuthRepository {
     suspend fun login(username: String, password: String): AuthResult
+    suspend fun verifyTwoFactor(challengeToken: String, code: String): AuthResult
+}
+
+/** Mensaje del backend (campo detail) para no inventar textos distintos a la API. */
+internal fun HttpException.serverDetail(): String? = try {
+    response()?.errorBody()?.string()?.let { body ->
+        Json.parseToJsonElement(body).jsonObject["detail"]?.jsonPrimitive?.content
+    }
+} catch (_: Exception) {
+    null
 }
 
 /**
@@ -26,7 +42,6 @@ interface AuthRepository {
 class FakeAuthRepository(private val session: SessionManager) : AuthRepository {
 
     override suspend fun login(username: String, password: String): AuthResult {
-        delay(700) // simula la latencia de la red
         if (username.isBlank() || password.length < 4) {
             return AuthResult.Error("Usuario o contraseña incorrectos")
         }
@@ -34,6 +49,9 @@ class FakeAuthRepository(private val session: SessionManager) : AuthRepository {
         session.saveToken(token)
         return AuthResult.Success(token)
     }
+
+    override suspend fun verifyTwoFactor(challengeToken: String, code: String): AuthResult =
+        AuthResult.Error("El segundo factor no está disponible en el modo demo")
 }
 
 /** Implementación REAL contra la API del hospital. */
@@ -44,23 +62,54 @@ class RemoteAuthRepository(
 
     override suspend fun login(username: String, password: String): AuthResult = try {
         val response = api.login(LoginRequest(username = username, password = password))
-        if (response.role != "patient") {
-            AuthResult.Error("Este acceso es exclusivo para pacientes")
-        } else {
-            session.saveToken(response.accessToken)
-            AuthResult.Success(response.accessToken)
+        when {
+            response.requires2fa && response.challengeToken != null ->
+                AuthResult.NeedsTwoFactor(response.challengeToken)
+
+            response.role != "patient" -> AuthResult.Error("Este acceso es exclusivo para pacientes")
+
+            response.accessToken != null -> {
+                session.saveToken(response.accessToken)
+                AuthResult.Success(response.accessToken)
+            }
+
+            else -> AuthResult.Error("No se pudo iniciar sesión. Intenta más tarde")
         }
     } catch (cancellation: CancellationException) {
         throw cancellation // nunca se debe "tragar" la cancelación de una corrutina
     } catch (error: HttpException) {
-        if (error.code() == 401) {
-            AuthResult.Error("Usuario o contraseña incorrectos")
-        } else {
-            AuthResult.Error("No se pudo iniciar sesión. Intenta más tarde")
+        when (error.code()) {
+            401 -> AuthResult.Error(error.serverDetail() ?: "Usuario o contraseña incorrectos")
+            423 -> AuthResult.Error(error.serverDetail() ?: "Cuenta bloqueada temporalmente")
+            else -> AuthResult.Error("No se pudo iniciar sesión. Intenta más tarde")
         }
     } catch (error: IOException) {
         AuthResult.Error("No se pudo conectar con el servidor")
     } catch (error: Exception) {
         AuthResult.Error(error.message ?: "No se pudo conectar con el servidor")
+    }
+
+    override suspend fun verifyTwoFactor(challengeToken: String, code: String): AuthResult = try {
+        val response = api.verifyTwoFactor(
+            TwoFactorVerifyRequest(challengeToken = challengeToken, code = code.trim().uppercase())
+        )
+        val token = response.accessToken
+        if (token == null) {
+            AuthResult.Error("No se pudo completar la verificación. Intenta de nuevo")
+        } else {
+            session.saveToken(token)
+            AuthResult.Success(token)
+        }
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (error: HttpException) {
+        when (error.code()) {
+            401 -> AuthResult.Error(error.serverDetail() ?: "Código incorrecto o verificación expirada")
+            else -> AuthResult.Error("No se pudo verificar el código. Intenta más tarde")
+        }
+    } catch (error: IOException) {
+        AuthResult.Error("No se pudo conectar con el servidor")
+    } catch (error: Exception) {
+        AuthResult.Error("No se pudo verificar el código. Intenta más tarde")
     }
 }

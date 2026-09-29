@@ -750,6 +750,10 @@ a {
   opacity: 0.85;
 }
 
+.note-action {
+  margin-top: 12px;
+}
+
 /* ── Historial clínico (línea de tiempo) ───────────────────────────────────── */
 
 .chart-list {
@@ -880,6 +884,7 @@ body.login {
 
 .login-panel {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 48px clamp(28px, 6vw, 80px);
@@ -1019,6 +1024,53 @@ body.login {
   letter-spacing: 0.08em;
 }
 
+/* ── Mi seguridad (2FA) ────────────────────────────────────────────────────── */
+
+.block {
+  max-width: 620px;
+}
+
+.security-setup {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+  max-width: 780px;
+}
+
+.security-form {
+  max-width: 380px;
+}
+
+.recovery-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 24px;
+  margin: 20px 0 0;
+  padding: 18px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.recovery-list li {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+}
+
+.login-caption-flush {
+  margin-top: 14px !important;
+  padding-top: 0 !important;
+  border-top: 0 !important;
+  text-align: center;
+}
+
+.login-cancel {
+  margin-top: 16px;
+  text-align: center;
+}
+
 /* ── Responsive ────────────────────────────────────────────────────────────── */
 
 @media (max-width: 920px) {
@@ -1112,6 +1164,10 @@ body.login {
     padding: 18px 0 0;
     border-left: 0;
     border-top: 1px solid var(--line-soft);
+  }
+
+  .security-setup {
+    grid-template-columns: 1fr;
   }
 }
 

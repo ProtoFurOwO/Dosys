@@ -14,6 +14,7 @@ object Routes {
     const val QR = "qr"
     const val APPOINTMENTS = "appointments"
     const val CHECKIN = "checkin"
+    const val SECURITY = "security"
 
     fun studyDetail(id: Int): String = "study/$id"
 }

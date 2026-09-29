@@ -13,3 +13,40 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     role: UserRole
+
+
+class TwoFactorChallengeResponse(BaseModel):
+    """Respuesta cuando la contraseña es correcta pero falta el segundo factor."""
+
+    requires_2fa: bool = True
+    challenge_token: str
+    message: str = "Escribe el código de 6 dígitos de tu app autenticadora."
+
+
+class TwoFactorVerifyRequest(BaseModel):
+    challenge_token: str = Field(min_length=20)
+    code: str = Field(min_length=6, max_length=16, examples=["123456"])
+
+
+class TwoFactorSetupResponse(BaseModel):
+    secret: str
+    otpauth_uri: str
+    issuer: str
+
+
+class TwoFactorConfirmRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=16)
+
+
+class TwoFactorEnableResponse(BaseModel):
+    enabled: bool
+    recovery_codes: list[str]
+
+
+class TwoFactorStatusResponse(BaseModel):
+    enabled: bool
+    recovery_codes_remaining: int
+
+
+class TwoFactorDisableRequest(BaseModel):
+    password: str = Field(min_length=8, max_length=128)

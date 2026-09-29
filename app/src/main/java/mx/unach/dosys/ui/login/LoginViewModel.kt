@@ -10,10 +10,16 @@ import kotlinx.coroutines.launch
 import mx.unach.dosys.core.di.ServiceLocator
 import mx.unach.dosys.data.repository.AuthResult
 
+/** Paso actual del inicio de sesión. */
+enum class LoginStep { CREDENTIALS, TWO_FACTOR }
+
 /** Estado de la pantalla de inicio de sesión. */
 data class LoginUiState(
     val username: String = "",
     val password: String = "",
+    val code: String = "",
+    val step: LoginStep = LoginStep.CREDENTIALS,
+    val challengeToken: String? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
     val loggedIn: Boolean = false,
@@ -34,6 +40,11 @@ class LoginViewModel : ViewModel() {
         _state.update { it.copy(password = value, error = null) }
     }
 
+    fun onCodeChange(value: String) {
+        val clean = value.filter { it.isLetterOrDigit() || it == '-' }.uppercase().take(16)
+        _state.update { it.copy(code = clean, error = null) }
+    }
+
     fun login() {
         if (_state.value.isLoading) return
         _state.update { it.copy(isLoading = true, error = null) }
@@ -41,8 +52,38 @@ class LoginViewModel : ViewModel() {
         viewModelScope.launch {
             when (val result = repository.login(_state.value.username.trim(), _state.value.password)) {
                 is AuthResult.Success -> _state.update { it.copy(isLoading = false, loggedIn = true) }
+                is AuthResult.NeedsTwoFactor -> _state.update {
+                    it.copy(
+                        isLoading = false,
+                        step = LoginStep.TWO_FACTOR,
+                        challengeToken = result.challengeToken,
+                        code = "",
+                        error = null,
+                    )
+                }
                 is AuthResult.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
             }
+        }
+    }
+
+    fun verifyCode() {
+        val current = _state.value
+        val challenge = current.challengeToken ?: return
+        if (current.isLoading || current.code.isBlank()) return
+        _state.update { it.copy(isLoading = true, error = null) }
+
+        viewModelScope.launch {
+            when (val result = repository.verifyTwoFactor(challenge, current.code)) {
+                is AuthResult.Success -> _state.update { it.copy(isLoading = false, loggedIn = true) }
+                is AuthResult.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
+                is AuthResult.NeedsTwoFactor -> _state.update { it.copy(isLoading = false) }
+            }
+        }
+    }
+
+    fun backToCredentials() {
+        _state.update {
+            it.copy(step = LoginStep.CREDENTIALS, code = "", challengeToken = null, error = null)
         }
     }
 }

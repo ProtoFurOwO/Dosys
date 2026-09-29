@@ -77,10 +77,15 @@ def main() -> None:
     # 4. Listado con pacientes.
     status, html = get(opener, "/portal")
     assert status == 200
-    match = re.search(r'/portal/pacientes/(\d+)"', html)
-    assert match, "El listado debe mostrar al paciente sembrado"
-    patient_id = int(match.group(1))
-    assert "Matuz" in html
+    # El paciente sembrado puede no ser el primero si hay más registros.
+    patient_id = None
+    for row in html.split("<tr>"):
+        if "Matuz" in row:
+            match = re.search(r"/portal/pacientes/(\d+)", row)
+            if match:
+                patient_id = int(match.group(1))
+                break
+    assert patient_id, "El listado debe mostrar al paciente sembrado"
 
     # 5. Registro de consulta desde el portal.
     marker = f"PORTAL-{datetime.now():%Y%m%d%H%M%S}"

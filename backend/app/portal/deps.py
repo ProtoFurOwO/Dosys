@@ -8,7 +8,7 @@ from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import decode_access_token
+from app.core.security import ACCESS_PURPOSE, decode_token
 from app.models.enums import UserRole
 from app.models.user import User
 
@@ -37,7 +37,8 @@ async def current_doctor(request: Request, db: AsyncSession) -> User | None:
     if not token:
         return None
     try:
-        payload = decode_access_token(token)
+        # Solo tokens de acceso: el token temporal del 2FA no abre el portal.
+        payload = decode_token(token, purpose=ACCESS_PURPOSE)
         user_id = int(payload["sub"])
     except (jwt.PyJWTError, KeyError, TypeError, ValueError):
         return None

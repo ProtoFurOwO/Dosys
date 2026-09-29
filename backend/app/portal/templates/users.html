@@ -44,10 +44,21 @@
           {% else %}
           <span class="chip chip-cancelled">Inactivo</span>
           {% endif %}
+          {% if person.totp_enabled %}
+          <span class="chip chip-done">2FA</span>
+          {% endif %}
+          {% if person.locked %}
+          <span class="chip chip-cancelled">Bloqueada {{ person.lock_minutes }} min</span>
+          {% endif %}
         </td>
         <td class="hide-sm nowrap">{{ person.last_access | fecha_hora }}</td>
         <td class="col-action">
           <div class="row-actions">
+            {% if person.locked %}
+            <form method="post" action="/portal/usuarios/{{ person.id }}/desbloquear">
+              <button class="btn btn-line" type="submit">Desbloquear</button>
+            </form>
+            {% endif %}
             <a class="btn btn-line" href="/portal/usuarios/{{ person.id }}/editar">Editar</a>
             <form method="post" action="/portal/usuarios/{{ person.id }}/reset">
               <button class="btn btn-quiet" type="submit">Restablecer</button>

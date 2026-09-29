@@ -1,0 +1,94 @@
+{% extends "panel.html" %}
+{% block title %}Mi seguridad · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Mi seguridad</h1>
+    <p class="page-note">Segundo factor (2FA) con app autenticadora para la cuenta <strong>{{ username }}</strong>.</p>
+  </div>
+  {% if enabled %}
+  <span class="chip chip-confirmed">2FA activo</span>
+  {% else %}
+  <span class="chip chip-scheduled">2FA inactivo</span>
+  {% endif %}
+</header>
+
+{% if error %}
+<div class="note note-error" role="alert">{{ error }}</div>
+{% endif %}
+
+{% if recovery_codes %}
+<div class="note note-ok" role="status">
+  <p>Guarda estos códigos de recuperación: se muestran una sola vez.</p>
+  <p class="note-sub">Cada código sirve una vez, por si pierdes el teléfono o la app autenticadora.</p>
+</div>
+<article class="credential" id="credencial">
+  <p class="credential-brand">D.O.S.Y.S · Códigos de recuperación</p>
+  <h2 class="credential-name">{{ doctor_name }}</h2>
+  <p class="credential-role">Cuenta {{ username }}</p>
+  <ul class="recovery-list">
+    {% for code in recovery_codes %}
+    <li class="code">{{ code }}</li>
+    {% endfor %}
+  </ul>
+  <p class="credential-note">Imprímelos y guárdalos en un lugar seguro. No se volverán a mostrar.</p>
+</article>
+<div class="credential-actions">
+  <button class="btn btn-line" type="button" data-print>Imprimir códigos</button>
+  <a class="btn btn-quiet" href="/portal/seguridad">Entendido</a>
+</div>
+
+{% elif enabled %}
+<section class="block">
+  <h2 class="section-title">Segundo factor activo</h2>
+  <p class="page-note">
+    Te quedan <strong>{{ remaining }}</strong> códigos de recuperación sin usar.
+    Al iniciar sesión se te pedirá el código de tu app autenticadora.
+  </p>
+  <form class="form" method="post" action="/portal/seguridad/desactivar">
+    <div class="field">
+      <label for="password">Contraseña para desactivarlo</label>
+      <input id="password" name="password" type="password" required autocomplete="current-password">
+      <p class="help">Confirma tu contraseña para apagar el segundo factor de esta cuenta.</p>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-line" type="submit">Desactivar 2FA</button>
+    </div>
+  </form>
+</section>
+
+{% elif qr %}
+<section class="security-setup">
+  <div class="security-qr">
+    <div class="qr">{{ qr | safe }}</div>
+    <p class="qr-help">Escanea con Google Authenticator, Microsoft Authenticator o cualquier app TOTP.</p>
+    <p class="qr-code">Secreto manual: <span>{{ secret }}</span></p>
+  </div>
+  <form class="form security-form" method="post" action="/portal/seguridad/confirmar">
+    <div class="field">
+      <label for="code">Código de 6 dígitos de la app</label>
+      <input id="code" name="code" inputmode="numeric" maxlength="6" placeholder="123456" required autofocus>
+      <p class="help">Con esto confirmamos que la app quedó bien configurada.</p>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">Activar segundo factor</button>
+      <a class="btn btn-quiet" href="/portal/seguridad">Cancelar</a>
+    </div>
+  </form>
+</section>
+
+{% else %}
+<section class="block">
+  <h2 class="section-title">Protege tu cuenta con un segundo factor</h2>
+  <p class="page-note">
+    Además de tu contraseña, al iniciar sesión se pedirá un código temporal que cambia cada 30 segundos.
+    Sirve aunque alguien descubra tu contraseña.
+  </p>
+  <form method="post" action="/portal/seguridad/iniciar">
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">Activar 2FA</button>
+    </div>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

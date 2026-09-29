@@ -100,6 +100,66 @@ Demostración de 7 a 10 minutos con dos dispositivos: **laptop** (portal clínic
 - Lo que sigue: rol administrador, MFA, cambio obligatorio de contraseña, envío real de
   correo, respaldos y monitoreo (está en el README del backend).
 
+## Demo de seguridad (login + 2FA)
+
+### A. Bloqueo por intentos fallidos (2 min)
+
+1. En el portal, cierra sesión y en el login escribe el usuario `maria.argueta` con una
+   contraseña incorrecta **5 veces**.
+2. Al sexto intento (aunque escribas la correcta) verás:
+   *"Cuenta bloqueada temporalmente por intentos fallidos. Intenta de nuevo en 15 minutos."*
+3. Entra con tu cuenta de médico → **Actividad**: están los 5 intentos + el bloqueo.
+4. Para desbloquear: abre el **expediente del paciente** (o la lista de Usuarios para
+   personal) → botón **Desbloquear acceso** → el paciente ya puede entrar.
+
+### B. 2FA con app autenticadora (3 min)
+
+**Requisito previo (hazlo antes de clase):** instala Google Authenticator (o Microsoft
+Authenticator / Authy) en tu celular y **pre-enrola** al paciente demo y al médico, para no
+gastar tiempo en vivo.
+
+- Portal: **Mi seguridad** → *Activar segundo factor* → escanea el QR → escribe el código →
+  aparecen los **8 códigos de recuperación** (imprímelos con el botón).
+- App: **Mi seguridad** → *Activar segundo factor* → escanea el QR → código → guarda los
+  códigos.
+
+**En vivo:**
+
+1. Portal: cierra sesión → entra con `medico` → escribe la contraseña → aparece
+   **"Verificación en dos pasos"** → abre la app autenticadora → escribe el código → dentro.
+2. Prueba un código falso: lo rechaza y queda en la bitácora.
+3. App: lo mismo con `maria.argueta` (o con el paciente que prefieras).
+4. Si quieres lucir el enrolamiento en vivo, crea un **paciente nuevo** y actívalo ahí mismo.
+
+### C. Explicar el JWT (1 min)
+
+El token es la "credencial firmada" de la sesión. Se puede decodificar sin herramientas,
+desde PowerShell:
+
+```powershell
+$token = "PEGA_AQUI_EL_ACCESS_TOKEN"
+$payload = $token.Split('.')[1].Replace('-','+').Replace('_','/')
+switch ($payload.Length % 4) { 2 { $payload += '==' } 3 { $payload += '=' } }
+[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload))
+```
+
+Qué decir al mostrar el resultado:
+
+- Tiene **3 partes**: cabecera, datos (payload) y **firma**. La firma es HMAC-SHA256 con el
+  secreto del servidor: si alguien cambia un dato, el token deja de ser válido.
+- Dentro solo va **quién es** (`sub`), **su rol** (`role`), el **tipo** (`purpose`) y la
+  **caducidad** (`exp`, 30 minutos). **No hay datos clínicos** dentro del token.
+- El token del segundo factor (`purpose: "2fa"`) dura 5 minutos y **no sirve** para llamar a
+  la API: el servidor revisa el `purpose` en cada petición.
+- Al caducar, la app pide iniciar sesión otra vez.
+
+### D. Lo demás que ya estaba (mencionarlo)
+
+- Contraseñas con **Argon2** en la base (abre la tabla `users` y muestra el hash).
+- **Errores genéricos**: usuario inexistente y contraseña mala dan el mismo mensaje.
+- Cookie del portal **HttpOnly** (DevTools → no es legible por JavaScript).
+- HTTPS + Cloudflare (candado) y **HSTS**; Swagger apagado en producción.
+
 ## Frases que ayudan a explicar
 
 - **"Solo lectura para el paciente"**: la app nunca modifica datos clínicos; las únicas

@@ -30,6 +30,16 @@ ACTION_LABELS = {
     "portal_user_deactivated": "Usuario desactivado",
     "portal_reset_password": "Contraseña restablecida",
     "portal_send_credentials": "Credenciales enviadas al paciente (simulado)",
+    # Seguridad del login
+    "account_locked": "Cuenta bloqueada por intentos fallidos",
+    "account_unlocked": "Cuenta desbloqueada",
+    "login_blocked": "Intento de acceso con cuenta bloqueada",
+    "login_2fa_challenge": "Segundo factor solicitado",
+    "login_2fa_success": "Segundo factor correcto",
+    "login_2fa_failed": "Segundo factor incorrecto",
+    "two_factor_enabled": "Segundo factor activado",
+    "two_factor_disabled": "Segundo factor desactivado",
+    "recovery_code_used": "Código de recuperación usado",
 }
 
 

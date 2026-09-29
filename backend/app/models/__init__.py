@@ -4,6 +4,7 @@ from app.models.consultation import Consultation
 from app.models.doctor import Doctor
 from app.models.enums import AppointmentStatus, UserRole
 from app.models.patient import Patient
+from app.models.recovery_code import RecoveryCode
 from app.models.user import User
 
 __all__ = [
@@ -13,6 +14,7 @@ __all__ = [
     "Consultation",
     "Doctor",
     "Patient",
+    "RecoveryCode",
     "User",
     "UserRole",
 ]

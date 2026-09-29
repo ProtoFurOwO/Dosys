@@ -6,6 +6,12 @@ import mx.unach.dosys.data.model.LoginResponse
 import mx.unach.dosys.data.model.PatientAppointment
 import mx.unach.dosys.data.model.PatientConsultation
 import mx.unach.dosys.data.model.PatientProfile
+import mx.unach.dosys.data.model.TwoFactorConfirmRequest
+import mx.unach.dosys.data.model.TwoFactorDisableRequest
+import mx.unach.dosys.data.model.TwoFactorEnableResult
+import mx.unach.dosys.data.model.TwoFactorSetup
+import mx.unach.dosys.data.model.TwoFactorStatus
+import mx.unach.dosys.data.model.TwoFactorVerifyRequest
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
@@ -16,13 +22,34 @@ import retrofit2.http.Path
  * Contrato de la API REST (backend en FastAPI).
  *
  * Nota de seguridad: el rol PACIENTE solo dispone de endpoints de LECTURA.
- * Las únicas escrituras permitidas son el inicio de sesión y confirmar la
- * llegada de una cita con el código del hospital (check-in).
+ * Las únicas escrituras permitidas son el inicio de sesión, el segundo factor,
+ * confirmar la llegada de una cita (check-in) y la seguridad de su propia cuenta.
  */
 interface ApiService {
 
     @POST("auth/login")
     suspend fun login(@Body request: LoginRequest): LoginResponse
+
+    @POST("auth/2fa/verify")
+    suspend fun verifyTwoFactor(@Body request: TwoFactorVerifyRequest): LoginResponse
+
+    @GET("auth/2fa/status")
+    suspend fun twoFactorStatus(@Header("Authorization") authorization: String): TwoFactorStatus
+
+    @POST("auth/2fa/setup")
+    suspend fun setupTwoFactor(@Header("Authorization") authorization: String): TwoFactorSetup
+
+    @POST("auth/2fa/confirm")
+    suspend fun confirmTwoFactor(
+        @Header("Authorization") authorization: String,
+        @Body request: TwoFactorConfirmRequest,
+    ): TwoFactorEnableResult
+
+    @POST("auth/2fa/disable")
+    suspend fun disableTwoFactor(
+        @Header("Authorization") authorization: String,
+        @Body request: TwoFactorDisableRequest,
+    ): TwoFactorStatus
 
     @GET("patients/me")
     suspend fun me(@Header("Authorization") authorization: String): PatientProfile
@@ -43,5 +70,5 @@ interface ApiService {
     // Próximos endpoints:
     // @GET("study-orders")         estudios y resultados
     // @GET("prescriptions")        recetas + tomas
-    // @POST("qr/token")            token temporal para el check-in
+    // @GET("qr/token")            token temporal para el check-in
 }

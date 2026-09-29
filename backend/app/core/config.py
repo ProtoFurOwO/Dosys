@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = Field(default=30, ge=5, le=120)
     cors_origins: str = "http://localhost:5173,http://10.0.2.2"
 
+    # Seguridad del login.
+    login_max_attempts: int = Field(default=5, ge=3, le=10)
+    login_lock_minutes: int = Field(default=15, ge=1, le=120)
+    totp_issuer: str = "D.O.S.Y.S"
+    two_factor_challenge_minutes: int = Field(default=5, ge=1, le=15)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

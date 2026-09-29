@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Verificación en dos pasos · D.O.S.Y.S Portal clínico{% endblock %}
+{% block body_class %}login{% endblock %}
+{% block body %}
+<main class="login-grid">
+  <section class="login-intro">
+    <span class="brand">
+      <span class="brand-mark brand-mark-lg" aria-hidden="true"></span>
+      <span class="brand-text">
+        <strong>D.O.S.Y.S</strong>
+        <small>Sistema hospitalario</small>
+      </span>
+    </span>
+    <h1>Verificación en dos pasos</h1>
+    <p>
+      Tu contraseña es correcta. Falta el segundo factor: abre tu app autenticadora
+      y escribe el código de 6 dígitos.
+    </p>
+    <p class="login-caption">
+      Si perdiste el teléfono, usa uno de tus códigos de recuperación en el mismo campo.
+    </p>
+  </section>
+  <section class="login-panel">
+    <form class="login-form" method="post" action="/portal/2fa" novalidate>
+      <h2 class="form-title">Código de verificación</h2>
+
+      {% if error %}
+      <div class="note note-error" role="alert">{{ error }}</div>
+      {% endif %}
+
+      <div class="field">
+        <label for="code">Código de 6 dígitos</label>
+        <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="16"
+               placeholder="123456" required autofocus>
+        <p class="help">También puedes escribir un código de recuperación (formato XXXX-XXXX).</p>
+      </div>
+
+      <button class="btn btn-primary btn-wide" type="submit">Verificar</button>
+      <p class="login-caption login-caption-flush">
+        Usuario: <strong>{{ username }}</strong>
+      </p>
+    </form>
+    <form method="post" action="/portal/2fa/cancelar" class="login-cancel">
+      <button class="btn btn-quiet" type="submit">Cancelar e iniciar sesión de nuevo</button>
+    </form>
+  </section>
+</main>
+{% endblock %}

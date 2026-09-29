@@ -6,6 +6,16 @@ from app.models.audit_log import AuditLog
 from app.models.consultation import Consultation
 from app.models.doctor import Doctor
 from app.models.patient import Patient
+from app.models.recovery_code import RecoveryCode
 from app.models.user import User
 
-__all__ = ["Base", "User", "Patient", "Doctor", "Consultation", "Appointment", "AuditLog"]
+__all__ = [
+    "Base",
+    "User",
+    "Patient",
+    "Doctor",
+    "Consultation",
+    "Appointment",
+    "AuditLog",
+    "RecoveryCode",
+]

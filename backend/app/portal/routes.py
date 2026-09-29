@@ -13,7 +13,13 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.security import create_access_token, verify_password
+from app.core.security import (
+    TWO_FACTOR_PURPOSE,
+    create_access_token,
+    create_challenge_token,
+    decode_token,
+    verify_password,
+)
 from app.db.session import get_db
 from app.models.appointment import Appointment
 from app.models.consultation import Consultation
@@ -25,6 +31,7 @@ from app.portal import deps
 from app.portal.labels import ROLE_LABELS
 from app.portal.qr import qr_svg
 from app.portal.templating import credential_context, templates
+from app.services import login_security, two_factor
 from app.services.appointments import create_appointment
 from app.services.audit import write_audit_event
 from app.services.consultations import create_consultation
@@ -38,6 +45,8 @@ from app.services.users import (
 )
 
 router = APIRouter(prefix="/portal", tags=["Portal clínico"], include_in_schema=False)
+
+TWO_FACTOR_COOKIE = "dosys_2fa"
 
 REASON_MIN, REASON_MAX = 3, 300
 DIAGNOSIS_MIN, DIAGNOSIS_MAX = 3, 500
@@ -72,6 +81,19 @@ def render_login(request: Request, *, error: str | None, username: str = "", cod
     )
 
 
+def set_session_cookie(response: RedirectResponse, token: str, expires_in: int) -> RedirectResponse:
+    response.set_cookie(
+        deps.COOKIE_NAME,
+        token,
+        max_age=expires_in,
+        httponly=True,
+        secure=settings.app_env != "development",
+        samesite="lax",
+        path="/portal",
+    )
+    return response
+
+
 # ── Sesión ────────────────────────────────────────────────────────────────────
 
 
@@ -91,7 +113,40 @@ async def login_submit(
 ) -> HTMLResponse:
     user = await db.scalar(select(User).where(User.username == username.strip().lower()))
 
+    # Cuenta bloqueada por intentos fallidos: ni la contraseña correcta entra.
+    if user is not None and login_security.is_locked(user):
+        await write_audit_event(
+            db,
+            user=user,
+            action="login_blocked",
+            entity_type="authentication",
+            entity_id=user.id,
+            request=request,
+        )
+        await db.commit()
+        return render_login(
+            request,
+            error=(
+                "Cuenta bloqueada temporalmente por intentos fallidos. "
+                f"Intenta de nuevo en {login_security.lock_minutes_left(user)} minutos."
+            ),
+            username=username.strip(),
+            code=status.HTTP_423_LOCKED,
+        )
+
     if user is None or not user.is_active or not verify_password(password, user.password_hash):
+        if user is not None and user.is_active:
+            locked = await login_security.register_failed_attempt(db, user)
+            if locked:
+                await write_audit_event(
+                    db,
+                    user=user,
+                    action="account_locked",
+                    entity_type="authentication",
+                    entity_id=user.id,
+                    request=request,
+                    detail=f"intentos={settings.login_max_attempts} bloqueo_min={settings.login_lock_minutes}",
+                )
         await write_audit_event(
             db,
             user=None,
@@ -126,6 +181,32 @@ async def login_submit(
             code=status.HTTP_403_FORBIDDEN,
         )
 
+    await login_security.reset_failed_attempts(db, user)
+
+    # Segundo factor: no se entrega la sesión hasta verificar el código.
+    if user.totp_enabled and user.totp_secret:
+        challenge, challenge_ttl = create_challenge_token(user.id)
+        await write_audit_event(
+            db,
+            user=user,
+            action="login_2fa_challenge",
+            entity_type="authentication",
+            entity_id=user.id,
+            request=request,
+        )
+        await db.commit()
+        response = RedirectResponse("/portal/2fa", status_code=status.HTTP_303_SEE_OTHER)
+        response.set_cookie(
+            TWO_FACTOR_COOKIE,
+            challenge,
+            max_age=challenge_ttl,
+            httponly=True,
+            secure=settings.app_env != "development",
+            samesite="lax",
+            path="/portal",
+        )
+        return response
+
     token, expires_in = create_access_token(user.id, user.role)
     await write_audit_event(
         db,
@@ -137,17 +218,267 @@ async def login_submit(
     )
     await db.commit()
 
-    response = RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER)
-    response.set_cookie(
-        deps.COOKIE_NAME,
-        token,
-        max_age=expires_in,
-        httponly=True,
-        secure=settings.app_env != "development",
-        samesite="lax",
-        path="/portal",
+    return set_session_cookie(RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER), token, expires_in)
+
+
+# ── Segundo factor del portal ─────────────────────────────────────────────────
+
+
+async def _pending_two_factor_user(request: Request, db: AsyncSession) -> User | None:
+    token = request.cookies.get(TWO_FACTOR_COOKIE)
+    if not token:
+        return None
+    try:
+        decoded = decode_token(token, purpose=TWO_FACTOR_PURPOSE)
+        user_id = int(decoded["sub"])
+    except Exception:
+        return None
+    user = await db.get(User, user_id)
+    if user is None or not user.is_active or not user.totp_enabled or not user.totp_secret:
+        return None
+    return user
+
+
+@router.get("/2fa", response_class=HTMLResponse)
+async def two_factor_page(request: Request, db: AsyncSession = Depends(get_db)) -> HTMLResponse:
+    user = await _pending_two_factor_user(request, db)
+    if user is None:
+        return login_redirect()
+    return templates.TemplateResponse(
+        request,
+        "two_factor.html",
+        {"error": None, "username": user.username},
     )
+
+
+@router.post("/2fa", response_class=HTMLResponse)
+async def two_factor_submit(
+    request: Request,
+    code: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    user = await _pending_two_factor_user(request, db)
+    if user is None:
+        return login_redirect()
+
+    used_recovery = False
+    valid = two_factor.verify_code(user.totp_secret, code)
+    if not valid:
+        used_recovery = await two_factor.consume_recovery_code(db, user, code)
+        valid = used_recovery
+
+    if not valid:
+        await write_audit_event(
+            db,
+            user=user,
+            action="login_2fa_failed",
+            entity_type="authentication",
+            entity_id=user.id,
+            request=request,
+        )
+        await db.commit()
+        return templates.TemplateResponse(
+            request,
+            "two_factor.html",
+            {"error": "Código incorrecto. Revisa tu app autenticadora e intenta de nuevo.", "username": user.username},
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if used_recovery:
+        await write_audit_event(
+            db,
+            user=user,
+            action="recovery_code_used",
+            entity_type="authentication",
+            entity_id=user.id,
+            request=request,
+        )
+
+    token, expires_in = create_access_token(user.id, user.role)
+    await write_audit_event(
+        db,
+        user=user,
+        action="login_2fa_success",
+        entity_type="authentication",
+        entity_id=user.id,
+        request=request,
+    )
+    await db.commit()
+
+    response = RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER)
+    response.delete_cookie(TWO_FACTOR_COOKIE, path="/portal")
+    return set_session_cookie(response, token, expires_in)
+
+
+@router.post("/2fa/cancelar")
+async def two_factor_cancel() -> RedirectResponse:
+    response = RedirectResponse("/portal/login", status_code=status.HTTP_303_SEE_OTHER)
+    response.delete_cookie(TWO_FACTOR_COOKIE, path="/portal")
     return response
+
+
+# ── Mi seguridad (2FA del médico) ─────────────────────────────────────────────
+
+
+def security_context(
+    doctor_name: str,
+    *,
+    user: User,
+    enabled: bool,
+    remaining: int,
+    otpauth_uri: str | None = None,
+    secret: str | None = None,
+    recovery_codes: list[str] | None = None,
+    error: str | None = None,
+) -> dict:
+    return {
+        "doctor_name": doctor_name,
+        "active": "seguridad",
+        "enabled": enabled,
+        "remaining": remaining,
+        "otpauth_uri": otpauth_uri,
+        "qr": qr_svg(otpauth_uri) if otpauth_uri else None,
+        "secret": secret,
+        "recovery_codes": recovery_codes,
+        "error": error,
+        "username": user.username,
+    }
+
+
+@router.get("/seguridad", response_class=HTMLResponse)
+async def security_page(request: Request, db: AsyncSession = Depends(get_db)) -> HTMLResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await doctor_profile(db, user)
+    if doctor is None:
+        return login_redirect()
+
+    enabled = user.totp_enabled
+    pending = bool(user.totp_secret) and not enabled
+    return templates.TemplateResponse(
+        request,
+        "security.html",
+        security_context(
+            doctor.full_name,
+            user=user,
+            enabled=enabled,
+            remaining=await two_factor.recovery_codes_remaining(db, user) if enabled else 0,
+            otpauth_uri=two_factor.provisioning_uri(user.totp_secret, user.username) if pending else None,
+            secret=user.totp_secret if pending else None,
+        ),
+    )
+
+
+@router.post("/seguridad/iniciar")
+async def security_start(request: Request, db: AsyncSession = Depends(get_db)) -> RedirectResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    if not user.totp_enabled:
+        user.totp_secret = two_factor.generate_secret()
+        await db.flush()
+        await db.commit()
+    return RedirectResponse("/portal/seguridad", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/seguridad/confirmar", response_class=HTMLResponse)
+async def security_confirm(
+    request: Request,
+    code: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await doctor_profile(db, user)
+    if doctor is None:
+        return login_redirect()
+
+    if not user.totp_secret:
+        return RedirectResponse("/portal/seguridad", status_code=status.HTTP_303_SEE_OTHER)
+
+    if not two_factor.verify_code(user.totp_secret, code):
+        return templates.TemplateResponse(
+            request,
+            "security.html",
+            security_context(
+                doctor.full_name,
+                user=user,
+                enabled=False,
+                remaining=0,
+                otpauth_uri=two_factor.provisioning_uri(user.totp_secret, user.username),
+                secret=user.totp_secret,
+                error="El código no coincide. Revisa la hora de tu teléfono e intenta otra vez.",
+            ),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    codes = two_factor.generate_recovery_codes()
+    await two_factor.store_recovery_codes(db, user, codes)
+    user.totp_enabled = True
+    user.totp_confirmed_at = datetime.now(timezone.utc)
+    await write_audit_event(
+        db,
+        user=user,
+        action="two_factor_enabled",
+        entity_type="authentication",
+        entity_id=user.id,
+        request=request,
+    )
+    await db.commit()
+
+    return templates.TemplateResponse(
+        request,
+        "security.html",
+        security_context(
+            doctor.full_name,
+            user=user,
+            enabled=True,
+            remaining=len(codes),
+            recovery_codes=codes,
+        ),
+    )
+
+
+@router.post("/seguridad/desactivar", response_class=HTMLResponse)
+async def security_disable(
+    request: Request,
+    password: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await doctor_profile(db, user)
+    if doctor is None:
+        return login_redirect()
+
+    if not verify_password(password, user.password_hash):
+        return templates.TemplateResponse(
+            request,
+            "security.html",
+            security_context(
+                doctor.full_name,
+                user=user,
+                enabled=user.totp_enabled,
+                remaining=await two_factor.recovery_codes_remaining(db, user),
+                error="Contraseña incorrecta. No se desactivó el segundo factor.",
+            ),
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    await two_factor.clear_two_factor(db, user)
+    await write_audit_event(
+        db,
+        user=user,
+        action="two_factor_disabled",
+        entity_type="authentication",
+        entity_id=user.id,
+        request=request,
+    )
+    await db.commit()
+    return RedirectResponse("/portal/seguridad", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/salir")
@@ -240,6 +571,7 @@ async def patient_detail(
             request, "not_found.html", {"doctor_name": doctor.full_name}, status_code=status.HTTP_404_NOT_FOUND
         )
 
+    account = await db.scalar(select(User).where(User.id == patient.user_id))
     rows = (
         await db.execute(
             select(Consultation, Doctor)
@@ -281,8 +613,42 @@ async def patient_detail(
             "patient": patient,
             "consultations": consultations,
             "created": created,
+            "locked": login_security.is_locked(account) if account else False,
+            "lock_minutes": login_security.lock_minutes_left(account) if account else 0,
         },
     )
+
+
+@router.post("/pacientes/{patient_id:int}/desbloquear")
+async def patient_unlock(
+    patient_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Levanta el bloqueo del acceso del paciente (lo pide en consulta o recepción)."""
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+
+    patient = await db.get(Patient, patient_id)
+    if patient is None:
+        return RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER)
+
+    account = await db.scalar(select(User).where(User.id == patient.user_id))
+    if account is not None:
+        await login_security.reset_failed_attempts(db, account)
+        await write_audit_event(
+            db,
+            user=user,
+            action="account_unlocked",
+            entity_type="user",
+            entity_id=account.id,
+            request=request,
+            detail=f"username={account.username}",
+        )
+        await db.commit()
+
+    return RedirectResponse(f"/portal/pacientes/{patient.id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 # ── Citas ─────────────────────────────────────────────────────────────────────

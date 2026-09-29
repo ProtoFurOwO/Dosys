@@ -6,7 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import decode_access_token
+from app.core.security import ACCESS_PURPOSE, decode_token
 from app.db.session import get_db
 from app.models.enums import UserRole
 from app.models.user import User
@@ -27,7 +27,8 @@ async def get_current_user(
         )
 
     try:
-        payload = decode_access_token(credentials.credentials)
+        # Solo se aceptan tokens de acceso: un token de desafío 2FA no sirve aquí.
+        payload = decode_token(credentials.credentials, purpose=ACCESS_PURPOSE)
         user_id = int(payload["sub"])
     except (jwt.PyJWTError, KeyError, TypeError, ValueError):
         raise HTTPException(

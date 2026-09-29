@@ -17,6 +17,9 @@ Backend académico con **FastAPI + SQLAlchemy async + Alembic + PostgreSQL** y u
   escanea con la cámara para confirmar su llegada.
 - **Registro de cuentas**: el médico da de alta pacientes y médicos; el sistema genera la
   credencial (se muestra una vez, se puede imprimir y se simula su envío por correo).
+- **Login seguro**: bloqueo de la cuenta tras 5 intentos fallidos (con desbloqueo desde el
+  portal), **segundo factor TOTP** (Google Authenticator y similares) para médicos y
+  pacientes, y **códigos de recuperación** de un solo uso.
 - PostgreSQL aislado, migraciones Alembic versionadas y bitácora de auditoría de todos
   los accesos, sin guardar tokens ni texto clínico.
 
@@ -79,7 +82,11 @@ Con los contenedores levantados:
 py -3.12 scripts\verify_vertical_slice.py   # API: médico crea, paciente lee, RBAC 401/403
 py -3.12 scripts\verify_portal.py           # Portal: pacientes, consultas, citas, usuarios, credenciales y bitácora
 py -3.12 scripts\verify_checkin.py          # Check-in: código incorrecto 400, correcto 200 e idempotente
+py -3.12 scripts\verify_login_security.py   # Login: bloqueo 423, desbloqueo, 2FA y códigos de recuperación
 ```
+
+Para pruebas manuales del segundo factor está `scripts\totp_code.py <secreto>`: genera el
+código de 6 dígitos a partir del secreto (útil si el teléfono no está a mano).
 
 Los tres scripts aceptan `DOSYS_API_URL` para apuntar a otro entorno (por ejemplo el VPS).
 
@@ -128,11 +135,13 @@ Swagger queda desactivado en producción (`DOCS_ENABLED=false`); el personal usa
 
 ## Seguridad: estado y pendientes
 
-**Ya implementado:** JWT de corta duración, contraseñas con Argon2, RBAC validado en
-servidor, bitácora de auditoría visible desde el portal, HTTPS en producción, cookie del
-portal `HttpOnly` y `SameSite=Lax`, cabeceras de seguridad (CSP, X-Frame-Options), Swagger
-apagado en producción, PostgreSQL sin puertos públicos, alta de cuentas con contraseña
-temporal mostrada una sola vez y gestión de usuarios restringida al rol médico.
+**Ya implementado:** JWT de corta duración (30 min) firmado y con `purpose`, contraseñas con
+Argon2, RBAC validado en servidor, bitácora de auditoría visible desde el portal,
+**bloqueo por intentos fallidos** con desbloqueo, **segundo factor TOTP** con códigos de
+recuperación, HTTPS en producción + HSTS, cookie del portal `HttpOnly` y `SameSite=Lax`,
+cabeceras de seguridad (CSP, X-Frame-Options), Swagger apagado en producción, PostgreSQL sin
+puertos públicos, alta de cuentas con contraseña temporal mostrada una sola vez y gestión de
+usuarios restringida al rol médico.
 
 **Falta antes de usar datos reales:**
 
@@ -140,8 +149,7 @@ temporal mostrada una sola vez y gestión de usuarios restringida al rol médico
    - Rol `admin` dedicado para la gestión de usuarios (hoy lo hace cualquier médico).
    - Cambio obligatorio de contraseña en el primer inicio de sesión.
    - Refresh tokens con revocación y cierre de sesión por inactividad.
-   - Recuperación de contraseña y bloqueo por intentos fallidos.
-   - Segundo factor (MFA) para el personal médico.
+   - Recuperación de contraseña por correo y bloqueo distribuido (hoy es por base de datos).
    - Restringir el portal a red interna o VPN, como pide el análisis inicial.
    - Relación médico-paciente: hoy el médico ve a todos los pacientes del hospital.
 2. **Protección de datos**

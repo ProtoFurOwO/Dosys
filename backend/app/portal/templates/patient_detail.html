@@ -26,6 +26,16 @@
 </div>
 {% endif %}
 
+{% if locked %}
+<div class="note note-error" role="alert">
+  <p>El acceso de este paciente está bloqueado por intentos fallidos ({{ lock_minutes }} min restantes).</p>
+  <p class="note-sub">Puedes desbloquearlo para que vuelva a entrar a la app.</p>
+  <form method="post" action="/portal/pacientes/{{ patient.id }}/desbloquear" class="note-action">
+    <button class="btn btn-line" type="submit">Desbloquear acceso</button>
+  </form>
+</div>
+{% endif %}
+
 <section class="chart">
   <h2 class="section-title">Historial de consultas</h2>
 

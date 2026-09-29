@@ -15,6 +15,7 @@ from app.models.user import User
 from app.portal import deps
 from app.portal.labels import ROLE_LABELS, action_label
 from app.portal.templating import credential_context, templates
+from app.services import login_security
 from app.services.audit import write_audit_event
 from app.services.users import (
     EMAIL_PATTERN,
@@ -106,6 +107,9 @@ async def users_page(request: Request, aviso: str = "", db: AsyncSession = Depen
             "specialty": profile.specialty if profile else None,
             "last_access": last_access.get(account.id),
             "is_self": account.id == current_user.id,
+            "totp_enabled": account.totp_enabled,
+            "locked": login_security.is_locked(account),
+            "lock_minutes": login_security.lock_minutes_left(account),
         }
         for account, profile in rows
     ]
@@ -338,6 +342,36 @@ async def user_toggle_state(
         db,
         user=current_user,
         action="portal_user_activated" if account.is_active else "portal_user_deactivated",
+        entity_type="user",
+        entity_id=account.id,
+        request=request,
+        detail=f"username={account.username}",
+    )
+    await db.commit()
+    return users_redirect()
+
+
+@router.post("/usuarios/{user_id:int}/desbloquear")
+async def user_unlock(
+    user_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Quita el bloqueo por intentos fallidos (para soporte y para la demo)."""
+    session = await require_staff(request, db)
+    if session is None:
+        return login_redirect()
+    current_user, _ = session
+
+    account = await db.get(User, user_id)
+    if account is None:
+        return users_redirect("no-encontrado")
+
+    await login_security.reset_failed_attempts(db, account)
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="account_unlocked",
         entity_type="user",
         entity_id=account.id,
         request=request,

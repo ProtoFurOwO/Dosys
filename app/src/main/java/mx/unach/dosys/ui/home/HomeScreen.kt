@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,6 +58,7 @@ fun HomeScreen(
     onOpenQr: () -> Unit,
     onOpenAppointments: () -> Unit,
     onOpenCheckIn: () -> Unit,
+    onOpenSecurity: () -> Unit,
     viewModel: HomeViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -135,7 +137,10 @@ fun HomeScreen(
                 }
             }
             item {
-                QuickAccess(Icons.Filled.QrCodeScanner, "Check-in con QR", Modifier.fillMaxWidth(), onOpenCheckIn)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    QuickAccess(Icons.Filled.QrCodeScanner, "Check-in con QR", Modifier.weight(1f), onOpenCheckIn)
+                    QuickAccess(Icons.Filled.Shield, "Mi seguridad", Modifier.weight(1f), onOpenSecurity)
+                }
             }
             item {
                 Text(

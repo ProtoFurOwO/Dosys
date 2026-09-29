@@ -60,6 +60,9 @@ async def security_headers(request: Request, call_next):
     """Cabeceras mínimas de seguridad para el HTML del personal médico."""
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    if settings.app_env != "development":
+        # En producción todo va por HTTPS: el navegador no debe volver a HTTP.
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     if request.url.path.startswith("/portal"):
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "same-origin")
