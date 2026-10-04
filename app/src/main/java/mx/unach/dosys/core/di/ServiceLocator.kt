@@ -9,6 +9,7 @@ import mx.unach.dosys.data.repository.RemotePatientRepository
 import mx.unach.dosys.data.repository.RemoteSecurityRepository
 import mx.unach.dosys.data.repository.SecurityRepository
 import mx.unach.dosys.data.remote.NetworkModule
+import mx.unach.dosys.data.remote.TokenRefresher
 
 /**
  * Contenedor de dependencias sencillo (service locator).
@@ -31,8 +32,9 @@ object ServiceLocator {
     fun init(context: Context) {
         sessionManager = SessionManager(context.applicationContext)
         val api = NetworkModule.create()
+        val refresher = TokenRefresher(api, sessionManager)
         authRepository = RemoteAuthRepository(api, sessionManager)
-        patientRepository = RemotePatientRepository(api, sessionManager)
-        securityRepository = RemoteSecurityRepository(api, sessionManager)
+        patientRepository = RemotePatientRepository(api, sessionManager, refresher)
+        securityRepository = RemoteSecurityRepository(api, sessionManager, refresher)
     }
 }

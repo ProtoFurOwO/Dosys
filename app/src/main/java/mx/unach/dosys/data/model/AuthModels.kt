@@ -72,3 +72,31 @@ data class TwoFactorEnableResult(
 data class TwoFactorDisableRequest(
     val password: String,
 )
+
+// ── Sesión renovable y contraseña ─────────────────────────────────────────────
+
+/** Renovación de la sesión sin volver a pedir credenciales. */
+@Serializable
+data class RefreshRequest(
+    @SerialName("refresh_token") val refreshToken: String,
+)
+
+/** Cambio de contraseña propio desde la app. */
+@Serializable
+data class ChangePasswordRequest(
+    @SerialName("current_password") val currentPassword: String,
+    @SerialName("new_password") val newPassword: String,
+    @SerialName("new_password_confirm") val newPasswordConfirm: String,
+)
+
+/** Respuesta simple con el mensaje del servidor. */
+@Serializable
+data class SimpleMessage(
+    val detail: String = "",
+)
+
+/** Cierre de sesión: revoca el token de renovación en el servidor. */
+@Serializable
+data class LogoutRequest(
+    @SerialName("refresh_token") val refreshToken: String,
+)

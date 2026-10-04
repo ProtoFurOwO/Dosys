@@ -6,6 +6,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import mx.unach.dosys.core.auth.SessionManager
 import mx.unach.dosys.data.model.LoginRequest
+import mx.unach.dosys.data.model.LogoutRequest
 import mx.unach.dosys.data.model.TwoFactorVerifyRequest
 import mx.unach.dosys.data.remote.ApiService
 import retrofit2.HttpException
@@ -24,6 +25,9 @@ sealed interface AuthResult {
 interface AuthRepository {
     suspend fun login(username: String, password: String): AuthResult
     suspend fun verifyTwoFactor(challengeToken: String, code: String): AuthResult
+
+    /** Cierra la sesión local y revoca el token de renovación en el servidor. */
+    suspend fun logout()
 }
 
 /** Mensaje del backend (campo detail) para no inventar textos distintos a la API. */
@@ -46,12 +50,16 @@ class FakeAuthRepository(private val session: SessionManager) : AuthRepository {
             return AuthResult.Error("Usuario o contraseña incorrectos")
         }
         val token = "demo-token-jwt"
-        session.saveToken(token)
+        session.saveSession(token)
         return AuthResult.Success(token)
     }
 
     override suspend fun verifyTwoFactor(challengeToken: String, code: String): AuthResult =
         AuthResult.Error("El segundo factor no está disponible en el modo demo")
+
+    override suspend fun logout() {
+        session.clear()
+    }
 }
 
 /** Implementación REAL contra la API del hospital. */
@@ -69,7 +77,7 @@ class RemoteAuthRepository(
             response.role != "patient" -> AuthResult.Error("Este acceso es exclusivo para pacientes")
 
             response.accessToken != null -> {
-                session.saveToken(response.accessToken)
+                session.saveSession(response.accessToken, response.refreshToken)
                 AuthResult.Success(response.accessToken)
             }
 
@@ -97,7 +105,7 @@ class RemoteAuthRepository(
         if (token == null) {
             AuthResult.Error("No se pudo completar la verificación. Intenta de nuevo")
         } else {
-            session.saveToken(token)
+            session.saveSession(token, response.refreshToken)
             AuthResult.Success(token)
         }
     } catch (cancellation: CancellationException) {
@@ -111,5 +119,19 @@ class RemoteAuthRepository(
         AuthResult.Error("No se pudo conectar con el servidor")
     } catch (error: Exception) {
         AuthResult.Error("No se pudo verificar el código. Intenta más tarde")
+    }
+
+    override suspend fun logout() {
+        val refreshToken = session.currentRefreshToken()
+        if (!refreshToken.isNullOrBlank()) {
+            try {
+                api.logout(LogoutRequest(refreshToken))
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                // Si el servidor no responde, la sesión local se cierra de todos modos.
+            }
+        }
+        session.clear()
     }
 }

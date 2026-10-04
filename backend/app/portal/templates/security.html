@@ -17,6 +17,10 @@
 <div class="note note-error" role="alert">{{ error }}</div>
 {% endif %}
 
+{% if notice %}
+<div class="note note-ok" role="status">{{ notice }}</div>
+{% endif %}
+
 {% if recovery_codes %}
 <div class="note note-ok" role="status">
   <p>Guarda estos códigos de recuperación: se muestran una sola vez.</p>
@@ -94,4 +98,40 @@
   </form>
 </section>
 {% endif %}
+
+<section class="block">
+  <h2 class="section-title">Contraseña de la cuenta</h2>
+  <form class="form" method="post" action="/portal/seguridad/contrasena">
+    <div class="field">
+      <label for="current_password">Contraseña actual</label>
+      <input id="current_password" name="current_password" type="password" required autocomplete="current-password">
+    </div>
+    <div class="field">
+      <label for="new_password">Contraseña nueva</label>
+      <input id="new_password" name="new_password" type="password" required autocomplete="new-password">
+      <p class="help">Mínimo 8 caracteres, con letras y números.</p>
+    </div>
+    <div class="field">
+      <label for="new_password_confirm">Repite la contraseña nueva</label>
+      <input id="new_password_confirm" name="new_password_confirm" type="password" required autocomplete="new-password">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">Cambiar contraseña</button>
+    </div>
+  </form>
+</section>
+
+<section class="block">
+  <h2 class="section-title">Correo de la cuenta</h2>
+  <p class="page-note">Se usa para iniciar sesión y para recuperar la contraseña si la olvidas.</p>
+  <form class="form" method="post" action="/portal/seguridad/correo">
+    <div class="field">
+      <label for="email">Correo</label>
+      <input id="email" name="email" type="email" value="{{ account_email or '' }}" autocomplete="email">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-line" type="submit">Guardar correo</button>
+    </div>
+  </form>
+</section>
 {% endblock %}

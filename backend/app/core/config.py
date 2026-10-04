@@ -29,6 +29,16 @@ class Settings(BaseSettings):
     documents_max_mb: int = Field(default=10, ge=1, le=50)
     documents_signing_key: str = ""
 
+    # Cuentas: sesión renovable, recuperación y límite de peticiones.
+    refresh_token_expire_days: int = Field(default=7, ge=1, le=30)
+    password_reset_expire_minutes: int = Field(default=15, ge=5, le=60)
+    auth_rate_limit_per_minute: int = Field(default=20, ge=5, le=120)
+    public_base_url: str = "http://127.0.0.1:8000"
+
+    # Envío de correo (si está vacío se usa la vista previa simulada).
+    resend_api_key: str = ""
+    email_from: str = "D.O.S.Y.S <no-reply@example.com>"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

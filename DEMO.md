@@ -163,7 +163,6 @@ Qué decir al mostrar el resultado:
 ## Demo de roles, permisos y documentos
 
 ### E. Roles y permisos (panel de administración)
-
 Usa la cuenta `admin` / `Admin123!` (el rol médico no ve esta sección: así se muestra el
 control por permisos).
 
@@ -185,6 +184,24 @@ control por permisos).
    con la app que elijas: visor de PDF, galería…).
 5. *Opcional (si quieres el efecto "wow")*: altera el archivo en el servidor y vuelve a
    **Verificar** → *"El archivo no coincide con la huella registrada"*.
+
+### G. Cambio y recuperación de contraseña (2 min)
+
+1. En el portal, **Mi seguridad** → *Contraseña de la cuenta*: cambia la contraseña del
+   médico de prueba (actual + nueva). El aviso confirma y las sesiones renovables se cierran.
+2. Cierra sesión y en el acceso usa **¿Olvidaste tu contraseña?** con el usuario: se muestra
+   la **vista previa del correo** (sin proveedor configurado) con el enlace de un solo uso.
+3. Abre el enlace, crea la contraseña nueva y entra: el enlace ya no vuelve a servir.
+4. Menciona la **sesión renovable**: el acceso dura 30 min y se renueva solo hasta 7 días
+   (con rotación y revocación en la base); en la app el mismo mecanismo renueva sin pedir
+   credenciales otra vez.
+
+### H. Límite de peticiones y API de administración (1 min)
+
+- Repite el login con contraseña incorrecta más de 20 veces en un minuto: el servidor
+  responde **429 (demasiadas solicitudes)** antes de que el bloqueo de la cuenta actúe.
+- En local, abre `/docs`: están documentados `GET/PUT/DELETE /admin/users` y
+  `GET/PUT/DELETE /admin/roles` (en producción Swagger va apagado).
 
 ## Frases que ayudan a explicar
 

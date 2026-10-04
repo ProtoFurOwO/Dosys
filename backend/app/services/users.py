@@ -8,7 +8,7 @@ import secrets
 import re
 from datetime import date, datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
@@ -59,6 +59,28 @@ async def _ensure_username_free(db: AsyncSession, username: str) -> None:
         raise AccountError("Ese usuario ya está en uso. Elige otro.")
 
 
+async def _ensure_email_free(db: AsyncSession, email: str | None, *, exclude_user_id: int | None = None) -> str | None:
+    """Normaliza el correo y verifica que no pertenezca a otra cuenta."""
+    if email is None or not email.strip():
+        return None
+    clean = email.strip().lower()
+    query = select(User).where(func.lower(User.email) == clean)
+    if exclude_user_id is not None:
+        query = query.where(User.id != exclude_user_id)
+    if await db.scalar(query) is not None:
+        raise AccountError("Ese correo ya está registrado en otra cuenta.")
+    return clean
+
+
+async def set_user_email(db: AsyncSession, user: User, email: str | None) -> None:
+    """Actualiza el correo de la cuenta (sirve para iniciar sesión y recuperar la contraseña)."""
+    clean = await _ensure_email_free(db, email, exclude_user_id=user.id)
+    if clean is not None and not EMAIL_PATTERN.match(clean):
+        raise AccountError("Escribe un correo válido.")
+    user.email = clean
+    await db.flush()
+
+
 async def _role_id(db: AsyncSession, code: str) -> int:
     role = await db.scalar(select(Role).where(Role.code == code))
     if role is None:
@@ -79,12 +101,14 @@ async def create_patient_account(
     password: str,
 ) -> tuple[User, Patient]:
     await _ensure_username_free(db, username)
+    clean_email = await _ensure_email_free(db, email)
     duplicated = await db.scalar(select(Patient).where(Patient.curp == curp))
     if duplicated is not None:
         raise AccountError("Ya existe un paciente con esa CURP.")
 
     user = User(
         username=username,
+        email=clean_email,
         password_hash=hash_password(password),
         role_id=await _role_id(db, "patient"),
     )
@@ -98,7 +122,7 @@ async def create_patient_account(
         blood_type=blood_type or None,
         birth_date=birth_date,
         emergency_contact=emergency_contact or None,
-        email=email or None,
+        email=clean_email,
     )
     db.add(patient)
     await db.flush()
@@ -112,11 +136,14 @@ async def create_doctor_account(
     specialty: str,
     username: str,
     password: str,
+    email: str | None = None,
 ) -> tuple[User, Doctor]:
     await _ensure_username_free(db, username)
+    clean_email = await _ensure_email_free(db, email)
 
     user = User(
         username=username,
+        email=clean_email,
         password_hash=hash_password(password),
         role_id=await _role_id(db, "doctor"),
     )

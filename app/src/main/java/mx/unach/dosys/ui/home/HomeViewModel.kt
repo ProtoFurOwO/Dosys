@@ -59,7 +59,7 @@ class HomeViewModel : ViewModel() {
 
     fun logout(onComplete: () -> Unit) {
         viewModelScope.launch {
-            sessionManager.clear()
+            ServiceLocator.authRepository.logout()
             onComplete()
         }
     }

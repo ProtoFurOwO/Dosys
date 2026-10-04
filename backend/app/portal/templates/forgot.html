@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Recuperar contraseña · D.O.S.Y.S Portal clínico{% endblock %}
+{% block body_class %}login{% endblock %}
+{% block body %}
+<main class="login-grid">
+  <section class="login-intro">
+    <span class="brand">
+      <span class="brand-mark brand-mark-lg" aria-hidden="true"></span>
+      <span class="brand-text">
+        <strong>D.O.S.Y.S</strong>
+        <small>Sistema hospitalario</small>
+      </span>
+    </span>
+    <h1>Recuperar contraseña</h1>
+    <p>
+      Escribe tu usuario o el correo registrado en tu cuenta y generaremos un enlace
+      de un solo uso para crear una contraseña nueva.
+    </p>
+    <p class="login-caption">
+      El enlace vence en pocos minutos y solo puede usarse una vez.
+    </p>
+  </section>
+  <section class="login-panel">
+    <form class="login-form" method="post" action="/portal/recuperar" novalidate>
+      <h2 class="form-title">Restablecer acceso</h2>
+
+      {% if error %}
+      <div class="note note-error" role="alert">{{ error }}</div>
+      {% endif %}
+
+      <div class="field">
+        <label for="identifier">Usuario o correo</label>
+        <input id="identifier" name="identifier" value="{{ identifier }}" autocomplete="username" required autofocus>
+      </div>
+
+      <button class="btn btn-primary btn-wide" type="submit">Enviar enlace</button>
+      <p class="login-caption"><a href="/portal/login">Volver al inicio de sesión</a></p>
+    </form>
+  </section>
+</main>
+{% endblock %}

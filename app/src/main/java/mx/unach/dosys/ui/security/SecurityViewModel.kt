@@ -104,4 +104,17 @@ class SecurityViewModel : ViewModel() {
     fun dismissRecoveryCodes() {
         _state.update { it.copy(recoveryCodes = emptyList()) }
     }
+
+    fun changePassword(current: String, new: String, confirm: String) {
+        if (_state.value.isSubmitting || current.isBlank() || new.isBlank()) return
+        _state.update { it.copy(isSubmitting = true, error = null, message = null) }
+        viewModelScope.launch {
+            when (val result = repository.changePassword(current, new, confirm)) {
+                is ClinicalResult.Success -> _state.update {
+                    it.copy(isSubmitting = false, message = result.value)
+                }
+                is ClinicalResult.Error -> _state.update { it.copy(isSubmitting = false, error = result.message) }
+            }
+        }
+    }
 }

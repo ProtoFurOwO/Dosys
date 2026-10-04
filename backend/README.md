@@ -83,6 +83,7 @@ py -3.12 scripts\verify_vertical_slice.py   # API: médico crea, paciente lee, R
 py -3.12 scripts\verify_portal.py           # Portal: pacientes, consultas, citas, usuarios, credenciales y bitácora
 py -3.12 scripts\verify_checkin.py          # Check-in: código incorrecto 400, correcto 200 e idempotente
 py -3.12 scripts\verify_login_security.py   # Login: bloqueo 423, desbloqueo, 2FA y códigos de recuperación
+py -3.12 scripts\verify_account_security.py # Cuentas: cambio y recuperación de contraseña, refresh con rotación, rate limit y API admin
 ```
 
 Para pruebas manuales del segundo factor está `scripts\totp_code.py <secreto>`: genera el
@@ -135,28 +136,30 @@ Swagger queda desactivado en producción (`DOCS_ENABLED=false`); el personal usa
 
 ## Seguridad: estado y pendientes
 
-**Ya implementado:** JWT de corta duración (30 min) firmado y con `purpose`, contraseñas con
-Argon2, RBAC validado en servidor, bitácora de auditoría visible desde el portal,
-**bloqueo por intentos fallidos** con desbloqueo, **segundo factor TOTP** con códigos de
-recuperación, HTTPS en producción + HSTS, cookie del portal `HttpOnly` y `SameSite=Lax`,
-cabeceras de seguridad (CSP, X-Frame-Options), Swagger apagado en producción, PostgreSQL sin
-puertos públicos, alta de cuentas con contraseña temporal mostrada una sola vez y gestión de
-usuarios restringida al rol médico.
+**Ya implementado:** JWT de corta duración (30 min) firmado y con `purpose`, **sesión renovable
+con refresh tokens de 7 días, rotación y revocación** (API y portal), contraseñas con
+Argon2, **cambio de contraseña propio** y **recuperación con token de un solo uso**, RBAC
+validado en servidor, bitácora de auditoría visible desde el portal,
+**bloqueo por intentos fallidos** con desbloqueo, **límite de peticiones por IP** en los
+accesos sensibles, **segundo factor TOTP** con códigos de recuperación, HTTPS en producción +
+HSTS, cookie del portal `HttpOnly` y `SameSite=Lax`, cabeceras de seguridad (CSP,
+X-Frame-Options), Swagger apagado en producción, PostgreSQL sin puertos públicos, alta de
+cuentas con contraseña temporal mostrada una sola vez, **API de administración con verbos
+GET/PUT/DELETE** y gestión de usuarios restringida al rol médico.
 
 **Falta antes de usar datos reales:**
 
 1. **Acceso**
    - Rol `admin` dedicado para la gestión de usuarios (hoy lo hace cualquier médico).
    - Cambio obligatorio de contraseña en el primer inicio de sesión.
-   - Refresh tokens con revocación y cierre de sesión por inactividad.
-   - Recuperación de contraseña por correo y bloqueo distribuido (hoy es por base de datos).
+   - Cierre de sesión por inactividad en la app.
+   - Envío real de correo con un proveedor (Resend) y bloqueo distribuido entre instancias.
    - Restringir el portal a red interna o VPN, como pide el análisis inicial.
    - Relación médico-paciente: hoy el médico ve a todos los pacientes del hospital.
 2. **Protección de datos**
    - Guardar el token en el celular con Android Keystore (hoy va en DataStore).
    - Cifrado en reposo de PostgreSQL y de los respaldos.
-   - Envío real de credenciales por correo (hoy es una simulación con vista previa).
-   - Límite de peticiones (rate limiting) contra fuerza bruta en login y portal.
+   - Límite de peticiones distribuido (hoy es en memoria, por instancia).
    - Token CSRF formal en el portal (hoy la cookie `SameSite=Lax` cubre lo básico).
    - Gestión de secretos con Vault/Doppler en lugar de archivos `.env`.
    - Escaneo de dependencias (`pip-audit`) y de la imagen (`trivy`) en cada versión.
@@ -182,7 +185,7 @@ usuarios restringida al rol médico.
 |---|---|
 | Registro de usuarios (nombre, correo, contraseña) | ✅ alta de pacientes y personal con credencial |
 | Inicio de sesión | ✅ con bloqueo y segundo factor |
-| Cambio de contraseña propio y recuperación | ⏳ siguiente iteración (la recuperación usará el envío simulado) |
+| Cambio de contraseña propio y recuperación | ✅ API y portal; recuperación con token de un solo uso (15 min) y correo simulado con proveedor opcional |
 | Roles predeterminados (administrador / editor / usuario regular) | ✅ en base de datos: Administrador, Médico (editor), Laboratorio, Recepción y Paciente (lectura) |
 | Permisos por acción (lectura, escritura, eliminación) | ✅ catálogo con área, acción y descripción |
 | Asignar permisos a los roles dinámicamente | ✅ panel de Roles |
@@ -191,13 +194,13 @@ usuarios restringida al rol médico.
 | Dashboard: usuarios, asignar/revocar roles, crear roles, auditoría | ✅ |
 | Frontend web + API REST | ✅ portal web; la API REST la consume la app Android y queda documentada en OpenAPI |
 | JWT: firma, expiración y datos (rol y permisos) | ✅ 30 min, HS256, claims `role`, `permissions`, `purpose` |
-| Refresh tokens | ⏳ siguiente iteración |
+| Refresh tokens | ✅ 7 días con rotación y revocación; la app renueva sola al recibir 401 y el portal renueva su cookie |
 | Contraseñas con hash seguro (salt) | ✅ Argon2 |
 | HTTPS/TLS | ✅ producción con Let's Encrypt |
 | Cookie HttpOnly, Secure y SameSite | ✅ portal |
 | Validación y sanitización de entradas | ✅ Pydantic + ORM (sin SQL crudo) + autoescape de plantillas |
 | Fuerza bruta: bloqueo temporal | ✅ 5 intentos → 15 minutos, con desbloqueo desde el portal |
-| Rate limiting | ⏳ siguiente iteración |
+| Rate limiting | ✅ ventana deslizante por IP en login, 2FA, recuperación y refresh (en memoria, por instancia) |
 | Auditoría inmutable desde la aplicación | ✅ la bitácora es de solo lectura |
 | CORS restringido a orígenes autorizados | ✅ |
 | Principio de mínimo privilegio | ✅ permisos por rol; el paciente solo ve sus propios datos |

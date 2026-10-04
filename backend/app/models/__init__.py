@@ -8,6 +8,7 @@ from app.models.patient import Patient
 from app.models.permission import Permission
 from app.models.recovery_code import RecoveryCode
 from app.models.role import Role
+from app.models.session_token import PasswordResetToken, RefreshToken
 from app.models.user import User
 
 __all__ = [
@@ -18,8 +19,10 @@ __all__ = [
     "Doctor",
     "Document",
     "Patient",
+    "PasswordResetToken",
     "Permission",
     "RecoveryCode",
+    "RefreshToken",
     "Role",
     "User",
     "UserRole",

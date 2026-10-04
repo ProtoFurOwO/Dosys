@@ -33,7 +33,7 @@ from app.portal import deps
 from app.portal.labels import ROLE_LABELS
 from app.portal.qr import qr_svg
 from app.portal.templating import credential_context, templates
-from app.services import login_security, two_factor
+from app.services import accounts, email, login_security, rate_limit, two_factor
 from app.services.appointments import create_appointment
 from app.services.audit import write_audit_event
 from app.services.consultations import create_consultation
@@ -53,11 +53,13 @@ from app.services.users import (
     AccountError,
     create_patient_account,
     password_policy_error,
+    set_user_email,
 )
 
 router = APIRouter(prefix="/portal", tags=["Portal clínico"], include_in_schema=False)
 
 TWO_FACTOR_COOKIE = "dosys_2fa"
+REFRESH_COOKIE = "dosys_portal_refresh"
 
 REASON_MIN, REASON_MAX = 3, 300
 DIAGNOSIS_MIN, DIAGNOSIS_MAX = 3, 500
@@ -105,16 +107,28 @@ def forbidden(request: Request, doctor_name: str, detail: str) -> HTMLResponse:
     )
 
 
-def render_login(request: Request, *, error: str | None, username: str = "", code: int = 200) -> HTMLResponse:
+def render_login(
+    request: Request,
+    *,
+    error: str | None,
+    username: str = "",
+    notice: str | None = None,
+    code: int = 200,
+) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
         "login.html",
-        {"error": error, "username": username},
+        {"error": error, "username": username, "notice": notice},
         status_code=code,
     )
 
 
-def set_session_cookie(response: RedirectResponse, token: str, expires_in: int) -> RedirectResponse:
+def set_session_cookie(
+    response: RedirectResponse,
+    token: str,
+    expires_in: int,
+    refresh_token: str | None = None,
+) -> RedirectResponse:
     response.set_cookie(
         deps.COOKIE_NAME,
         token,
@@ -124,6 +138,17 @@ def set_session_cookie(response: RedirectResponse, token: str, expires_in: int) 
         samesite="lax",
         path="/portal",
     )
+    if refresh_token:
+        # Sesión renovable: permite seguir trabajando sin volver a pedir credenciales.
+        response.set_cookie(
+            REFRESH_COOKIE,
+            refresh_token,
+            max_age=settings.refresh_token_expire_days * 86400,
+            httponly=True,
+            secure=settings.app_env != "development",
+            samesite="lax",
+            path="/portal",
+        )
     return response
 
 
@@ -131,10 +156,28 @@ def set_session_cookie(response: RedirectResponse, token: str, expires_in: int) 
 
 
 @router.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request, db: AsyncSession = Depends(get_db)) -> HTMLResponse:
+async def login_page(
+    request: Request,
+    restablecida: int = 0,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
     if await deps.current_doctor(request, db) is not None:
         return RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER)
-    return render_login(request, error=None)
+
+    # Sesión renovable: si el acceso expiró pero el token de renovación sigue
+    # vivo, se emite un acceso nuevo sin pedir credenciales otra vez.
+    refresh_token = request.cookies.get(REFRESH_COOKIE)
+    if refresh_token:
+        rotated = await accounts.rotate_refresh_token(db, refresh_token)
+        if rotated is not None:
+            user, new_refresh = rotated
+            await db.commit()
+            token, expires_in = create_access_token(user.id, user.role.code, sorted(permission_codes(user)))
+            response = RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER)
+            return set_session_cookie(response, token, expires_in, new_refresh)
+
+    notice = "Tu contraseña quedó actualizada. Inicia sesión con la nueva." if restablecida else None
+    return render_login(request, error=None, notice=notice)
 
 
 @router.post("/login", response_class=HTMLResponse)
@@ -144,7 +187,15 @@ async def login_submit(
     password: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
-    user = await db.scalar(select(User).where(User.username == username.strip().lower()))
+    if rate_limit.exceeded("portal-login", request):
+        return render_login(
+            request,
+            error="Demasiadas solicitudes desde esta red. Espera un minuto e intenta de nuevo.",
+            username=username.strip(),
+            code=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
+    user = await accounts.find_user_by_identifier(db, username)
 
     # Cuenta bloqueada por intentos fallidos: ni la contraseña correcta entra.
     if user is not None and login_security.is_locked(user):
@@ -241,6 +292,7 @@ async def login_submit(
         return response
 
     token, expires_in = create_access_token(user.id, user.role.code, sorted(permission_codes(user)))
+    refresh_token = await accounts.issue_refresh_token(db, user)
     await write_audit_event(
         db,
         user=user,
@@ -251,7 +303,9 @@ async def login_submit(
     )
     await db.commit()
 
-    return set_session_cookie(RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER), token, expires_in)
+    return set_session_cookie(
+        RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER), token, expires_in, refresh_token
+    )
 
 
 # ── Segundo factor del portal ─────────────────────────────────────────────────
@@ -328,6 +382,7 @@ async def two_factor_submit(
         )
 
     token, expires_in = create_access_token(user.id, user.role.code, sorted(permission_codes(user)))
+    refresh_token = await accounts.issue_refresh_token(db, user)
     await write_audit_event(
         db,
         user=user,
@@ -340,7 +395,7 @@ async def two_factor_submit(
 
     response = RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER)
     response.delete_cookie(TWO_FACTOR_COOKIE, path="/portal")
-    return set_session_cookie(response, token, expires_in)
+    return set_session_cookie(response, token, expires_in, refresh_token)
 
 
 @router.post("/2fa/cancelar")
@@ -363,6 +418,7 @@ def security_context(
     secret: str | None = None,
     recovery_codes: list[str] | None = None,
     error: str | None = None,
+    notice: str | None = None,
 ) -> dict:
     return {
         "doctor_name": doctor_name,
@@ -374,7 +430,9 @@ def security_context(
         "secret": secret,
         "recovery_codes": recovery_codes,
         "error": error,
+        "notice": notice,
         "username": user.username,
+        "account_email": user.email,
     }
 
 
@@ -508,11 +566,235 @@ async def security_disable(
     return RedirectResponse("/portal/seguridad", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.post("/seguridad/contrasena", response_class=HTMLResponse)
+async def security_change_password(
+    request: Request,
+    current_password: str = Form(""),
+    new_password: str = Form(""),
+    new_password_confirm: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Cambio de contraseña propio desde el portal."""
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await portal_staff(db, user)
+
+    try:
+        await accounts.change_password(
+            db,
+            user,
+            current=current_password,
+            new=new_password,
+            confirm=new_password_confirm,
+        )
+    except AccountError as error:
+        return templates.TemplateResponse(
+            request,
+            "security.html",
+            security_context(
+                doctor.full_name,
+                user=user,
+                enabled=user.totp_enabled,
+                remaining=await two_factor.recovery_codes_remaining(db, user) if user.totp_enabled else 0,
+                error=str(error),
+            ),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    await write_audit_event(
+        db,
+        user=user,
+        action="password_changed",
+        entity_type="authentication",
+        entity_id=user.id,
+        request=request,
+    )
+    await db.commit()
+    return templates.TemplateResponse(
+        request,
+        "security.html",
+        security_context(
+            doctor.full_name,
+            user=user,
+            enabled=user.totp_enabled,
+            remaining=await two_factor.recovery_codes_remaining(db, user) if user.totp_enabled else 0,
+            notice="Contraseña actualizada. Las sesiones renovables se cerraron por seguridad.",
+        ),
+    )
+
+
+@router.post("/seguridad/correo", response_class=HTMLResponse)
+async def security_update_email(
+    request: Request,
+    email: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Registra el correo de la cuenta (sirve para recuperar la contraseña)."""
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await portal_staff(db, user)
+
+    try:
+        await set_user_email(db, user, email)
+    except AccountError as error:
+        return templates.TemplateResponse(
+            request,
+            "security.html",
+            security_context(
+                doctor.full_name,
+                user=user,
+                enabled=user.totp_enabled,
+                remaining=await two_factor.recovery_codes_remaining(db, user) if user.totp_enabled else 0,
+                error=str(error),
+            ),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    await write_audit_event(
+        db,
+        user=user,
+        action="account_email_updated",
+        entity_type="user",
+        entity_id=user.id,
+        request=request,
+    )
+    await db.commit()
+    return templates.TemplateResponse(
+        request,
+        "security.html",
+        security_context(
+            doctor.full_name,
+            user=user,
+            enabled=user.totp_enabled,
+            remaining=await two_factor.recovery_codes_remaining(db, user) if user.totp_enabled else 0,
+            notice="Correo de la cuenta guardado.",
+        ),
+    )
+
+
 @router.post("/salir")
-async def logout() -> RedirectResponse:
+async def logout(request: Request, db: AsyncSession = Depends(get_db)) -> RedirectResponse:
+    refresh_token = request.cookies.get(REFRESH_COOKIE)
+    if refresh_token:
+        await accounts.revoke_refresh_token(db, refresh_token)
+        await db.commit()
     response = RedirectResponse("/portal/login", status_code=status.HTTP_303_SEE_OTHER)
     response.delete_cookie(deps.COOKIE_NAME, path="/portal")
+    response.delete_cookie(REFRESH_COOKIE, path="/portal")
     return response
+
+
+# ── Recuperación de contraseña ────────────────────────────────────────────────
+
+
+@router.get("/recuperar", response_class=HTMLResponse)
+async def forgot_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request, "forgot.html", {"error": None, "identifier": ""}
+    )
+
+
+@router.post("/recuperar", response_class=HTMLResponse)
+async def forgot_submit(
+    request: Request,
+    identifier: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Genera un enlace de un solo uso; la respuesta no revela si la cuenta existe."""
+    if rate_limit.exceeded("portal-forgot", request):
+        return templates.TemplateResponse(
+            request,
+            "forgot.html",
+            {
+                "error": "Demasiadas solicitudes desde esta red. Espera un minuto e intenta de nuevo.",
+                "identifier": identifier.strip(),
+            },
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
+    user = await accounts.find_user_by_identifier(db, identifier)
+    link: str | None = None
+    destination = identifier.strip()
+
+    if user is not None and user.is_active:
+        token = await accounts.create_password_reset(db, user)
+        link = accounts.reset_link(token)
+        destination = user.email or destination
+        sent = False
+        if user.email:
+            sent = await email.send_email(
+                to=user.email,
+                subject="D.O.S.Y.S · Restablece tu contraseña",
+                text=(
+                    "Recibimos una solicitud para restablecer tu contraseña.\n\n"
+                    f"Abre este enlace (válido {settings.password_reset_expire_minutes} minutos):\n{link}\n\n"
+                    "Si no fuiste tú, ignora este mensaje."
+                ),
+            )
+        if sent:
+            link = None
+        await write_audit_event(
+            db,
+            user=user,
+            action="portal_password_reset_requested",
+            entity_type="authentication",
+            entity_id=user.id,
+            request=request,
+            detail=f"delivery={'email' if sent else 'simulated'}",
+        )
+        await db.commit()
+
+    return templates.TemplateResponse(
+        request,
+        "email_reset.html",
+        {"to": destination, "link": link, "minutes": settings.password_reset_expire_minutes},
+    )
+
+
+@router.get("/restablecer", response_class=HTMLResponse)
+async def reset_page(request: Request, token: str = "") -> HTMLResponse:
+    return templates.TemplateResponse(request, "reset.html", {"error": None, "token": token})
+
+
+@router.post("/restablecer", response_class=HTMLResponse)
+async def reset_submit(
+    request: Request,
+    token: str = Form(""),
+    password: str = Form(""),
+    password_confirm: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    policy_error = password_policy_error(password, password_confirm)
+    if policy_error:
+        return templates.TemplateResponse(
+            request,
+            "reset.html",
+            {"error": policy_error, "token": token},
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    user = await accounts.consume_password_reset(db, token)
+    if user is None:
+        return templates.TemplateResponse(
+            request,
+            "reset.html",
+            {"error": "El enlace no es válido o ya expiró. Solicita uno nuevo.", "token": ""},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    await accounts.replace_password(db, user, new=password, confirm=password_confirm)
+    await write_audit_event(
+        db,
+        user=user,
+        action="password_reset",
+        entity_type="authentication",
+        entity_id=user.id,
+        request=request,
+    )
+    await db.commit()
+    return RedirectResponse("/portal/login?restablecida=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
 # ── Pacientes ─────────────────────────────────────────────────────────────────

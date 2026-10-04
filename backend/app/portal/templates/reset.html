@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Nueva contraseña · D.O.S.Y.S Portal clínico{% endblock %}
+{% block body_class %}login{% endblock %}
+{% block body %}
+<main class="login-grid">
+  <section class="login-intro">
+    <span class="brand">
+      <span class="brand-mark brand-mark-lg" aria-hidden="true"></span>
+      <span class="brand-text">
+        <strong>D.O.S.Y.S</strong>
+        <small>Sistema hospitalario</small>
+      </span>
+    </span>
+    <h1>Crea tu contraseña nueva</h1>
+    <p>
+      Al guardarla se cerrarán las sesiones abiertas por seguridad y podrás iniciar
+      sesión con la contraseña nueva.
+    </p>
+  </section>
+  <section class="login-panel">
+    <form class="login-form" method="post" action="/portal/restablecer" novalidate>
+      <h2 class="form-title">Nueva contraseña</h2>
+
+      {% if error %}
+      <div class="note note-error" role="alert">{{ error }}</div>
+      {% endif %}
+
+      <input type="hidden" name="token" value="{{ token }}">
+
+      <div class="field">
+        <label for="password">Contraseña nueva</label>
+        <input id="password" name="password" type="password" required autocomplete="new-password" autofocus>
+        <p class="help">Mínimo 8 caracteres, con letras y números.</p>
+      </div>
+      <div class="field">
+        <label for="password_confirm">Repite la contraseña</label>
+        <input id="password_confirm" name="password_confirm" type="password" required autocomplete="new-password">
+      </div>
+
+      <button class="btn btn-primary btn-wide" type="submit">Guardar contraseña</button>
+      <p class="login-caption"><a href="/portal/login">Volver al inicio de sesión</a></p>
+    </form>
+  </section>
+</main>
+{% endblock %}

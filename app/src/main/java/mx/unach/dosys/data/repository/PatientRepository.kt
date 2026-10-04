@@ -8,6 +8,8 @@ import mx.unach.dosys.data.model.PatientConsultation
 import mx.unach.dosys.data.model.PatientDocument
 import mx.unach.dosys.data.model.PatientProfile
 import mx.unach.dosys.data.remote.ApiService
+import mx.unach.dosys.data.remote.SessionExpiredException
+import mx.unach.dosys.data.remote.TokenRefresher
 import retrofit2.HttpException
 import java.io.IOException
 
@@ -29,6 +31,7 @@ interface PatientRepository {
 class RemotePatientRepository(
     private val api: ApiService,
     private val session: SessionManager,
+    private val refresher: TokenRefresher,
 ) : PatientRepository {
 
     override suspend fun profile(): ClinicalResult<PatientProfile> = authorized { header ->
@@ -96,13 +99,13 @@ class RemotePatientRepository(
     }
 
     private suspend fun <T> authorized(call: suspend (String) -> T): ClinicalResult<T> {
-        val token = session.currentToken()
-            ?: return ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
-
         return try {
-            ClinicalResult.Success(call("Bearer $token"))
+            ClinicalResult.Success(refresher.withFreshToken(call))
         } catch (cancellation: CancellationException) {
             throw cancellation
+        } catch (error: SessionExpiredException) {
+            session.clear()
+            ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
         } catch (error: HttpException) {
             if (error.code() == 401) {
                 session.clear()

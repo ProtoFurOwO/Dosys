@@ -8,9 +8,40 @@ class LoginRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str | None = None
     token_type: str = "bearer"
     expires_in: int
     role: str
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=20)
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str = Field(min_length=20)
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+    new_password_confirm: str = Field(min_length=8, max_length=128)
+
+
+class PasswordForgotRequest(BaseModel):
+    identifier: str = Field(min_length=3, max_length=160, examples=["paciente", "paciente@correo.com"])
+
+
+class PasswordForgotResponse(BaseModel):
+    message: str = "Si la cuenta existe, generamos un enlace de restablecimiento."
+    delivery: str = "simulated"
+    preview_url: str | None = None
+
+
+class PasswordResetRequest(BaseModel):
+    token: str = Field(min_length=20)
+    new_password: str = Field(min_length=8, max_length=128)
+    new_password_confirm: str = Field(min_length=8, max_length=128)
 
 
 class TwoFactorChallengeResponse(BaseModel):

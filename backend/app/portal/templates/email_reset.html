@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Correo enviado · D.O.S.Y.S Portal clínico{% endblock %}
+{% block body_class %}login{% endblock %}
+{% block body %}
+<main class="login-grid">
+  <section class="login-intro">
+    <span class="brand">
+      <span class="brand-mark brand-mark-lg" aria-hidden="true"></span>
+      <span class="brand-text">
+        <strong>D.O.S.Y.S</strong>
+        <small>Sistema hospitalario</small>
+      </span>
+    </span>
+    <h1>Revisa tu correo</h1>
+    <p>
+      Si la cuenta existe, generamos un enlace de restablecimiento válido por
+      {{ minutes }} minutos. El enlace solo puede usarse una vez.
+    </p>
+    <p class="login-caption">
+      Por seguridad no confirmamos si el usuario o correo están registrados.
+    </p>
+  </section>
+  <section class="login-panel">
+    <article class="email-preview">
+      <div class="email-head">
+        <p><b>Para:</b> {{ to }}</p>
+        <p><b>De:</b> portal@dosys.mx</p>
+        <p><b>Asunto:</b> Restablece tu contraseña de D.O.S.Y.S</p>
+      </div>
+      <div class="email-body">
+        <p>Hola:</p>
+        <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta.</p>
+        {% if link %}
+        <p><a class="btn btn-primary" href="{{ link }}">Crear contraseña nueva</a></p>
+        <p class="note-sub">Vista previa simulada: sin proveedor de correo configurado el enlace se muestra aquí.</p>
+        {% else %}
+        <p>El enlace llegará a tu bandeja de entrada. Si no lo ves, revisa la carpeta de spam.</p>
+        {% endif %}
+      </div>
+      <p class="email-foot">
+        Esta instalación académica simula el envío del correo; en producción se conecta el proveedor
+        de correo del hospital.
+      </p>
+    </article>
+    <p class="login-caption"><a href="/portal/login">Volver al inicio de sesión</a></p>
+  </section>
+</main>
+{% endblock %}

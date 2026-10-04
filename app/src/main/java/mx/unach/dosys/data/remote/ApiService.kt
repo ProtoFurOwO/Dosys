@@ -1,12 +1,16 @@
 package mx.unach.dosys.data.remote
 
+import mx.unach.dosys.data.model.ChangePasswordRequest
 import mx.unach.dosys.data.model.CheckInRequest
 import mx.unach.dosys.data.model.LoginRequest
 import mx.unach.dosys.data.model.LoginResponse
+import mx.unach.dosys.data.model.LogoutRequest
 import mx.unach.dosys.data.model.PatientAppointment
 import mx.unach.dosys.data.model.PatientConsultation
 import mx.unach.dosys.data.model.PatientDocument
 import mx.unach.dosys.data.model.PatientProfile
+import mx.unach.dosys.data.model.RefreshRequest
+import mx.unach.dosys.data.model.SimpleMessage
 import mx.unach.dosys.data.model.TwoFactorConfirmRequest
 import mx.unach.dosys.data.model.TwoFactorDisableRequest
 import mx.unach.dosys.data.model.TwoFactorEnableResult
@@ -35,6 +39,21 @@ interface ApiService {
 
     @POST("auth/2fa/verify")
     suspend fun verifyTwoFactor(@Body request: TwoFactorVerifyRequest): LoginResponse
+
+    /** Renueva la sesión sin pedir credenciales otra vez. */
+    @POST("auth/refresh")
+    suspend fun refresh(@Body request: RefreshRequest): LoginResponse
+
+    /** Revoca la sesión renovable al cerrar sesión. */
+    @POST("auth/logout")
+    suspend fun logout(@Body request: LogoutRequest): SimpleMessage
+
+    /** Cambio de contraseña propio (exige la contraseña actual). */
+    @POST("auth/password/change")
+    suspend fun changePassword(
+        @Header("Authorization") authorization: String,
+        @Body request: ChangePasswordRequest,
+    ): SimpleMessage
 
     @GET("auth/2fa/status")
     suspend fun twoFactorStatus(@Header("Authorization") authorization: String): TwoFactorStatus
