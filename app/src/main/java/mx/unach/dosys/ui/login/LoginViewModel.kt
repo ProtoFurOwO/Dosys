@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mx.unach.dosys.core.di.ServiceLocator
 import mx.unach.dosys.data.repository.AuthResult
+import mx.unach.dosys.data.repository.RecoveryResult
 
 /** Paso actual del inicio de sesión. */
 enum class LoginStep { CREDENTIALS, TWO_FACTOR }
@@ -23,6 +24,13 @@ data class LoginUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val loggedIn: Boolean = false,
+    // Recuperación de contraseña
+    val showRecovery: Boolean = false,
+    val recoveryIdentifier: String = "",
+    val recoveryLoading: Boolean = false,
+    val recoveryMessage: String? = null,
+    val recoveryError: String? = null,
+    val recoveryPreviewUrl: String? = null,
 )
 
 class LoginViewModel : ViewModel() {
@@ -84,6 +92,51 @@ class LoginViewModel : ViewModel() {
     fun backToCredentials() {
         _state.update {
             it.copy(step = LoginStep.CREDENTIALS, code = "", challengeToken = null, error = null)
+        }
+    }
+
+    // ── Recuperación de contraseña ────────────────────────────────────────────
+
+    fun openRecovery() {
+        _state.update {
+            it.copy(
+                showRecovery = true,
+                recoveryIdentifier = it.username.trim(),
+                recoveryMessage = null,
+                recoveryError = null,
+                recoveryPreviewUrl = null,
+            )
+        }
+    }
+
+    fun closeRecovery() {
+        _state.update {
+            it.copy(showRecovery = false, recoveryLoading = false, recoveryError = null)
+        }
+    }
+
+    fun onRecoveryIdentifierChange(value: String) {
+        _state.update { it.copy(recoveryIdentifier = value, recoveryError = null) }
+    }
+
+    fun requestPasswordReset() {
+        val identifier = _state.value.recoveryIdentifier.trim()
+        if (_state.value.recoveryLoading || identifier.isBlank()) return
+        _state.update { it.copy(recoveryLoading = true, recoveryError = null, recoveryMessage = null) }
+
+        viewModelScope.launch {
+            when (val result = repository.requestPasswordReset(identifier)) {
+                is RecoveryResult.Success -> _state.update {
+                    it.copy(
+                        recoveryLoading = false,
+                        recoveryMessage = result.message,
+                        recoveryPreviewUrl = result.previewUrl,
+                    )
+                }
+                is RecoveryResult.Error -> _state.update {
+                    it.copy(recoveryLoading = false, recoveryError = result.message)
+                }
+            }
         }
     }
 }

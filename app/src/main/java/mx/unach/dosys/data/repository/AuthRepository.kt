@@ -7,6 +7,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import mx.unach.dosys.core.auth.SessionManager
 import mx.unach.dosys.data.model.LoginRequest
 import mx.unach.dosys.data.model.LogoutRequest
+import mx.unach.dosys.data.model.PasswordForgotRequest
 import mx.unach.dosys.data.model.TwoFactorVerifyRequest
 import mx.unach.dosys.data.remote.ApiService
 import retrofit2.HttpException
@@ -21,10 +22,19 @@ sealed interface AuthResult {
     data class NeedsTwoFactor(val challengeToken: String) : AuthResult
 }
 
+/** Resultado de solicitar el enlace de recuperación de contraseña. */
+sealed interface RecoveryResult {
+    data class Success(val message: String, val previewUrl: String?) : RecoveryResult
+    data class Error(val message: String) : RecoveryResult
+}
+
 /** Contrato del repositorio de autenticación. */
 interface AuthRepository {
     suspend fun login(username: String, password: String): AuthResult
     suspend fun verifyTwoFactor(challengeToken: String, code: String): AuthResult
+
+    /** Solicita el enlace de restablecimiento (usuario o correo). */
+    suspend fun requestPasswordReset(identifier: String): RecoveryResult
 
     /** Cierra la sesión local y revoca el token de renovación en el servidor. */
     suspend fun logout()
@@ -56,6 +66,12 @@ class FakeAuthRepository(private val session: SessionManager) : AuthRepository {
 
     override suspend fun verifyTwoFactor(challengeToken: String, code: String): AuthResult =
         AuthResult.Error("El segundo factor no está disponible en el modo demo")
+
+    override suspend fun requestPasswordReset(identifier: String): RecoveryResult =
+        RecoveryResult.Success(
+            "Si la cuenta existe, enviamos un enlace de restablecimiento.",
+            previewUrl = null,
+        )
 
     override suspend fun logout() {
         session.clear()
@@ -119,6 +135,25 @@ class RemoteAuthRepository(
         AuthResult.Error("No se pudo conectar con el servidor")
     } catch (error: Exception) {
         AuthResult.Error("No se pudo verificar el código. Intenta más tarde")
+    }
+
+    override suspend fun requestPasswordReset(identifier: String): RecoveryResult = try {
+        val response = api.forgotPassword(PasswordForgotRequest(identifier.trim()))
+        RecoveryResult.Success(
+            response.message.ifBlank { "Si la cuenta existe, enviamos un enlace de restablecimiento." },
+            previewUrl = response.previewUrl,
+        )
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (error: HttpException) {
+        when (error.code()) {
+            429 -> RecoveryResult.Error(error.serverDetail() ?: "Demasiadas solicitudes. Espera un minuto.")
+            else -> RecoveryResult.Error("No se pudo solicitar el enlace. Intenta más tarde")
+        }
+    } catch (error: IOException) {
+        RecoveryResult.Error("No se pudo conectar con el servidor")
+    } catch (error: Exception) {
+        RecoveryResult.Error("No se pudo solicitar el enlace. Intenta más tarde")
     }
 
     override suspend fun logout() {

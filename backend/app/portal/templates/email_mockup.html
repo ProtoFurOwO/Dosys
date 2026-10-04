@@ -15,6 +15,13 @@
   </div>
 </header>
 
+{% if send_error %}
+<div class="note note-error" role="alert">
+  No se pudo enviar el correo: {{ send_error }}. Comparte la credencial desde esta pantalla o revisa
+  la configuración del proveedor.
+</div>
+{% endif %}
+
 <article class="email-preview">
   <div class="email-head">
     <p><b>Para:</b> {{ to }}</p>

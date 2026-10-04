@@ -21,7 +21,7 @@ from app.portal.routes import forbidden, portal_staff
 from app.portal.templating import credential_context, templates
 from app.services import login_security, two_factor
 from app.services.audit import write_audit_event
-from app.services.email import send_email
+from app.services.email import delivery_enabled, send_email
 from app.services.permissions import has_permission
 from app.services.users import (
     EMAIL_PATTERN,
@@ -791,7 +791,8 @@ async def send_credentials_email(
         f"Contraseña temporal: {password}\n\n"
         "Por seguridad, no compartas este mensaje y cambia la contraseña después de tu primer acceso.\n"
     )
-    sent = await send_email(to=clean_email, subject="Tu acceso a D.O.S.Y.S", text=body)
+    sent, reason = await send_email(to=clean_email, subject="Tu acceso a D.O.S.Y.S", text=body)
+    send_error = reason if not sent and delivery_enabled() else None
 
     await write_audit_event(
         db,
@@ -819,6 +820,7 @@ async def send_credentials_email(
             "back_label": back_label,
             "sender": settings.email_from,
             "sent": sent,
+            "send_error": send_error,
         },
     )
 

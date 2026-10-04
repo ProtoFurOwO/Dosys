@@ -398,7 +398,7 @@ async def forgot_password(
         token = await accounts.create_password_reset(db, user)
         link = accounts.reset_link(token)
         if user.email:
-            sent = await email.send_email(
+            sent, _ = await email.send_email(
                 to=user.email,
                 subject="D.O.S.Y.S · Restablece tu contraseña",
                 text=(

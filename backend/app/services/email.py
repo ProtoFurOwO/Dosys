@@ -21,16 +21,16 @@ def delivery_enabled() -> bool:
     return bool(settings.resend_api_key.strip())
 
 
-async def send_email(*, to: str, subject: str, text: str) -> bool:
-    """Envía el correo y devuelve True solo si el proveedor lo aceptó."""
+async def send_email(*, to: str, subject: str, text: str) -> tuple[bool, str]:
+    """Envía el correo; devuelve (ok, motivo). El motivo va vacío si se envió."""
     if not to:
-        return False
+        return False, "destinatario vacío"
     if not delivery_enabled():
         logger.info("Correo simulado (sin RESEND_API_KEY): %s -> %s", to, subject)
-        return False
+        return False, "sin proveedor configurado"
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.post(
                 _RESEND_ENDPOINT,
                 headers={"Authorization": f"Bearer {settings.resend_api_key.strip()}"},
@@ -41,11 +41,16 @@ async def send_email(*, to: str, subject: str, text: str) -> bool:
                     "text": text,
                 },
             )
-    except httpx.HTTPError:
-        logger.warning("No se pudo contactar al proveedor de correo para enviar a %s", to)
-        return False
+    except httpx.HTTPError as error:
+        logger.warning("No se pudo contactar al proveedor de correo para enviar a %s: %s", to, error)
+        return False, f"no se pudo contactar al proveedor ({type(error).__name__})"
 
     if response.status_code >= 400:
-        logger.warning("El proveedor de correo respondió %s al enviar a %s", response.status_code, to)
-        return False
-    return True
+        detail = ""
+        try:
+            detail = str(response.json().get("message", ""))[:140]
+        except Exception:
+            detail = response.text[:140]
+        logger.warning("El proveedor de correo respondió %s al enviar a %s: %s", response.status_code, to, detail)
+        return False, f"el proveedor respondió {response.status_code}: {detail}"
+    return True, ""

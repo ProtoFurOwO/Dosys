@@ -9,6 +9,8 @@ import mx.unach.dosys.data.model.PatientAppointment
 import mx.unach.dosys.data.model.PatientConsultation
 import mx.unach.dosys.data.model.PatientDocument
 import mx.unach.dosys.data.model.PatientProfile
+import mx.unach.dosys.data.model.PasswordForgotRequest
+import mx.unach.dosys.data.model.PasswordForgotResponse
 import mx.unach.dosys.data.model.RefreshRequest
 import mx.unach.dosys.data.model.SimpleMessage
 import mx.unach.dosys.data.model.TwoFactorConfirmRequest
@@ -47,6 +49,10 @@ interface ApiService {
     /** Revoca la sesión renovable al cerrar sesión. */
     @POST("auth/logout")
     suspend fun logout(@Body request: LogoutRequest): SimpleMessage
+
+    /** Solicita el enlace para restablecer la contraseña. */
+    @POST("auth/password/forgot")
+    suspend fun forgotPassword(@Body request: PasswordForgotRequest): PasswordForgotResponse
 
     /** Cambio de contraseña propio (exige la contraseña actual). */
     @POST("auth/password/change")

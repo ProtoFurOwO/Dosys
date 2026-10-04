@@ -717,6 +717,7 @@ async def forgot_submit(
     user = await accounts.find_user_by_identifier(db, identifier)
     link: str | None = None
     destination = identifier.strip()
+    send_error: str | None = None
 
     if user is not None and user.is_active:
         token = await accounts.create_password_reset(db, user)
@@ -724,7 +725,7 @@ async def forgot_submit(
         destination = user.email or destination
         sent = False
         if user.email:
-            sent = await email.send_email(
+            sent, reason = await email.send_email(
                 to=user.email,
                 subject="D.O.S.Y.S · Restablece tu contraseña",
                 text=(
@@ -733,6 +734,8 @@ async def forgot_submit(
                     "Si no fuiste tú, ignora este mensaje."
                 ),
             )
+            if not sent and email.delivery_enabled():
+                send_error = reason
         if sent:
             link = None
         await write_audit_event(
@@ -754,6 +757,7 @@ async def forgot_submit(
             "link": link,
             "minutes": settings.password_reset_expire_minutes,
             "sender": settings.email_from,
+            "send_error": send_error,
         },
     )
 

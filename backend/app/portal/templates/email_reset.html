@@ -21,6 +21,11 @@
     </p>
   </section>
   <section class="login-panel">
+    {% if send_error %}
+    <div class="note note-error" role="alert">
+      No se pudo enviar el correo: {{ send_error }}. Puedes usar el enlace de esta página como respaldo.
+    </div>
+    {% endif %}
     <article class="email-preview">
       <div class="email-head">
         <p><b>Para:</b> {{ to }}</p>

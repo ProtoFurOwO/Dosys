@@ -100,3 +100,19 @@ data class SimpleMessage(
 data class LogoutRequest(
     @SerialName("refresh_token") val refreshToken: String,
 )
+
+// ── Recuperación de contraseña ────────────────────────────────────────────────
+
+/** Solicitud del enlace de restablecimiento (usuario o correo). */
+@Serializable
+data class PasswordForgotRequest(
+    val identifier: String,
+)
+
+/** Respuesta del backend a la solicitud de recuperación. */
+@Serializable
+data class PasswordForgotResponse(
+    val message: String = "",
+    val delivery: String = "simulated",
+    @SerialName("preview_url") val previewUrl: String? = null,
+)

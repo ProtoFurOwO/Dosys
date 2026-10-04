@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -57,6 +58,10 @@ fun LoginScreen(
 
     LaunchedEffect(state.loggedIn) {
         if (state.loggedIn) onLoggedIn()
+    }
+
+    if (state.showRecovery) {
+        RecoveryDialog(state = state, viewModel = viewModel)
     }
 
     Scaffold { padding ->
@@ -152,6 +157,11 @@ private fun CredentialsStep(state: LoginUiState, viewModel: LoginViewModel) {
         } else {
             Text("Iniciar sesión", fontSize = 16.sp)
         }
+    }
+
+    Spacer(Modifier.height(8.dp))
+    TextButton(onClick = viewModel::openRecovery) {
+        Text("¿Olvidaste tu contraseña?")
     }
 
     Spacer(Modifier.height(20.dp))
@@ -253,4 +263,63 @@ private fun TwoFactorStep(state: LoginUiState, viewModel: LoginViewModel) {
     TextButton(onClick = viewModel::backToCredentials) {
         Text("Volver a escribir usuario y contraseña")
     }
+}
+
+@Composable
+private fun RecoveryDialog(state: LoginUiState, viewModel: LoginViewModel) {
+    AlertDialog(
+        onDismissRequest = viewModel::closeRecovery,
+        title = { Text("Recuperar contraseña") },
+        text = {
+            Column {
+                if (state.recoveryMessage == null) {
+                    Text(
+                        "Escribe tu usuario o el correo de tu cuenta. Si existe, enviaremos un enlace " +
+                            "para crear una contraseña nueva.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = state.recoveryIdentifier,
+                        onValueChange = viewModel::onRecoveryIdentifierChange,
+                        label = { Text("Usuario o correo") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    state.recoveryError?.let { message ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = message,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                } else {
+                    Text(state.recoveryMessage, style = MaterialTheme.typography.bodyMedium)
+                    state.recoveryPreviewUrl?.let { url ->
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            text = "Enlace de prueba (modo demo): $url",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (state.recoveryMessage == null) {
+                TextButton(onClick = viewModel::requestPasswordReset, enabled = !state.recoveryLoading) {
+                    Text(if (state.recoveryLoading) "Enviando…" else "Enviar enlace")
+                }
+            } else {
+                TextButton(onClick = viewModel::closeRecovery) { Text("Entendido") }
+            }
+        },
+        dismissButton = {
+            if (state.recoveryMessage == null) {
+                TextButton(onClick = viewModel::closeRecovery) { Text("Cancelar") }
+            }
+        },
+    )
 }
