@@ -46,7 +46,10 @@ services:
       - "127.0.0.1:8000:8000"
       - "172.17.0.1:8000:8000"
     networks:
+      # `data` es interna (la base no ve internet); `edge` le da a la API
+      # salida a internet para servicios externos como el correo (Resend).
       - data
+      - edge
 
 volumes:
   postgres_data:
@@ -56,3 +59,5 @@ networks:
   # Solo api y db entran aquí; la base jamás es visible desde el host.
   data:
     internal: true
+  # Salida a internet para la API (correo, futuras integraciones).
+  edge:
