@@ -749,7 +749,12 @@ async def forgot_submit(
     return templates.TemplateResponse(
         request,
         "email_reset.html",
-        {"to": destination, "link": link, "minutes": settings.password_reset_expire_minutes},
+        {
+            "to": destination,
+            "link": link,
+            "minutes": settings.password_reset_expire_minutes,
+            "sender": settings.email_from,
+        },
     )
 
 
