@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
 from app.models.doctor import Doctor
+from app.models.patient import Patient
 from app.models.permission import Permission
 from app.models.role import Role
 from app.models.user import User
@@ -87,8 +88,9 @@ async def users_page(request: Request, aviso: str = "", db: AsyncSession = Depen
 
     rows = (
         await db.execute(
-            select(User, Doctor)
+            select(User, Doctor, Patient)
             .outerjoin(Doctor, Doctor.user_id == User.id)
+            .outerjoin(Patient, Patient.user_id == User.id)
             .order_by(User.username.asc())
         )
     ).all()
@@ -107,15 +109,16 @@ async def users_page(request: Request, aviso: str = "", db: AsyncSession = Depen
             "role_code": account.role.code,
             "role_label": account.role.name,
             "active": account.is_active,
-            "full_name": profile.full_name if profile else account.username,
-            "specialty": profile.specialty if profile else None,
+            # El nombre viene de la ficha (médico o paciente); el usuario es solo el acceso.
+            "full_name": profile.full_name if profile else (patient.full_name if patient else account.username),
+            "specialty": profile.specialty if profile else ("Paciente" if patient else None),
             "last_access": last_access.get(account.id),
             "is_self": account.id == current_user.id,
             "totp_enabled": account.totp_enabled,
             "locked": login_security.is_locked(account),
             "lock_minutes": login_security.lock_minutes_left(account),
         }
-        for account, profile in rows
+        for account, profile, patient in rows
     ]
 
     return templates.TemplateResponse(

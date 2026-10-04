@@ -15,6 +15,12 @@
   </div>
 </header>
 
+{% if sent %}
+<div class="note note-ok" role="status">
+  El correo con las credenciales se envió a {{ to }}.
+</div>
+{% endif %}
+
 {% if send_error %}
 <div class="note note-error" role="alert">
   No se pudo enviar el correo: {{ send_error }}. Comparte la credencial desde esta pantalla o revisa

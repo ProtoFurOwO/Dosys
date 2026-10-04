@@ -21,6 +21,7 @@
     </p>
   </section>
   <section class="login-panel">
+    {% if link or send_error %}
     {% if send_error %}
     <div class="note note-error" role="alert">
       No se pudo enviar el correo: {{ send_error }}. Puedes usar el enlace de esta página como respaldo.
@@ -35,25 +36,31 @@
       <div class="email-body">
         <p>Hola:</p>
         <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta.</p>
-        {% if link %}
         <p><a class="btn btn-primary" href="{{ link }}">Crear contraseña nueva</a></p>
-        <p class="note-sub">Vista previa simulada: sin proveedor de correo configurado el enlace se muestra aquí.</p>
+        {% if send_error %}
+        <p class="note-sub">Enlace de respaldo: úsalo porque el correo no pudo enviarse.</p>
         {% else %}
-        <p>El enlace llegará a tu bandeja de entrada. Si no lo ves, revisa la carpeta de spam.</p>
+        <p class="note-sub">Vista previa simulada: sin proveedor de correo configurado el enlace se muestra aquí.</p>
         {% endif %}
       </div>
-      {% if link %}
+      {% if send_error %}
+      <p class="email-foot">Revisa la configuración del proveedor de correo (el intento quedó en la bitácora).</p>
+      {% else %}
       <p class="email-foot">
         Esta instalación académica simula el envío del correo; en producción se conecta el proveedor
         de correo del hospital.
       </p>
-      {% else %}
-      <p class="email-foot">
-        El mensaje se envió a {{ to }} con el proveedor de correo configurado. Si no lo ves en unos
-        minutos, revisa la carpeta de spam.
-      </p>
       {% endif %}
     </article>
+    {% else %}
+    <div class="note note-ok" role="status">
+      <p><strong>Correo enviado a {{ to }}.</strong></p>
+      <p class="note-sub">
+        Revisa tu bandeja de entrada (y la carpeta de spam) y abre el enlace para crear tu contraseña
+        nueva. El enlace vence en {{ minutes }} minutos.
+      </p>
+    </div>
+    {% endif %}
     <p class="login-caption"><a href="/portal/login">Volver al inicio de sesión</a></p>
   </section>
 </main>
