@@ -115,6 +115,10 @@ variante `release` el dominio HTTPS. Los endpoints del paciente son:
    JWT_SECRET_KEY=<secreto-aleatorio-de-64-o-más-caracteres>
    JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
    CORS_ORIGINS=https://medicos.tudominio.dev
+   PUBLIC_BASE_URL=https://medicos.tudominio.dev
+   # Correo real (opcional): sin clave se usa la vista previa simulada del portal.
+   RESEND_API_KEY=
+   EMAIL_FROM=D.O.S.Y.S <no-reply@tudominio.dev>
    ```
 
 2. Levanta el stack con el daemon donde vive Nginx Proxy Manager:
