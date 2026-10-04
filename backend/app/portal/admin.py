@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
 from app.models.doctor import Doctor
@@ -20,6 +21,7 @@ from app.portal.routes import forbidden, portal_staff
 from app.portal.templating import credential_context, templates
 from app.services import login_security, two_factor
 from app.services.audit import write_audit_event
+from app.services.email import send_email
 from app.services.permissions import has_permission
 from app.services.users import (
     EMAIL_PATTERN,
@@ -782,6 +784,15 @@ async def send_credentials_email(
         context["errors"] = {"email": "Escribe un correo válido para enviar la credencial."}
         return templates.TemplateResponse(request, "credential.html", context, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
+    body = (
+        f"Hola {person_name}:\n\n"
+        "Tu cuenta del hospital ya está lista. Descarga la app D.O.S.Y.S e inicia sesión con estos datos:\n\n"
+        f"Usuario: {username}\n"
+        f"Contraseña temporal: {password}\n\n"
+        "Por seguridad, no compartas este mensaje y cambia la contraseña después de tu primer acceso.\n"
+    )
+    sent = await send_email(to=clean_email, subject="Tu acceso a D.O.S.Y.S", text=body)
+
     await write_audit_event(
         db,
         user=current_user,
@@ -789,7 +800,7 @@ async def send_credentials_email(
         entity_type="user",
         entity_id=user_id or None,
         request=request,
-        detail=f"to={clean_email}",
+        detail=f"to={clean_email} delivery={'email' if sent else 'simulated'}",
     )
     await db.commit()
 
@@ -806,6 +817,8 @@ async def send_credentials_email(
             "password": password,
             "back_url": back_url,
             "back_label": back_label,
+            "sender": settings.email_from,
+            "sent": sent,
         },
     )
 

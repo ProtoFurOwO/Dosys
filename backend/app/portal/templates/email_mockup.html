@@ -1,18 +1,24 @@
 {% extends "panel.html" %}
-{% block title %}Correo enviado · D.O.S.Y.S Portal clínico{% endblock %}
+{% block title %}{% if sent %}Correo enviado{% else %}Correo enviado (simulación){% endif %} · D.O.S.Y.S Portal clínico{% endblock %}
 {% block content %}
 <header class="page-head">
   <div>
     <a class="back-link" href="{{ back_url }}">{{ back_label }}</a>
-    <h1>Correo enviado (simulación)</h1>
-    <p class="page-note">Vista previa del mensaje que recibiría {{ to }}. El envío quedó registrado en la bitácora.</p>
+    <h1>{% if sent %}Correo enviado{% else %}Correo enviado (simulación){% endif %}</h1>
+    <p class="page-note">
+      {% if sent %}
+      El mensaje salió hacia {{ to }} con el proveedor de correo configurado y quedó registrado en la bitácora.
+      {% else %}
+      Vista previa del mensaje que recibiría {{ to }}. El envío quedó registrado en la bitácora.
+      {% endif %}
+    </p>
   </div>
 </header>
 
 <article class="email-preview">
   <div class="email-head">
     <p><b>Para:</b> {{ to }}</p>
-    <p><b>De:</b> portal@dosys.mx</p>
+    <p><b>De:</b> {{ sender }}</p>
     <p><b>Asunto:</b> Tu acceso a D.O.S.Y.S</p>
   </div>
   <div class="email-body">
@@ -24,9 +30,16 @@
     </ul>
     <p>Por seguridad, no compartas este mensaje y cambia la contraseña después de tu primer acceso.</p>
   </div>
+  {% if sent %}
+  <p class="email-foot">
+    El correo se envió con el proveedor configurado. Si no llega en unos minutos, pide que revisen
+    la carpeta de spam.
+  </p>
+  {% else %}
   <p class="email-foot">
     Esta instalación académica simula el envío del correo; en producción se conectará el proveedor
     de correo del hospital.
   </p>
+  {% endif %}
 </article>
 {% endblock %}
