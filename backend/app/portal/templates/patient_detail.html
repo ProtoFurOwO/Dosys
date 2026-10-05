@@ -14,9 +14,15 @@
     </p>
   </div>
   <div class="page-actions">
+    {% if can_write_patients %}
     <a class="btn btn-quiet" href="/portal/pacientes/{{ patient.id }}/editar">Editar datos</a>
+    {% endif %}
+    {% if can_write_appointments %}
     <a class="btn btn-line" href="/portal/pacientes/{{ patient.id }}/cita">Agendar cita</a>
+    {% endif %}
+    {% if can_write_consultations %}
     <a class="btn btn-primary" href="/portal/pacientes/{{ patient.id }}/consulta">Nueva consulta</a>
+    {% endif %}
   </div>
 </header>
 
@@ -138,6 +144,7 @@
   {% endif %}
 </section>
 
+{% if can_read_consultations %}
 <section class="chart">
   <h2 class="section-title">Historial de consultas</h2>
 
@@ -169,9 +176,14 @@
   {% else %}
   <div class="empty">
     <p class="empty-title">Este paciente aún no tiene consultas</p>
+    {% if can_write_consultations %}
     <p>Registra la primera consulta para que aparezca también en la app del paciente.</p>
     <a class="btn btn-line" href="/portal/pacientes/{{ patient.id }}/consulta">Registrar consulta</a>
+    {% else %}
+    <p>Todavía no hay consultas registradas.</p>
+    {% endif %}
   </div>
   {% endif %}
 </section>
+{% endif %}
 {% endblock %}

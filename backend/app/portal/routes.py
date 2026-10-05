@@ -913,6 +913,17 @@ async def patient_detail(
         for consultation, doctor_row in rows
     ]
     created = next((item for item in consultations if item["id"] == creada), None)
+
+    # Separación de funciones: Recepción y Laboratorio ven los datos del paciente
+    # y sus documentos, pero no el historial clínico salvo que tengan el permiso.
+    can_read_consultations = has_permission(user, "consultations:read")
+    can_write_consultations = has_permission(user, "consultations:write")
+    can_write_patients = has_permission(user, "patients:write")
+    can_write_appointments = has_permission(user, "appointments:write")
+    if not can_read_consultations:
+        consultations = []
+        created = None
+
     documents = (
         await db.scalars(
             select(Document).where(Document.patient_id == patient.id).order_by(Document.created_at.desc())
@@ -938,6 +949,10 @@ async def patient_detail(
             "patient": patient,
             "consultations": consultations,
             "created": created,
+            "can_read_consultations": can_read_consultations,
+            "can_write_consultations": can_write_consultations,
+            "can_write_patients": can_write_patients,
+            "can_write_appointments": can_write_appointments,
             "locked": login_security.is_locked(account) if account else False,
             "lock_minutes": login_security.lock_minutes_left(account) if account else 0,
             "totp_enabled": bool(account.totp_enabled) if account else False,
