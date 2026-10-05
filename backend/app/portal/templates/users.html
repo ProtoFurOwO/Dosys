@@ -6,7 +6,7 @@
     <h1>Usuarios</h1>
     <p class="page-note">Todas las cuentas con acceso al sistema: personal del hospital y pacientes.</p>
   </div>
-  <a class="btn btn-primary" href="/portal/usuarios/nuevo">Nuevo médico</a>
+  <a class="btn btn-primary" href="/portal/usuarios/nuevo">Nuevo usuario</a>
 </header>
 
 {% if aviso == 'propio' %}
@@ -98,9 +98,9 @@
 </div>
 {% else %}
 <div class="empty">
-  <p class="empty-title">Todavía no hay personal registrado</p>
-  <p>Registra al primer médico para que pueda entrar al portal.</p>
-  <a class="btn btn-line" href="/portal/usuarios/nuevo">Nuevo médico</a>
+  <p class="empty-title">Todavía no hay usuarios registrados</p>
+  <p>Registra al primer usuario del personal para que pueda entrar al portal.</p>
+  <a class="btn btn-line" href="/portal/usuarios/nuevo">Nuevo usuario</a>
 </div>
 {% endif %}
 {% endblock %}

@@ -108,6 +108,7 @@ async def create_patient_account(
 
     user = User(
         username=username,
+        full_name=full_name,
         email=clean_email,
         password_hash=hash_password(password),
         role_id=await _role_id(db, "patient"),
@@ -137,23 +138,61 @@ async def create_doctor_account(
     username: str,
     password: str,
     email: str | None = None,
-) -> tuple[User, Doctor]:
+) -> tuple[User, Doctor | None]:
+    """Cuenta de médico con su ficha (especialidad)."""
+    return await create_staff_account(
+        db,
+        full_name=full_name,
+        role_code="doctor",
+        username=username,
+        password=password,
+        email=email,
+        specialty=specialty,
+    )
+
+
+async def create_staff_account(
+    db: AsyncSession,
+    *,
+    full_name: str,
+    role_code: str,
+    username: str,
+    password: str,
+    email: str | None = None,
+    specialty: str | None = None,
+) -> tuple[User, Doctor | None]:
+    """Cuenta del personal con el rol indicado.
+
+    Los pacientes tienen su propia sección de registro. Solo el rol médico
+    lleva ficha con especialidad; el resto guarda su nombre en la cuenta.
+    """
     await _ensure_username_free(db, username)
     clean_email = await _ensure_email_free(db, email)
 
+    role = await db.scalar(select(Role).where(Role.code == role_code))
+    if role is None:
+        raise AccountError("El rol seleccionado no existe.")
+    if role.code == "patient":
+        raise AccountError("Los pacientes se registran desde la sección Pacientes.")
+    if role.code == "doctor" and not (specialty or "").strip():
+        raise AccountError("Escribe la especialidad del médico.")
+
     user = User(
         username=username,
+        full_name=full_name,
         email=clean_email,
         password_hash=hash_password(password),
-        role_id=await _role_id(db, "doctor"),
+        role_id=role.id,
     )
     db.add(user)
     await db.flush()
 
-    doctor = Doctor(user_id=user.id, full_name=full_name, specialty=specialty)
-    db.add(doctor)
-    await db.flush()
-    return user, doctor
+    profile: Doctor | None = None
+    if role.code == "doctor":
+        profile = Doctor(user_id=user.id, full_name=full_name, specialty=(specialty or "").strip())
+        db.add(profile)
+        await db.flush()
+    return user, profile
 
 
 async def set_user_active(db: AsyncSession, user: User, active: bool) -> None:

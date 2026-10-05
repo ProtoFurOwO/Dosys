@@ -1,13 +1,13 @@
 {% extends "panel.html" %}
-{% block title %}{% if mode == 'create' %}Nuevo médico{% else %}Editar médico{% endif %} · D.O.S.Y.S Portal clínico{% endblock %}
+{% block title %}{% if mode == 'create' %}Nuevo usuario{% else %}Editar usuario{% endif %} · D.O.S.Y.S Portal clínico{% endblock %}
 {% block content %}
 <header class="page-head">
   <div>
     <a class="back-link" href="/portal/usuarios">Volver a usuarios</a>
-    <h1>{% if mode == 'create' %}Nuevo médico{% else %}Editar médico{% endif %}</h1>
+    <h1>{% if mode == 'create' %}Nuevo usuario{% else %}Editar usuario{% endif %}</h1>
     <p class="page-note">
       {% if mode == 'create' %}
-      La cuenta da acceso al portal clínico y a la API del hospital.
+      La cuenta da acceso al portal clínico y a la API del hospital, con el rol que elijas.
       {% else %}
       Los cambios se ven de inmediato en el portal.
       {% endif %}
@@ -29,13 +29,38 @@
     {% if errors.full_name %}<p class="error">{{ errors.full_name }}</p>{% endif %}
   </div>
 
+  {% if mode == 'create' %}
+  <div class="field {% if errors.role_code %}has-error{% endif %}">
+    <label for="role_code">Rol</label>
+    <select id="role_code" name="role_code">
+      {% for role in roles %}
+      <option value="{{ role.code }}" {% if role.code == values.role_code %}selected{% endif %}>{{ role.name }}</option>
+      {% endfor %}
+    </select>
+    <p class="help">Define los permisos de la cuenta dentro del sistema.</p>
+    {% if errors.role_code %}<p class="error">{{ errors.role_code }}</p>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if mode == 'create' or is_doctor %}
   <div class="field {% if errors.specialty %}has-error{% endif %}">
     <label for="specialty">Especialidad</label>
     <input id="specialty" name="specialty" maxlength="120" value="{{ values.specialty }}" placeholder="Ej. Medicina General">
+    <p class="help">
+      {% if mode == 'create' %}Solo para el rol Médico.{% else %}Se muestra en el expediente de los pacientes.{% endif %}
+    </p>
     {% if errors.specialty %}<p class="error">{{ errors.specialty }}</p>{% endif %}
   </div>
+  {% endif %}
 
   {% if mode == 'create' %}
+  <div class="field {% if errors.email %}has-error{% endif %}">
+    <label for="email">Correo (opcional)</label>
+    <input id="email" name="email" type="email" maxlength="160" value="{{ values.email }}" placeholder="persona@correo.com" autocomplete="off">
+    <p class="help">Sirve para enviar credenciales y recuperar la contraseña.</p>
+    {% if errors.email %}<p class="error">{{ errors.email }}</p>{% endif %}
+  </div>
+
   <div class="field {% if errors.username %}has-error{% endif %}">
     <label for="username">Usuario</label>
     <input id="username" name="username" class="uppercase" maxlength="64" value="{{ values.username }}" autocomplete="off" required>
@@ -65,7 +90,7 @@
 
   <div class="form-actions">
     <button class="btn btn-primary" type="submit">
-      {% if mode == 'create' %}Registrar médico{% else %}Guardar cambios{% endif %}
+      {% if mode == 'create' %}Registrar usuario{% else %}Guardar cambios{% endif %}
     </button>
     <a class="btn btn-quiet" href="/portal/usuarios">Cancelar</a>
   </div>

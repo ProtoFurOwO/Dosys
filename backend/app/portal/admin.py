@@ -28,7 +28,7 @@ from app.services.users import (
     EMAIL_PATTERN,
     USERNAME_PATTERN,
     AccountError,
-    create_doctor_account,
+    create_staff_account,
     password_policy_error,
     reset_user_password,
     set_user_active,
@@ -63,7 +63,16 @@ async def require_staff(
     return user, await portal_staff(db, user)
 
 
-def doctor_form_context(doctor_name: str, *, mode: str, user: User | None, values: dict, errors: dict) -> dict:
+def doctor_form_context(
+    doctor_name: str,
+    *,
+    mode: str,
+    user: User | None,
+    values: dict,
+    errors: dict,
+    roles: list[Role] | None = None,
+    is_doctor: bool = True,
+) -> dict:
     return {
         "doctor_name": doctor_name,
         "active": "usuarios",
@@ -71,6 +80,8 @@ def doctor_form_context(doctor_name: str, *, mode: str, user: User | None, value
         "user": user,
         "values": values,
         "errors": errors,
+        "roles": roles or [],
+        "is_doctor": is_doctor,
     }
 
 
@@ -109,8 +120,8 @@ async def users_page(request: Request, aviso: str = "", db: AsyncSession = Depen
             "role_code": account.role.code,
             "role_label": account.role.name,
             "active": account.is_active,
-            # El nombre viene de la ficha (médico o paciente); el usuario es solo el acceso.
-            "full_name": profile.full_name if profile else (patient.full_name if patient else account.username),
+            # El nombre viene de la ficha (médico o paciente) o de la propia cuenta.
+            "full_name": account.full_name or (profile.full_name if profile else (patient.full_name if patient else account.username)),
             "specialty": profile.specialty if profile else ("Paciente" if patient else None),
             "last_access": last_access.get(account.id),
             "is_self": account.id == current_user.id,
@@ -141,6 +152,9 @@ async def doctor_new_page(request: Request, db: AsyncSession = Depends(get_db)) 
         return login_redirect()
     _, doctor = session
 
+    roles = list(
+        (await db.scalars(select(Role).where(Role.code != "patient").order_by(Role.name.asc()))).all()
+    )
     return templates.TemplateResponse(
         request,
         "doctor_form.html",
@@ -148,8 +162,9 @@ async def doctor_new_page(request: Request, db: AsyncSession = Depends(get_db)) 
             doctor.full_name,
             mode="create",
             user=None,
-            values={"full_name": "", "specialty": "", "username": ""},
+            values={"full_name": "", "specialty": "", "username": "", "role_code": "doctor", "email": ""},
             errors={},
+            roles=roles,
         ),
     )
 
@@ -158,7 +173,9 @@ async def doctor_new_page(request: Request, db: AsyncSession = Depends(get_db)) 
 async def doctor_new_submit(
     request: Request,
     full_name: str = Form(""),
+    role_code: str = Form("doctor"),
     specialty: str = Form(""),
+    email: str = Form(""),
     username: str = Form(""),
     password: str = Form(""),
     password_confirm: str = Form(""),
@@ -169,17 +186,28 @@ async def doctor_new_submit(
         return login_redirect()
     current_user, doctor = session
 
+    roles = list(
+        (await db.scalars(select(Role).where(Role.code != "patient").order_by(Role.name.asc()))).all()
+    )
+    role = next((item for item in roles if item.code == role_code.strip().lower()), None)
+
     values = {
         "full_name": full_name.strip(),
+        "role_code": role.code if role else role_code.strip().lower(),
         "specialty": specialty.strip(),
+        "email": email.strip().lower(),
         "username": username.strip().lower(),
     }
     errors: dict[str, str] = {}
 
+    if role is None:
+        errors["role_code"] = "Selecciona un rol válido."
     if not 5 <= len(values["full_name"]) <= 160:
         errors["full_name"] = "Escribe el nombre completo (mínimo 5 caracteres)."
-    if not 3 <= len(values["specialty"]) <= 120:
+    if role is not None and role.code == "doctor" and not 3 <= len(values["specialty"]) <= 120:
         errors["specialty"] = "Escribe la especialidad (mínimo 3 caracteres)."
+    if values["email"] and not EMAIL_PATTERN.match(values["email"]):
+        errors["email"] = "Escribe un correo válido o déjalo vacío."
     if not USERNAME_PATTERN.match(values["username"]):
         errors["username"] = (
             "El usuario debe tener entre 3 y 64 caracteres: letras minúsculas, números, punto, guion o guion bajo."
@@ -192,35 +220,37 @@ async def doctor_new_submit(
         return templates.TemplateResponse(
             request,
             "doctor_form.html",
-            doctor_form_context(doctor.full_name, mode="create", user=None, values=values, errors=errors),
+            doctor_form_context(doctor.full_name, mode="create", user=None, values=values, errors=errors, roles=roles),
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
 
     try:
-        account, profile = await create_doctor_account(
+        account, profile = await create_staff_account(
             db,
             full_name=values["full_name"],
-            specialty=values["specialty"],
+            role_code=role.code if role else "doctor",
             username=values["username"],
             password=password,
+            email=values["email"] or None,
+            specialty=values["specialty"],
         )
     except AccountError as error:
         errors["general"] = str(error)
         return templates.TemplateResponse(
             request,
             "doctor_form.html",
-            doctor_form_context(doctor.full_name, mode="create", user=None, values=values, errors=errors),
+            doctor_form_context(doctor.full_name, mode="create", user=None, values=values, errors=errors, roles=roles),
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
 
     await write_audit_event(
         db,
         user=current_user,
-        action="portal_create_doctor",
+        action="portal_create_doctor" if account.role.code == "doctor" else "portal_create_staff",
         entity_type="user",
         entity_id=account.id,
         request=request,
-        detail=f"username={account.username} specialty={profile.specialty}",
+        detail=f"username={account.username} role={account.role.code}",
     )
     await db.commit()
 
@@ -229,11 +259,11 @@ async def doctor_new_submit(
         "credential.html",
         credential_context(
             doctor_name=doctor.full_name,
-            person_name=profile.full_name,
-            role_label=ROLE_LABELS["doctor"],
+            person_name=account.full_name or account.username,
+            role_label=account.role.name,
             username=account.username,
             password=password,
-            email=None,
+            email=values["email"] or None,
             user_id=account.id,
             back_url="/portal/usuarios",
             back_label="Volver a usuarios",
@@ -254,11 +284,11 @@ async def doctor_edit_page(
     _, doctor = session
 
     account = await db.get(User, user_id)
-    profile = await db.scalar(select(Doctor).where(Doctor.user_id == user_id)) if account else None
-    if account is None or profile is None:
+    if account is None:
         return templates.TemplateResponse(
             request, "not_found.html", {"doctor_name": doctor.full_name}, status_code=status.HTTP_404_NOT_FOUND
         )
+    profile = await db.scalar(select(Doctor).where(Doctor.user_id == user_id))
 
     return templates.TemplateResponse(
         request,
@@ -267,8 +297,13 @@ async def doctor_edit_page(
             doctor.full_name,
             mode="edit",
             user=account,
-            values={"full_name": profile.full_name, "specialty": profile.specialty, "username": account.username},
+            values={
+                "full_name": account.full_name or (profile.full_name if profile else account.username),
+                "specialty": profile.specialty if profile else "",
+                "username": account.username,
+            },
             errors={},
+            is_doctor=profile is not None,
         ),
     )
 
@@ -287,39 +322,48 @@ async def doctor_edit_submit(
     current_user, doctor = session
 
     account = await db.get(User, user_id)
-    profile = await db.scalar(select(Doctor).where(Doctor.user_id == user_id)) if account else None
-    if account is None or profile is None:
+    if account is None:
         return templates.TemplateResponse(
             request, "not_found.html", {"doctor_name": doctor.full_name}, status_code=status.HTTP_404_NOT_FOUND
         )
+    profile = await db.scalar(select(Doctor).where(Doctor.user_id == user_id))
 
     values = {
         "full_name": full_name.strip(),
-        "specialty": specialty.strip(),
+        "specialty": specialty.strip() if profile else "",
         "username": account.username,
     }
     errors: dict[str, str] = {}
     if not 5 <= len(values["full_name"]) <= 160:
         errors["full_name"] = "Escribe el nombre completo (mínimo 5 caracteres)."
-    if not 3 <= len(values["specialty"]) <= 120:
+    if profile is not None and not 3 <= len(values["specialty"]) <= 120:
         errors["specialty"] = "Escribe la especialidad (mínimo 3 caracteres)."
 
     if errors:
         return templates.TemplateResponse(
             request,
             "doctor_form.html",
-            doctor_form_context(doctor.full_name, mode="edit", user=account, values=values, errors=errors),
+            doctor_form_context(
+                doctor.full_name,
+                mode="edit",
+                user=account,
+                values=values,
+                errors=errors,
+                is_doctor=profile is not None,
+            ),
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
 
-    profile.full_name = values["full_name"]
-    profile.specialty = values["specialty"]
+    account.full_name = values["full_name"]
+    if profile is not None:
+        profile.full_name = values["full_name"]
+        profile.specialty = values["specialty"]
     await db.flush()
 
     await write_audit_event(
         db,
         user=current_user,
-        action="portal_update_doctor",
+        action="portal_update_doctor" if profile is not None else "portal_update_staff",
         entity_type="user",
         entity_id=account.id,
         request=request,
