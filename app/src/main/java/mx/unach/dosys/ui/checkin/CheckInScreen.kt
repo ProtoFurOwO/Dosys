@@ -121,6 +121,9 @@ fun CheckInScreen(
                                         setPrompt("Apunta al código de recepción")
                                         setBeepEnabled(false)
                                         setOrientationLocked(false)
+                                        // Orientación del teléfono: la pantalla por defecto de
+                                        // ZXing viene fijada en horizontal.
+                                        setCaptureActivity(PortraitCaptureActivity::class.java)
                                     }
                                 )
                             },

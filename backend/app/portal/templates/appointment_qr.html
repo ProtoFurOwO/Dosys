@@ -12,8 +12,10 @@
       <span><b>Lugar</b> {{ appointment.location }}</span>
     </p>
   </div>
-  <span class="chip chip-confirmed">{{ status_label }}</span>
+  <span class="chip chip-confirmed" id="cita-chip">{{ status_label }}</span>
 </header>
+
+<div id="checkin-aviso"></div>
 
 {% if appointment.checked_in_at %}
 <div class="note note-ok" role="status">
@@ -21,7 +23,9 @@
 </div>
 {% endif %}
 
-<div class="checkin-panel">
+<div class="checkin-panel"
+     id="checkin-panel"
+     {% if qr_svg and not appointment.checked_in_at %}data-checkin-watch="/portal/citas/{{ appointment.id }}/estado"{% endif %}>
   {% if qr_svg %}
   <div class="qr qr-large">{{ qr_svg | safe }}</div>
   <div class="checkin-info">
@@ -33,7 +37,7 @@
     {% if appointment.checked_in_at %}
     <p class="checkin-help">Llegada confirmada a las {{ appointment.checked_in_at | fecha_hora }}.</p>
     {% else %}
-    <p class="checkin-help">Aún no confirma su llegada.</p>
+    <p class="checkin-help" id="checkin-estado">Aún no confirma su llegada.</p>
     {% endif %}
   </div>
   {% else %}

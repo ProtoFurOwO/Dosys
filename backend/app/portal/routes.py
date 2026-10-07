@@ -9,7 +9,7 @@ import re
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1156,6 +1156,32 @@ async def appointment_qr_page(
             "checkin_code": code,
             "qr_svg": qr_svg(f"DOSYS-CHECKIN|{appointment.id}|{code}") if code else None,
         },
+    )
+
+
+@router.get("/citas/{appointment_id:int}/estado")
+async def appointment_checkin_state(
+    appointment_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Estado del check-in para que la pantalla del QR se actualice sola."""
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return JSONResponse({"detail": "Sesión requerida"}, status_code=status.HTTP_401_UNAUTHORIZED)
+    if not has_permission(user, "appointments:read"):
+        return JSONResponse({"detail": "Sin permiso"}, status_code=status.HTTP_403_FORBIDDEN)
+
+    appointment = await db.get(Appointment, appointment_id)
+    if appointment is None:
+        return JSONResponse({"detail": "Cita no encontrada"}, status_code=status.HTTP_404_NOT_FOUND)
+
+    return JSONResponse(
+        {
+            "checked_in": appointment.checked_in_at is not None,
+            "checked_in_label": deps.format_time(appointment.checked_in_at) if appointment.checked_in_at else None,
+            "status": appointment.status.value,
+        }
     )
 
 

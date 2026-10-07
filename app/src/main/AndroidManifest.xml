@@ -52,6 +52,18 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!--
+            Escáner QR del check-in con orientación libre: la actividad original
+            de ZXing fuerza horizontal (sensorLandscape) y volteaba la pantalla.
+        -->
+        <activity
+            android:name=".ui.checkin.PortraitCaptureActivity"
+            android:exported="false"
+            android:screenOrientation="sensor"
+            android:stateNotNeeded="true"
+            android:theme="@style/zxing_CaptureTheme"
+            android:windowSoftInputMode="stateAlwaysHidden" />
     </application>
 
 </manifest>
