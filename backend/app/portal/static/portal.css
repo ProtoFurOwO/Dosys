@@ -1416,3 +1416,19 @@ body.login {
     border: 1px solid #6a7871;
   }
 }
+
+/* Consulta: estudios, receta y sala de espera. */
+.study-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px}
+.study-option{display:flex;gap:10px;padding:10px 12px;border:1px solid #cfd8d2;border-radius:8px;cursor:pointer;background:#fff}
+.study-option small{display:block;color:#5a6b60;font-size:12px}
+.recipe-row{display:grid;grid-template-columns:2fr 1fr 1.2fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center}
+.recipe-row input{padding:8px 10px;border:1px solid #cfd8d2;border-radius:8px;min-width:0}
+.check-line{display:flex;gap:8px;align-items:center;margin:10px 0;font-weight:600}
+.lab-form{min-width:260px}
+.lab-form textarea{width:100%;padding:8px 10px;border:1px solid #cfd8d2;border-radius:8px}
+.lab-form .row-actions{display:flex;gap:8px;margin-top:8px}
+.code.small{font-size:12px}
+
+/* Distintivos de apps autenticadoras (2FA). */
+.app-badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.app-badge{display:inline-flex;align-items:center;gap:6px;border:1px solid #cfd8d2;border-radius:999px;padding:5px 11px;font-size:13px;background:#fff}

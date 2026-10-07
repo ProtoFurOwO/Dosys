@@ -13,3 +13,10 @@ class AppointmentStatus(str, Enum):
     CONFIRMED = "confirmed"
     ATTENDED = "attended"
     CANCELLED = "cancelled"
+
+
+class StudyOrderStatus(str, Enum):
+    REQUESTED = "requested"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"

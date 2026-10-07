@@ -26,6 +26,12 @@ ACTION_LABELS = {
     "portal_create_staff": "Usuario del personal registrado",
     "portal_update_doctor": "Datos del médico actualizados",
     "portal_update_staff": "Datos del usuario actualizados",
+    "portal_assign_room": "Consultorio asignado en el check-in",
+    "portal_create_study_orders": "Estudios solicitados al laboratorio",
+    "portal_complete_study_order": "Resultado de estudio capturado",
+    "portal_cancel_study_order": "Orden de estudio cancelada",
+    "portal_create_prescription": "Receta médica emitida",
+    "portal_schedule_next_appointment": "Próxima cita agendada desde la consulta",
     "portal_user_activated": "Usuario reactivado",
     "portal_user_deactivated": "Usuario desactivado",
     "portal_reset_password": "Contraseña restablecida",
@@ -67,6 +73,8 @@ ENTITY_LABELS = {
     "document": "Documento",
     "user": "Usuario",
     "role": "Rol",
+    "study_order": "Estudio",
+    "prescription": "Receta",
 }
 
 DETAIL_KEYS = {

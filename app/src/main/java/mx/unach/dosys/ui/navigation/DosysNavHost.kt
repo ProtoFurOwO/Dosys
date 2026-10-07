@@ -1,11 +1,9 @@
 package mx.unach.dosys.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import mx.unach.dosys.ui.appointments.AppointmentsScreen
 import mx.unach.dosys.ui.checkin.CheckInScreen
 import mx.unach.dosys.ui.documents.DocumentsScreen
@@ -16,7 +14,6 @@ import mx.unach.dosys.ui.qr.QrScreen
 import mx.unach.dosys.ui.record.RecordScreen
 import mx.unach.dosys.ui.security.SecurityScreen
 import mx.unach.dosys.ui.studies.StudiesScreen
-import mx.unach.dosys.ui.studies.StudyDetailScreen
 
 /**
  * Grafo de navegación de la app.
@@ -57,17 +54,7 @@ fun DosysNavHost() {
             RecordScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.STUDIES) {
-            StudiesScreen(
-                onBack = { navController.popBackStack() },
-                onOpenStudy = { id -> navController.navigate(Routes.studyDetail(id)) },
-            )
-        }
-        composable(
-            route = Routes.STUDY_DETAIL,
-            arguments = listOf(navArgument("id") { type = NavType.IntType }),
-        ) { entry ->
-            val id = entry.arguments?.getInt("id") ?: return@composable
-            StudyDetailScreen(studyId = id, onBack = { navController.popBackStack() })
+            StudiesScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.PRESCRIPTIONS) {
             PrescriptionsScreen(onBack = { navController.popBackStack() })

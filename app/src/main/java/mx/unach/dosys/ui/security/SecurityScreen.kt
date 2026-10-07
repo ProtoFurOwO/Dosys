@@ -1,7 +1,10 @@
 package mx.unach.dosys.ui.security
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,6 +15,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Button
@@ -34,6 +39,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +48,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.text.KeyboardOptions
 import mx.unach.dosys.ui.components.ScreenScaffold
@@ -151,6 +158,8 @@ fun SecurityScreen(
                             )
                             Spacer(Modifier.height(10.dp))
                             SecretRow(secret = setup.secret)
+                            Spacer(Modifier.height(14.dp))
+                            AuthenticatorBadges()
                             Spacer(Modifier.height(16.dp))
                             ConfirmCodeForm(isSubmitting = state.isSubmitting, onConfirm = viewModel::confirm)
                         }
@@ -376,4 +385,78 @@ private fun ChangePasswordForm(
             Text(if (isSubmitting) "Guardando…" else "Cambiar contraseña")
         }
     }
+}
+
+@Composable
+private fun AuthenticatorBadges() {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "Úsala con la app de códigos que prefieras:",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AuthenticatorBadge(label = "Google") {
+                Box(
+                    modifier = Modifier
+                        .size(16.dp)
+                        .background(Color(0xFF4285F4), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("G", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            AuthenticatorBadge(label = "Microsoft") {
+                MicrosoftLogo()
+            }
+            AuthenticatorBadge(label = "Otra app TOTP") {
+                Box(
+                    modifier = Modifier
+                        .size(16.dp)
+                        .background(Color(0xFF5A6B60), CircleShape),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AuthenticatorBadge(label: String, icon: @Composable () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(999.dp))
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+    ) {
+        icon()
+        Text(label, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+@Composable
+private fun MicrosoftLogo() {
+    Column {
+        Row {
+            MicrosoftSquare(0xFFF25022)
+            Spacer(Modifier.size(2.dp))
+            MicrosoftSquare(0xFF7FBA00)
+        }
+        Spacer(Modifier.size(2.dp))
+        Row {
+            MicrosoftSquare(0xFF00A4EF)
+            Spacer(Modifier.size(2.dp))
+            MicrosoftSquare(0xFFFFB900)
+        }
+    }
+}
+
+@Composable
+private fun MicrosoftSquare(color: Long) {
+    Box(
+        modifier = Modifier
+            .size(7.dp)
+            .background(Color(color)),
+    )
 }

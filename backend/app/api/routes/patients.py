@@ -13,10 +13,13 @@ from app.models.doctor import Doctor
 from app.models.document import Document
 from app.models.enums import UserRole
 from app.models.patient import Patient
+from app.models.prescription import Prescription
+from app.models.study_order import StudyOrder
 from app.models.user import User
 from app.schemas.appointment import AppointmentCheckInRequest, AppointmentResponse
 from app.schemas.consultation import ConsultationResponse
 from app.schemas.document import DocumentResponse
+from app.schemas.laboratory import PrescriptionItemResponse, PrescriptionResponse, StudyOrderResponse
 from app.schemas.patient import PatientProfileResponse
 from app.services.audit import write_audit_event
 from app.services.documents import document_path
@@ -87,6 +90,88 @@ async def get_my_consultations(
     )
     await db.commit()
     return consultations
+
+
+@router.get("/me/studies", response_model=list[StudyOrderResponse])
+async def get_my_studies(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.PATIENT)),
+) -> list[StudyOrderResponse]:
+    """Estudios solicitados al paciente y el documento del resultado cuando está listo."""
+    patient = await get_patient_for_user(db, current_user)
+    orders = (
+        await db.scalars(
+            select(StudyOrder)
+            .where(StudyOrder.patient_id == patient.id)
+            .order_by(StudyOrder.requested_at.desc())
+        )
+    ).all()
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="read_studies",
+        entity_type="patient",
+        entity_id=patient.id,
+        request=request,
+    )
+    await db.commit()
+    return [
+        StudyOrderResponse(
+            id=order.id,
+            study_name=order.study.name,
+            category=order.study.category,
+            status=order.status.value,
+            requested_at=order.requested_at,
+            performed_at=order.performed_at,
+            document_id=order.document_id,
+        )
+        for order in orders
+    ]
+
+
+@router.get("/me/prescriptions", response_model=list[PrescriptionResponse])
+async def get_my_prescriptions(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.PATIENT)),
+) -> list[PrescriptionResponse]:
+    """Recetas emitidas al paciente con sus medicamentos y el PDF firmado."""
+    patient = await get_patient_for_user(db, current_user)
+    prescriptions = (
+        await db.scalars(
+            select(Prescription)
+            .where(Prescription.patient_id == patient.id)
+            .order_by(Prescription.created_at.desc())
+        )
+    ).all()
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="read_prescriptions",
+        entity_type="patient",
+        entity_id=patient.id,
+        request=request,
+    )
+    await db.commit()
+    return [
+        PrescriptionResponse(
+            id=prescription.id,
+            created_at=prescription.created_at,
+            notes=prescription.notes,
+            document_id=prescription.document_id,
+            items=[
+                PrescriptionItemResponse(
+                    medication=item.medication,
+                    dose=item.dose,
+                    frequency=item.frequency,
+                    duration=item.duration,
+                )
+                for item in prescription.items
+            ],
+        )
+        for prescription in prescriptions
+    ]
 
 
 @router.get("/me/appointments", response_model=list[AppointmentResponse])

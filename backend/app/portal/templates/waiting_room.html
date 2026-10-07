@@ -1,0 +1,49 @@
+{% extends "panel.html" %}
+{% block title %}En espera · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Sala de espera</h1>
+    <p class="page-note">Pacientes que ya confirmaron su llegada en recepción. La lista se actualiza sola.</p>
+  </div>
+</header>
+
+<div data-waiting-watch="/portal/en-espera/estado"
+     data-waiting-signature="{% for item in waiting %}{{ item.appointment_id }}:{{ item.room }};{% endfor %}"></div>
+
+{% if waiting %}
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th scope="col">Paciente</th>
+        <th scope="col">Consultorio</th>
+        <th scope="col">Llegó</th>
+        <th scope="col">Servicio</th>
+        <th scope="col" class="col-action"><span class="visually-hidden">Acciones</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in waiting %}
+      <tr>
+        <td>{{ item.patient_name }}<span class="row-sub">{{ item.curp }}</span></td>
+        <td><span class="chip chip-confirmed">{{ item.room }}</span></td>
+        <td class="nowrap">{{ item.checked_in_label }}</td>
+        <td>{{ item.specialty }}{% if item.doctor_name %}<span class="row-sub">{{ item.doctor_name }}</span>{% endif %}</td>
+        <td class="col-action">
+          {% if can_write_consultations %}
+          <a class="btn btn-primary" href="/portal/pacientes/{{ item.patient_id }}/consulta?cita={{ item.appointment_id }}">Atender</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  <p class="empty-title">Nadie en espera por ahora</p>
+  <p>Cuando recepción confirme una llegada, el paciente aparecerá aquí automáticamente.</p>
+</div>
+{% endif %}
+{% endblock %}

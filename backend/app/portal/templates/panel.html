@@ -16,6 +16,10 @@
         <a class="nav-link {% if active == 'pacientes' %}is-active{% endif %}" href="/portal">Pacientes</a>
         {% if 'appointments:read' in perms %}
         <a class="nav-link {% if active == 'citas' %}is-active{% endif %}" href="/portal/citas">Citas</a>
+        <a class="nav-link {% if active == 'espera' %}is-active{% endif %}" href="/portal/en-espera">En espera</a>
+        {% endif %}
+        {% if 'studies:read' in perms %}
+        <a class="nav-link {% if active == 'laboratorio' %}is-active{% endif %}" href="/portal/laboratorio">Laboratorio</a>
         {% endif %}
         {% if 'users:manage' in perms %}
         <a class="nav-link {% if active == 'usuarios' %}is-active{% endif %}" href="/portal/usuarios">Usuarios</a>

@@ -73,6 +73,37 @@ async def store_document(
         raise DocumentError("Solo se aceptan PDF, JPG, PNG o WEBP.")
 
     data = await upload.read()
+    if not data:
+        raise DocumentError("El archivo llegó vacío.")
+    return await store_document_bytes(
+        db,
+        patient=patient,
+        uploader=uploader,
+        title=title,
+        category=category,
+        data=data,
+        content_type=content_type,
+        original_name=Path(upload.filename or "documento").name[:255],
+    )
+
+
+async def store_document_bytes(
+    db: AsyncSession,
+    *,
+    patient: Patient,
+    uploader: User | None,
+    title: str,
+    category: str,
+    data: bytes,
+    content_type: str,
+    original_name: str,
+) -> Document:
+    """Guarda un archivo ya en memoria (subidas o PDF generados por el sistema).
+
+    Devuelve el documento con su huella SHA-256 y el sello HMAC del servidor.
+    """
+    if content_type not in ALLOWED_TYPES:
+        raise DocumentError("Solo se aceptan PDF, JPG, PNG o WEBP.")
     limit = settings.documents_max_mb * 1024 * 1024
     if not data:
         raise DocumentError("El archivo llegó vacío.")
@@ -88,7 +119,7 @@ async def store_document(
         uploaded_by_user_id=uploader.id if uploader else None,
         title=title.strip(),
         category=category,
-        original_name=Path(upload.filename or "documento").name[:255],
+        original_name=original_name[:255],
         content_type=content_type,
         size_bytes=len(data),
         sha256=sha256,

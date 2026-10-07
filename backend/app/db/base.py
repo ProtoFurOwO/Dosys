@@ -6,11 +6,14 @@ from app.models.audit_log import AuditLog
 from app.models.consultation import Consultation
 from app.models.doctor import Doctor
 from app.models.document import Document
+from app.models.lab_study import LabStudy
 from app.models.patient import Patient
 from app.models.permission import Permission
+from app.models.prescription import Prescription, PrescriptionItem
 from app.models.recovery_code import RecoveryCode
 from app.models.role import Role, role_permissions
 from app.models.session_token import PasswordResetToken, RefreshToken
+from app.models.study_order import StudyOrder
 from app.models.user import User
 
 __all__ = [
@@ -27,4 +30,8 @@ __all__ = [
     "role_permissions",
     "RefreshToken",
     "PasswordResetToken",
+    "LabStudy",
+    "StudyOrder",
+    "Prescription",
+    "PrescriptionItem",
 ]

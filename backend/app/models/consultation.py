@@ -19,6 +19,9 @@ class Consultation(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     patient_id: Mapped[int] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), index=True, nullable=False)
     doctor_id: Mapped[int] = mapped_column(ForeignKey("doctors.id", ondelete="RESTRICT"), index=True, nullable=False)
+    appointment_id: Mapped[int | None] = mapped_column(
+        ForeignKey("appointments.id", ondelete="SET NULL"), index=True, nullable=True
+    )
     reason: Mapped[str] = mapped_column(String(300), nullable=False)
     diagnosis: Mapped[str] = mapped_column(String(500), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

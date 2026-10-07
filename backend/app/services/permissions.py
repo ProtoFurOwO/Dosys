@@ -21,6 +21,11 @@ PERMISSIONS: tuple[tuple[str, str, str, str], ...] = (
     ("users:manage", "Usuarios", "administración", "Gestionar cuentas y accesos"),
     ("roles:manage", "Roles", "administración", "Crear roles y asignar permisos"),
     ("audit:read", "Auditoría", "lectura", "Consultar la bitácora del sistema"),
+    ("studies:read", "Laboratorio", "lectura", "Ver estudios solicitados y sus resultados"),
+    ("studies:request", "Laboratorio", "escritura", "Solicitar estudios al laboratorio"),
+    ("studies:perform", "Laboratorio", "escritura", "Realizar estudios y capturar resultados"),
+    ("prescriptions:write", "Recetas", "escritura", "Emitir recetas médicas"),
+    ("prescriptions:read", "Recetas", "lectura", "Consultar recetas emitidas"),
 )
 
 BASE_ROLES: tuple[tuple[str, str, str], ...] = (
@@ -45,12 +50,18 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {
         "documents:write",
         "documents:delete",
         "audit:read",
+        "studies:read",
+        "studies:request",
+        "prescriptions:write",
+        "prescriptions:read",
     ),
     "laboratory": (
         "portal:access",
         "patients:read",
         "documents:read",
         "documents:write",
+        "studies:read",
+        "studies:perform",
     ),
     "reception": (
         "portal:access",
@@ -59,6 +70,7 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {
         "appointments:read",
         "appointments:write",
         "documents:read",
+        "studies:read",
     ),
     "patient": (),
 }

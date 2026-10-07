@@ -8,7 +8,9 @@ import mx.unach.dosys.data.model.LogoutRequest
 import mx.unach.dosys.data.model.PatientAppointment
 import mx.unach.dosys.data.model.PatientConsultation
 import mx.unach.dosys.data.model.PatientDocument
+import mx.unach.dosys.data.model.PatientPrescription
 import mx.unach.dosys.data.model.PatientProfile
+import mx.unach.dosys.data.model.PatientStudy
 import mx.unach.dosys.data.model.PasswordForgotRequest
 import mx.unach.dosys.data.model.PasswordForgotResponse
 import mx.unach.dosys.data.model.RefreshRequest
@@ -90,6 +92,12 @@ interface ApiService {
 
     @GET("patients/me/documents")
     suspend fun myDocuments(@Header("Authorization") authorization: String): List<PatientDocument>
+
+    @GET("patients/me/studies")
+    suspend fun myStudies(@Header("Authorization") authorization: String): List<PatientStudy>
+
+    @GET("patients/me/prescriptions")
+    suspend fun myPrescriptions(@Header("Authorization") authorization: String): List<PatientPrescription>
 
     @Streaming
     @GET("patients/me/documents/{id}/file")

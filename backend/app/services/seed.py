@@ -12,6 +12,7 @@ from app.models.audit_log import AuditLog
 from app.models.consultation import Consultation
 from app.models.doctor import Doctor
 from app.models.enums import AppointmentStatus
+from app.models.lab_study import LabStudy
 from app.models.patient import Patient
 from app.models.permission import Permission
 from app.models.role import Role
@@ -57,15 +58,51 @@ async def ensure_roles_and_permissions(db: AsyncSession) -> dict[str, Role]:
             role.name = name
             role.description = description
         # Los roles de sistema estrenan la matriz por defecto; si un administrador
-        # ya los editó (o los personalizó), el arranque no los sobrescribe.
-        if not role.permissions and str(role.id) not in edited_role_ids:
-            role.permissions = [
+        # ya los editó (o los personalizó), el arranque no los sobrescribe. Cuando
+        # el catálogo crece (permisos nuevos) se agregan los que falten sin quitar
+        # los que el hospital haya ajustado.
+        if str(role.id) not in edited_role_ids:
+            desired = {
                 permissions[item] for item in DEFAULT_ROLE_PERMISSIONS.get(code, ()) if item in permissions
-            ]
+            }
+            if not role.permissions:
+                role.permissions = sorted(desired, key=lambda permission: permission.code)
+            else:
+                granted = set(role.permissions)
+                missing = desired - granted
+                if missing:
+                    role.permissions = list(role.permissions) + sorted(missing, key=lambda permission: permission.code)
         roles[code] = role
 
     await db.flush()
     return roles
+
+
+LAB_STUDIES: tuple[tuple[str, str, str, str | None], ...] = (
+    ("tipo_sangre", "Tipo de sangre (ABO y Rh)", "laboratorio", "Una gota de sangre; resultado inmediato"),
+    ("biometria", "Biometría hemática completa", "laboratorio", "Serie roja, blanca y plaquetas"),
+    ("quimica", "Química sanguínea de 6 elementos", "laboratorio", "Glucosa, urea, creatinina, colesterol y más"),
+    ("glucosa", "Glucosa en ayuno", "laboratorio", "Requiere 8 horas de ayuno"),
+    ("ego", "Examen general de orina", "laboratorio", "Muestra de orina de la primera micción"),
+    ("rx_torax", "Rayos X de tórax", "imagen", "Proyección posteroanterior y lateral"),
+    ("rx_extremidad", "Rayos X de extremidad", "imagen", "Región afectada, dos proyecciones"),
+    ("ultrasonido", "Ultrasonido abdominal", "imagen", "Ayuno de 6 horas y vejiga llena"),
+    ("ecg", "Electrocardiograma", "imagen", "Reposo, 12 derivaciones"),
+    ("cultivo", "Cultivo de exudado faríngeo", "laboratorio", "Resultado en 48 a 72 horas"),
+)
+
+
+async def ensure_lab_studies(db: AsyncSession) -> None:
+    """Carga el catálogo de estudios de demostración (idempotente)."""
+    for code, name, category, description in LAB_STUDIES:
+        study = await db.scalar(select(LabStudy).where(LabStudy.code == code))
+        if study is None:
+            db.add(LabStudy(code=code, name=name, category=category, description=description))
+        else:
+            study.name = name
+            study.category = category
+            study.description = description
+    await db.flush()
 
 
 async def load_role(db: AsyncSession, code: str) -> Role:
@@ -85,6 +122,7 @@ async def seed_demo_data() -> None:
     """
     async with SessionLocal() as db:
         roles = await ensure_roles_and_permissions(db)
+        await ensure_lab_studies(db)
 
         patient_user = await db.scalar(select(User).where(User.username == "paciente"))
         if patient_user is None:

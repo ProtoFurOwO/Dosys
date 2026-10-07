@@ -10,6 +10,7 @@
       <span><b>Cita</b> {{ appointment.scheduled_at | fecha_hora }}</span>
       <span><b>Servicio</b> {{ appointment.specialty }}{% if attending %}, {{ attending.full_name }}{% endif %}</span>
       <span><b>Lugar</b> {{ appointment.location }}</span>
+      <span><b>Consultorio</b> {{ appointment.room or "Sin asignar" }}</span>
     </p>
   </div>
   <span class="chip chip-confirmed" id="cita-chip">{{ status_label }}</span>
@@ -44,4 +45,27 @@
   <p class="page-note">Esta cita no tiene check-in habilitado.</p>
   {% endif %}
 </div>
+
+{% if can_write_appointments and appointment.checked_in_at %}
+<section class="block">
+  <h2 class="section-title">Enviar al consultorio</h2>
+  <p class="page-note">El médico verá al paciente en su sala de espera con este consultorio asignado.</p>
+  <form class="form" method="post" action="/portal/citas/{{ appointment.id }}/consultorio">
+    <div class="field-row">
+      <div class="field">
+        <label for="room">Consultorio de destino</label>
+        <select id="room" name="room">
+          <option value="">Sin asignar</option>
+          {% for room in rooms %}
+          <option value="{{ room }}" {% if appointment.room == room %}selected{% endif %}>{{ room }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-line" type="submit">Guardar consultorio</button>
+    </div>
+  </form>
+</section>
+{% endif %}
 {% endblock %}

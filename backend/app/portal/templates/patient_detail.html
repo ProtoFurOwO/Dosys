@@ -144,10 +144,83 @@
   {% endif %}
 </section>
 
+{% if study_orders %}
+<section class="chart">
+  <h2 class="section-title">Estudios de laboratorio e imagen</h2>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th scope="col">Estudio</th>
+          <th scope="col">Solicitado</th>
+          <th scope="col">Estado</th>
+          <th scope="col" class="col-action"><span class="visually-hidden">Resultado</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in study_orders %}
+        <tr>
+          <td>{{ order.study.name }}{% if order.indications %}<span class="row-sub">{{ order.indications }}</span>{% endif %}</td>
+          <td class="nowrap">{{ order.requested_at | fecha_hora }}</td>
+          <td>
+            {% if order.status.value == 'completed' %}
+            <span class="chip chip-confirmed">Listo</span>
+            {% elif order.status.value == 'cancelled' %}
+            <span class="chip chip-cancelled">Cancelado</span>
+            {% else %}
+            <span class="chip chip-scheduled">Solicitado</span>
+            {% endif %}
+          </td>
+          <td class="col-action">
+            {% if order.document_id %}
+            <a class="btn btn-line" href="/portal/documentos/{{ order.document_id }}/archivo">Resultado</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{% if prescriptions %}
+<section class="chart">
+  <h2 class="section-title">Recetas emitidas</h2>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th scope="col">Fecha</th>
+          <th scope="col">Medicamentos</th>
+          <th scope="col" class="col-action"><span class="visually-hidden">Documento</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for prescription in prescriptions %}
+        <tr>
+          <td class="nowrap">{{ prescription.created_at | fecha_hora }}</td>
+          <td>
+            {% for item in prescription.items %}
+            {{ item.medication }}{% if not loop.last %} · {% endif %}
+            {% endfor %}
+          </td>
+          <td class="col-action">
+            {% if prescription.document_id %}
+            <a class="btn btn-line" href="/portal/documentos/{{ prescription.document_id }}/archivo">Receta PDF</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
 {% if can_read_consultations %}
 <section class="chart">
   <h2 class="section-title">Historial de consultas</h2>
-
   {% if consultations %}
   <ol class="chart-list">
     {% for consultation in consultations %}

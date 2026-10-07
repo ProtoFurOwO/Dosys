@@ -55,3 +55,34 @@ data class PatientDocument(
     val sha256: String,
     @SerialName("created_at") val createdAt: String,
 )
+
+/** Estudio de laboratorio o imagen solicitado al paciente. */
+@Serializable
+data class PatientStudy(
+    val id: Int,
+    @SerialName("study_name") val studyName: String,
+    val category: String = "",
+    val status: String = "",
+    @SerialName("requested_at") val requestedAt: String = "",
+    @SerialName("performed_at") val performedAt: String? = null,
+    @SerialName("document_id") val documentId: Int? = null,
+)
+
+/** Medicamento de una receta emitida. */
+@Serializable
+data class PatientPrescriptionItem(
+    val medication: String,
+    val dose: String = "",
+    val frequency: String = "",
+    val duration: String? = null,
+)
+
+/** Receta médica emitida al paciente (con su PDF firmado). */
+@Serializable
+data class PatientPrescription(
+    val id: Int,
+    @SerialName("created_at") val createdAt: String = "",
+    val notes: String? = null,
+    @SerialName("document_id") val documentId: Int? = null,
+    val items: List<PatientPrescriptionItem> = emptyList(),
+)

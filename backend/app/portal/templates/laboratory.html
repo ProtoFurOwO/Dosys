@@ -1,0 +1,103 @@
+{% extends "panel.html" %}
+{% block title %}Laboratorio · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Laboratorio</h1>
+    <p class="page-note">Cola de estudios solicitados por los médicos. Al capturar un resultado se genera su PDF con huella SHA-256.</p>
+  </div>
+</header>
+
+{% if aviso %}
+<div class="note note-ok" role="status">{{ aviso }}</div>
+{% endif %}
+{% if error %}
+<div class="note note-error" role="alert">{{ error }}</div>
+{% endif %}
+
+<section class="block">
+  <h2 class="section-title">Órdenes pendientes ({{ pending | length }})</h2>
+  {% if pending %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th scope="col">Paciente</th>
+          <th scope="col">Estudio</th>
+          <th scope="col">Solicitó</th>
+          <th scope="col">Fecha</th>
+          <th scope="col" class="col-action"><span class="visually-hidden">Resultado</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in pending %}
+        <tr>
+          <td>{{ item.patient.full_name }}<span class="row-sub">{{ item.patient.curp }}</span></td>
+          <td>{{ item.order.study.name }}<span class="row-sub">{{ item.order.indications or "Sin indicaciones" }}</span></td>
+          <td>{{ item.doctor.full_name }}</td>
+          <td class="nowrap">{{ item.order.requested_at | fecha_hora }}<span class="row-sub">{{ item.label }}</span></td>
+          <td class="col-action">
+            {% if can_perform %}
+            <form class="lab-form" method="post" action="/portal/laboratorio/{{ item.order.id }}/completar">
+              <textarea name="result_text" rows="2" maxlength="4000" required placeholder="Conclusión del estudio"></textarea>
+              <div class="row-actions">
+                <button class="btn btn-primary" type="submit">Guardar resultado</button>
+                <button class="btn btn-quiet" type="submit" formaction="/portal/laboratorio/{{ item.order.id }}/cancelar">Cancelar orden</button>
+              </div>
+            </form>
+            {% else %}
+            <span class="dim">Tu rol no captura resultados</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <p class="empty-title">Sin órdenes pendientes</p>
+    <p>Cuando un médico solicite estudios, aparecerán aquí al instante.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="block">
+  <h2 class="section-title">Resultados recientes</h2>
+  {% if done %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th scope="col">Paciente</th>
+          <th scope="col">Estudio</th>
+          <th scope="col">Realizado</th>
+          <th scope="col">Huella SHA-256</th>
+          <th scope="col" class="col-action"><span class="visually-hidden">Documento</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in done %}
+        <tr>
+          <td>{{ item.patient.full_name }}</td>
+          <td>{{ item.order.study.name }}<span class="row-sub">Solicitó {{ item.doctor.full_name }}</span></td>
+          <td class="nowrap">{{ item.order.performed_at | fecha_hora }}</td>
+          <td class="code small">{{ item.order.document.sha256[:16] }}…</td>
+          <td class="col-action">
+            {% if item.order.document_id %}
+            <a class="btn btn-line" href="/portal/documentos/{{ item.order.document_id }}/archivo">Descargar</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <p class="empty-title">Todavía no hay resultados</p>
+    <p>Cuando el laboratorio capture una conclusión, el PDF quedará aquí y en el expediente del paciente.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

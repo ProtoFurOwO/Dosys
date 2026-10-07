@@ -23,6 +23,7 @@ class Appointment(Base):
     specialty: Mapped[str] = mapped_column(String(120), nullable=False)
     scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     location: Mapped[str] = mapped_column(String(160), nullable=False)
+    room: Mapped[str | None] = mapped_column(String(40), nullable=True)
     status: Mapped[AppointmentStatus] = mapped_column(
         Enum(AppointmentStatus, name="appointment_status", values_callable=lambda enum: [item.value for item in enum]),
         default=AppointmentStatus.SCHEDULED,

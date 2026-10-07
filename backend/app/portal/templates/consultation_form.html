@@ -8,11 +8,20 @@
     <p class="meta-row">
       <span><b>Paciente</b> {{ patient.full_name }}</span>
       <span><b>CURP</b> {{ patient.curp }}</span>
+      {% if appointment %}
+      <span><b>Cita</b> {{ appointment.scheduled_at | fecha_hora }}{% if appointment.room %} · {{ appointment.room }}{% endif %}</span>
+      {% endif %}
     </p>
   </div>
 </header>
 
+{% if errors.general %}
+<div class="note note-error" role="alert">{{ errors.general }}</div>
+{% endif %}
+
 <form class="form" method="post" action="/portal/pacientes/{{ patient.id }}/consulta" novalidate>
+  <input type="hidden" name="cita" value="{{ appointment.id if appointment else 0 }}">
+
   <div class="field {% if errors.reason %}has-error{% endif %}">
     <label for="reason">Motivo de la consulta</label>
     <input id="reason" name="reason" maxlength="300" value="{{ values.reason }}" required aria-describedby="reason-help">
@@ -29,10 +38,91 @@
 
   <div class="field {% if errors.notes %}has-error{% endif %}">
     <label for="notes">Notas para el seguimiento</label>
-    <textarea id="notes" name="notes" rows="4" maxlength="4000" aria-describedby="notes-help">{{ values.notes }}</textarea>
-    <p class="help" id="notes-help">Opcional. Indicaciones, estudios solicitados o acuerdos con el paciente.</p>
+    <textarea id="notes" name="notes" rows="3" maxlength="4000" aria-describedby="notes-help">{{ values.notes }}</textarea>
+    <p class="help" id="notes-help">Opcional. Indicaciones generales o acuerdos con el paciente.</p>
     {% if errors.notes %}<p class="error">{{ errors.notes }}</p>{% endif %}
   </div>
+
+  {% if can_request_studies %}
+  <section class="block">
+    <h2 class="section-title">Estudios de laboratorio e imagen</h2>
+    <p class="page-note">Marca los estudios que se enviarán a realizar; el laboratorio los verá en su cola de trabajo.</p>
+    {% if errors.studies %}<p class="error">{{ errors.studies }}</p>{% endif %}
+    <div class="study-grid">
+      {% for study in studies_catalog %}
+      <label class="study-option">
+        <input type="checkbox" name="study_ids" value="{{ study.id }}" {% if study.id in values.study_ids %}checked{% endif %}>
+        <span><b>{{ study.name }}</b><small>{{ study.category }} · {{ study.description or "Sin indicaciones especiales" }}</small></span>
+      </label>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if can_write_prescriptions %}
+  <section class="block">
+    <h2 class="section-title">Receta médica</h2>
+    {% if errors.prescription %}<p class="error">{{ errors.prescription }}</p>{% endif %}
+    <label class="check-line">
+      <input type="checkbox" name="requires_prescription" data-toggle-recipe {% if values.requires_prescription %}checked{% endif %}>
+      ¿Esta consulta requiere receta?
+    </label>
+    <div id="recipe-panel" {% if not values.requires_prescription %}hidden{% endif %}>
+      <div id="recipe-rows">
+        {% for item in values.recipe_items %}
+        <div class="recipe-row">
+          <input name="medication" placeholder="Medicamento" maxlength="120" value="{{ item.medication }}">
+          <input name="dose" placeholder="Dosis (500 mg)" maxlength="80" value="{{ item.dose }}">
+          <input name="frequency" placeholder="Frecuencia (cada 8 h)" maxlength="80" value="{{ item.frequency }}">
+          <input name="duration" placeholder="Duración (7 días)" maxlength="80" value="{{ item.duration }}">
+          <button class="btn btn-quiet btn-inline" type="button" data-remove-row>Quitar</button>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-line" type="button" data-add-row>Agregar medicamento</button>
+      </div>
+      <div class="field">
+        <label for="prescription_notes">Indicaciones para el paciente</label>
+        <textarea id="prescription_notes" name="prescription_notes" rows="2" maxlength="300" placeholder="Ej. Tomar con alimentos, regresar si hay fiebre…">{{ values.prescription_notes }}</textarea>
+      </div>
+      <p class="help">Al guardar se genera la receta en PDF y el servidor le pone su huella SHA-256.</p>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if can_schedule %}
+  <section class="block">
+    <h2 class="section-title">Próxima cita</h2>
+    {% if errors.next %}<p class="error">{{ errors.next }}</p>{% endif %}
+    <label class="check-line">
+      <input type="checkbox" name="next_enabled" data-toggle-next {% if values.next_enabled %}checked{% endif %}>
+      Agendar la próxima cita en este momento
+    </label>
+    <div id="next-panel" {% if not values.next_enabled %}hidden{% endif %}>
+      <div class="field-row">
+        <div class="field">
+          <label for="next_when">Fecha y hora</label>
+          <input id="next_when" name="next_when" type="datetime-local" value="{{ values.next_when }}">
+        </div>
+        <div class="field">
+          <label for="next_specialty">Especialidad</label>
+          <input id="next_specialty" name="next_specialty" maxlength="120" value="{{ values.next_specialty }}" placeholder="Medicina General">
+        </div>
+        <div class="field">
+          <label for="next_room">Consultorio</label>
+          <select id="next_room" name="next_room">
+            <option value="">Sin asignar</option>
+            {% for room in rooms %}
+            <option value="{{ room }}" {% if room == values.next_room %}selected{% endif %}>{{ room }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <p class="help">Aparecerá de inmediato en la agenda de recepción. El sistema rechaza empalmes de médico, paciente o consultorio.</p>
+    </div>
+  </section>
+  {% endif %}
 
   <div class="form-actions">
     <button class="btn btn-primary" type="submit">Guardar consulta</button>
