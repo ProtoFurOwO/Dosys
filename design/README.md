@@ -43,7 +43,7 @@ design/
 ## Enlaces
 
 - Repositorio: <https://github.com/ProtoFurOwO/Dosys>
-- Prototipo en línea: <https://raw.githack.com/ProtoFurOwO/Dosys/master/design/prototipo/Prototipo_DOSYS.html>
+- Prototipo en línea: <https://htmlpreview.github.io/?https://raw.githubusercontent.com/ProtoFurOwO/Dosys/master/design/prototipo/Prototipo_DOSYS.html>
 - Sistema en vivo: <https://medicos.stolasimp.dev>
 
 > Las capturas y datos son ficticios de demostración académica. No contienen información clínica real.

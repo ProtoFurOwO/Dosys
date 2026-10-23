@@ -103,7 +103,7 @@ app/src/main/java/mx/unach/dosys/
 El diseño completo de la app (entregables E1–E4) está en:
 
 - [`design/UNACH_Diseño_Equipo5.pdf`](design/UNACH_Diseño_Equipo5.pdf) — documento de diseño con análisis, casos de uso, wireframes, mockups, arquitectura MVVM y modelo de datos.
-- [`design/prototipo/Prototipo_DOSYS.html`](design/prototipo/Prototipo_DOSYS.html) — **prototipo navegable autocontenido**: se abre en cualquier navegador y reproduce el flujo real con las capturas de la app. Versión en línea: <https://raw.githack.com/ProtoFurOwO/Dosys/master/design/prototipo/Prototipo_DOSYS.html>.
+- [`design/prototipo/Prototipo_DOSYS.html`](design/prototipo/Prototipo_DOSYS.html) — **prototipo navegable autocontenido**: se abre en cualquier navegador y reproduce el flujo real con las capturas de la app. Versión en línea: <https://htmlpreview.github.io/?https://raw.githubusercontent.com/ProtoFurOwO/Dosys/master/design/prototipo/Prototipo_DOSYS.html>.
 - [`design/index.html`](design/index.html) — fuente HTML del documento.
 
 ### Capturas de la app

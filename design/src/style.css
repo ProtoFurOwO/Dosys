@@ -420,6 +420,7 @@ code { font-family: Consolas, "Courier New", monospace; font-size: 9pt; backgrou
   word-break: break-all;
   margin: 3pt 0 5pt;
 }
+.linkbox .url a { color: var(--green); text-decoration: none; }
 .linkbox img { width: 3.1cm; height: 3.1cm; }
 .linkbox h4 { margin: 0 0 3pt; }
 .linkbox p { font-size: 9pt; margin: 0; text-align: left; }
