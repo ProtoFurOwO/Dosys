@@ -295,10 +295,10 @@ def build():
     <div class="divider"></div>
     <p class="label">Estados y módulos</p>
     <div class="state-grid">
-      <button class="state-btn" onclick="go('recovery')">Recuperar contraseña</button>
-      <button class="state-btn" onclick="go('biometric')">Bloqueo por huella</button>
-      <button class="state-btn" onclick="go('map')">Mapa GPS</button>
-      <button class="state-btn" onclick="go('twofactor')">Verificación 2FA</button>
+      <button class="state-btn" onclick="go('login');go('recovery')">Recuperar contraseña</button>
+      <button class="state-btn" onclick="go('record');go('biometric')">Bloqueo por huella</button>
+      <button class="state-btn" onclick="go('checkin');go('map')">Mapa GPS</button>
+      <button class="state-btn" onclick="go('login');go('twofactor')">Verificación 2FA</button>
     </div>
     <div class="tip">
       <b>Para el profe:</b> este prototipo usa las capturas reales de la app. Los botones
