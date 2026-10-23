@@ -1,0 +1,301 @@
+<!-- 1. E1 -->
+<section class="section">
+  <p class="kicker">Entregable E1 · Análisis</p>
+  <h1>1. Análisis del problema y requisitos</h1>
+
+  <p class="lead">
+    Esta sección define el problema, los usuarios y lo que la aplicación debe hacer. El objetivo no es describir
+    la tecnología, sino dejar claro <b>por qué</b> existe D.O.S.Y.S, <b>para quién</b> se diseñó y <b>qué</b> debe
+    poder hacer el paciente desde su teléfono.
+  </p>
+
+  <h2 id="s11">1.1 Ficha del proyecto</h2>
+  <table class="compact">
+    <tbody>
+      <tr><td style="width:4.2cm"><b>Nombre</b></td><td>D.O.S.Y.S — Expediente clínico digital y seguimiento de tratamientos</td></tr>
+      <tr><td><b>Tipo de solución</b></td><td>Aplicación Android nativa (Kotlin + Jetpack Compose) para el paciente, portal web para el personal y API REST con PostgreSQL.</td></tr>
+      <tr><td><b>Problema central</b></td><td>El paciente no puede consultar de forma oportuna su expediente, citas, estudios, recetas ni documentos; el hospital trabaja con papel y sin trazabilidad.</td></tr>
+      <tr><td><b>Usuarios</b></td><td>Paciente (actor principal de la app), médicos, recepción y laboratorio (portal).</td></tr>
+      <tr><td><b>Alcance de la app</b></td><td>11 rutas de navegación y 3 estados/diálogos, agrupados en 5 flujos principales: acceso, inicio, expediente, check-in y seguridad.</td></tr>
+      <tr><td><b>Stack</b></td><td>Android API 26+, Kotlin, Jetpack Compose, Material 3, Navigation Compose, Retrofit, kotlinx.serialization, DataStore, ZXing, OSMDroid, BiometricPrompt; FastAPI, PostgreSQL, Docker, Nginx y Cloudflare.</td></tr>
+      <tr><td><b>Repositorio</b></td><td><span class="mono">github.com/ProtoFurOwO/Dosys</span></td></tr>
+      <tr><td><b>Prototipo</b></td><td>APK de depuración <span class="mono">dosys-demo-vps.apk</span> + prototipo navegable HTML autocontenido.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="metric-grid">
+    <div class="metric"><div class="n">13</div><div class="l">requisitos funcionales<br>trazables a pantallas</div></div>
+    <div class="metric"><div class="n">7</div><div class="l">requisitos no funcionales<br>de calidad y seguridad</div></div>
+    <div class="metric"><div class="n">12</div><div class="l">historias de usuario<br>con criterios de aceptación</div></div>
+  </div>
+
+  <h2 id="s12">1.2 Problemática y justificación</h2>
+  <p>
+    En México, la información clínica de los pacientes permanece concentrada dentro de las instituciones de salud.
+    El paciente rara vez puede consultar sus resultados de laboratorio, sus recetas, sus citas o su historial
+    médico: esa información la tiene el hospital y, en la mayoría de los casos, no se le entrega de forma completa
+    ni oportuna. Como consecuencia, el paciente desconoce su propio estado de salud y difícilmente puede dar
+    seguimiento a un tratamiento.
+  </p>
+  <p>
+    Al mismo tiempo, dentro del hospital los procesos siguen apoyándose en el papel. La búsqueda del expediente
+    antes de cada consulta retrasa la atención; los resultados de estudios se extravían o se repiten por no existir
+    un registro digital unificado; y las solicitudes de estudios se trasladan manualmente entre el consultorio y el
+    área encargada de realizarlos. A esto se suma que el manejo de información tan sensible —alergias, enfermedades
+    crónicas, diagnósticos y tratamientos— ocurre, en muchos casos, sin un registro de quién la consulta o la modifica.
+  </p>
+  <p>
+    D.O.S.Y.S atiende esa doble necesidad: <b>digitalizar la operación clínica</b> y <b>devolver al paciente el acceso
+    a su propia información</b>, con una superficie de solo lectura y con controles de seguridad verificables. La app
+    no pretende sustituir el juicio médico ni el expediente institucional: es la ventana del paciente al expediente
+    que el hospital ya produce.
+  </p>
+
+  <div class="two-box">
+    <div class="box">
+      <h4>Lo que hoy falla</h4>
+      <ul style="margin-bottom:0">
+        <li>El paciente no ve su expediente, citas, estudios ni recetas.</li>
+        <li>Los resultados se pierden o se repiten por falta de un registro único.</li>
+        <li>La llegada se anota a mano y genera filas en recepción.</li>
+        <li>No hay trazabilidad de quién consulta o modifica el expediente.</li>
+        <li>La adherencia al tratamiento se pierde entre dosis y horarios.</li>
+      </ul>
+    </div>
+    <div class="box">
+      <h4>Lo que aporta D.O.S.Y.S</h4>
+      <ul style="margin-bottom:0">
+        <li>Expediente y agenda centralizados; el paciente ve lo que el médico registra.</li>
+        <li>Check-in con QR y confirmación en vivo en la sala de espera.</li>
+        <li>Estudios y recetas en PDF con huella SHA-256 y sello del servidor.</li>
+        <li>Roles, permisos, JWT, Argon2, 2FA y bitácora de auditoría.</li>
+        <li>App nativa con cámara, GPS y huella, sin servicios de pago.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 id="s13">1.3 Objetivos</h2>
+  <div class="callout">
+    <b>Objetivo general.</b> Diseñar y prototipar una aplicación móvil Android para el paciente de una clínica,
+    aplicando análisis centrado en el usuario, Material Design 3, arquitectura MVVM y un modelo de datos coherente,
+    de modo que el paciente pueda consultar su información clínica y confirmar su llegada de forma segura, clara y trazable.
+  </div>
+  <ol>
+    <li><b>Analizar</b> el problema y a los usuarios para definir requisitos funcionales, no funcionales e historias de usuario verificables.</li>
+    <li><b>Modelar</b> el comportamiento con casos de uso y un mapa de navegación que cubra todas las pantallas y transiciones.</li>
+    <li><b>Diseñar</b> la interfaz con wireframes y mockups de alta fidelidad, aplicando Material Design 3 y criterios de accesibilidad.</li>
+    <li><b>Proponer</b> una arquitectura MVVM con responsabilidades claras y un modelo de datos representado con <i>data classes</i> de Kotlin.</li>
+    <li><b>Construir</b> un prototipo navegable en Kotlin que reproduzca el diseño y se ejecute sin errores.</li>
+    <li><b>Documentar</b> y presentar el trabajo con control de versiones, evidencia de pruebas y un repositorio reproducible.</li>
+  </ol>
+
+  <h2 id="s14">1.4 Perfiles de usuario</h2>
+  <p>
+    Se definieron dos perfiles de paciente con necesidades distintas y un perfil secundario del personal clínico.
+    Los tres influyen en decisiones de diseño: claridad para quien tiene poca familiaridad digital, rapidez para
+    quien ya vive en el teléfono y confianza para quien toma decisiones clínicas.
+  </p>
+
+  <div class="profile-grid">
+    <div class="profile">
+      <div class="avatar">MA</div>
+      <h4>María Argüeta · 46 años</h4>
+      <div class="role">Paciente con hipertensión · Tuxtla Gutiérrez</div>
+      <p><b>Contexto.</b> Usa WhatsApp y Facebook, pero desconfía de las apps bancarias. Va a consulta cada mes y guarda sus recetas en papel.</p>
+      <p><b>Necesita.</b> Ver su próxima cita, sus medicamentos y sus resultados sin depender de una llamada; letras grandes, botones claros y mensajes en español.</p>
+      <p><b>Le frustra.</b> Hacer fila para preguntar algo que debería estar en su teléfono y no entender los términos técnicos.</p>
+      <div class="tags"><span class="tag">Baja alfabetización digital</span><span class="tag">Crónica</span><span class="tag">Accesibilidad</span></div>
+    </div>
+
+    <div class="profile">
+      <div class="avatar">JM</div>
+      <h4>José Antonio Matuz · 23 años</h4>
+      <div class="role">Paciente joven · estudiante universitario</div>
+      <p><b>Contexto.</b> Vive con el teléfono; usa apps bancarias, QR y autenticadores. Le molesta cargar papeles o volver al hospital por un resultado.</p>
+      <p><b>Necesita.</b> Check-in rápido con la cámara, PDFs descargables, 2FA y una sesión que no le pida la contraseña cada vez.</p>
+      <p><b>Le frustra.</b> Las filas, los portales que no funcionan en el celular y tener que llamar para confirmar una cita.</p>
+      <div class="tags"><span class="tag">Nativo digital</span><span class="tag">Autonomía</span><span class="tag amber">Check-in QR</span></div>
+    </div>
+
+    <div class="profile">
+      <div class="avatar">DL</div>
+      <h4>Dra. López Hernández · 38 años</h4>
+      <div class="role">Médica general · usuaria del portal clínico</div>
+      <p><b>Contexto.</b> Atiende consulta general, ordena estudios y emite recetas. Necesita ver el historial completo antes de decidir.</p>
+      <p><b>Necesita.</b> Abrir el expediente en segundos, saber quién ya llegó, ordenar estudios y dejar la próxima cita sin empalmes.</p>
+      <p><b>Le frustra.</b> Buscar carpetas, repetir estudios por extravío y no tener un registro de lo que se consultó.</p>
+      <div class="tags"><span class="tag blue">Portal web</span><span class="tag blue">Expediente</span><span class="tag blue">Laboratorio</span></div>
+    </div>
+
+    <div class="profile">
+      <div class="avatar">+</div>
+      <h4>Otros actores del sistema</h4>
+      <div class="role">Recepción · laboratorio · administración</div>
+      <p><b>Recepción.</b> Agenda citas, muestra el QR y confirma la llegada; ve la sala de espera por consultorio.</p>
+      <p><b>Laboratorio.</b> Recibe órdenes, captura resultados y genera el PDF con huella SHA-256.</p>
+      <p><b>Administración.</b> Gestiona usuarios, roles, permisos y consulta la bitácora de auditoría.</p>
+      <div class="tags"><span class="tag purple">Portal</span><span class="tag purple">RBAC</span><span class="tag purple">Auditoría</span></div>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <b>Decisión de diseño derivada de los perfiles.</b> La app usa una barra superior con títulos grandes,
+    tarjetas con iconos y texto, y un solo botón primario por pantalla. Las acciones destructivas o sensibles
+    (cambiar contraseña, desactivar 2FA) se separan en tarjetas propias para evitar toques accidentales.
+  </div>
+
+  <h2 id="s15">1.5 Requisitos funcionales</h2>
+  <p>
+    Cada requisito describe una capacidad observable desde la app. La columna <b>Pantalla</b> conecta el requisito
+    con el mapa de navegación de la sección 2 y con los mockups de la sección 3.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr><th style="width:1.3cm">ID</th><th>Requisito funcional</th><th style="width:1.7cm">Prioridad</th><th style="width:4.2cm">Pantalla / evidencia</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="id">RF-01</td><td>Permitir el acceso con usuario o CURP y contraseña, mostrando un error genérico si las credenciales no coinciden.</td><td>Alta</td><td>Login</td></tr>
+      <tr><td class="id">RF-02</td><td>Solicitar un código TOTP de 6 dígitos cuando la cuenta tiene el segundo factor activo, con opción de código de recuperación.</td><td>Alta</td><td>Login · 2FA</td></tr>
+      <tr><td class="id">RF-03</td><td>Permitir la recuperación de contraseña mediante un enlace de un solo uso enviado al correo registrado.</td><td>Media</td><td>Login · diálogo</td></tr>
+      <tr><td class="id">RF-04</td><td>Mostrar en el inicio la próxima cita, el tratamiento activo y los accesos rápidos a la información del paciente.</td><td>Alta</td><td>Inicio</td></tr>
+      <tr><td class="id">RF-05</td><td>Mostrar el expediente del paciente (datos generales, alergias y consultas) después de validar su identidad con huella o bloqueo del teléfono.</td><td>Alta</td><td>Mi expediente</td></tr>
+      <tr><td class="id">RF-06</td><td>Listar las citas con especialidad, médico, fecha, lugar y estado (agendada, confirmada, atendida, cancelada).</td><td>Alta</td><td>Citas</td></tr>
+      <tr><td class="id">RF-07</td><td>Mostrar un QR personal del paciente con vigencia de 3 minutos y un código de respaldo.</td><td>Media</td><td>Mi QR</td></tr>
+      <tr><td class="id">RF-08</td><td>Escanear con la cámara el QR de la cita que muestra recepción y confirmar la llegada al hospital.</td><td>Alta</td><td>Check-in</td></tr>
+      <tr><td class="id">RF-09</td><td>Mostrar la ubicación del hospital en un mapa, la ubicación del paciente y la distancia en metros, usando GPS y OpenStreetMap.</td><td>Media</td><td>Check-in · mapa</td></tr>
+      <tr><td class="id">RF-10</td><td>Listar los estudios solicitados con su estado (solicitado, en proceso, listo), abrir el detalle y descargar el resultado en PDF.</td><td>Alta</td><td>Estudios · detalle</td></tr>
+      <tr><td class="id">RF-11</td><td>Listar las recetas con medicamento, dosis, frecuencia y duración, y permitir descargar la receta en PDF.</td><td>Alta</td><td>Recetas</td></tr>
+      <tr><td class="id">RF-12</td><td>Listar los documentos del expediente con su categoría, fecha y huella SHA-256, y permitir abrirlos o descargarlos.</td><td>Alta</td><td>Documentos</td></tr>
+      <tr><td class="id">RF-13</td><td>Permitir activar/desactivar el segundo factor, cambiar la contraseña y cerrar la sesión desde “Mi seguridad”.</td><td>Alta</td><td>Mi seguridad</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s16">1.6 Requisitos no funcionales</h2>
+  <table class="compact">
+    <thead>
+      <tr><th style="width:1.3cm">ID</th><th>Requisito no funcional</th><th style="width:4.4cm">Criterio verificable</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="id">RNF-01</td><td><b>Seguridad de sesión.</b> El acceso usa JWT de 30 minutos y refresh de 7 días con rotación; las contraseñas se guardan con Argon2.</td><td>El token caducado devuelve 401; el refresh se revoca al cerrar sesión.</td></tr>
+      <tr><td class="id">RNF-02</td><td><b>Privacidad y solo lectura.</b> El paciente solo puede leer su propia información; las escrituras se limitan a login, check-in y seguridad de la cuenta.</td><td>Un paciente no puede consultar el expediente de otro (403).</td></tr>
+      <tr><td class="id">RNF-03</td><td><b>Usabilidad y accesibilidad.</b> Material Design 3, textos en español, objetivos táctiles de al menos 48 dp y contraste mínimo AA.</td><td>Verde #13653F sobre blanco: 7.09:1; gris #5B6560: 6.04:1.</td></tr>
+      <tr><td class="id">RNF-04</td><td><b>Compatibilidad.</b> Android 8.0 (API 26) o superior, orientación vertical y tamaño de pantalla de teléfono.</td><td>La app instala y navega en API 26+ sin cambios de layout.</td></tr>
+      <tr><td class="id">RNF-05</td><td><b>Rendimiento percibido.</b> Las pantallas muestran indicadores de carga y no bloquean el hilo principal durante las llamadas de red.</td><td>Estado de carga visible; la navegación sigue respondiendo.</td></tr>
+      <tr><td class="id">RNF-06</td><td><b>Disponibilidad y errores.</b> Si la API no responde, la app muestra un mensaje claro y no pierde la sesión; el check-in es idempotente.</td><td>Repetir el check-in no duplica la llegada; el error se muestra en pantalla.</td></tr>
+      <tr><td class="id">RNF-07</td><td><b>Mantenibilidad y trazabilidad.</b> Código organizado por capas (ui, data, core), nombres claros, Git y bitácora de auditoría en el servidor.</td><td>El proyecto compila; cada acceso sensible queda en <span class="mono">audit_log</span>.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s17">1.7 Historias de usuario</h2>
+  <p>
+    Las historias se escribieron con el formato <b>Como… quiero… para…</b> y criterios de aceptación
+    <b>Dado / Cuando / Entonces</b>. Cada una se puede probar sin ambigüedad y se relaciona con un requisito.
+  </p>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-01</span><span class="hu-title">Iniciar sesión con mis credenciales</span><span class="hu-pri">Alta</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> entrar con mi usuario o CURP y mi contraseña <b>para</b> consultar mi información clínica.</p>
+    <p class="crit"><b>Dado</b> que tengo una cuenta activa, <b>cuando</b> escribo credenciales correctas y toco “Iniciar sesión”, <b>entonces</b> llego al inicio y veo mi nombre. <b>Dado</b> que escribo una contraseña incorrecta, <b>cuando</b> intento entrar, <b>entonces</b> veo un mensaje genérico y puedo reintentar.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-02</span><span class="hu-title">Recuperar mi contraseña sin ir al hospital</span><span class="hu-pri">Media</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> solicitar un enlace de recuperación <b>para</b> volver a entrar si olvidé mi contraseña.</p>
+    <p class="crit"><b>Dado</b> que toco “¿Olvidaste tu contraseña?”, <b>cuando</b> escribo mi usuario o correo, <b>entonces</b> veo un mensaje neutro (“si la cuenta existe, se enviará un enlace”). <b>Dado</b> un enlace vencido o ya usado, <b>cuando</b> lo abro, <b>entonces</b> el sistema lo rechaza.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-03</span><span class="hu-title">Ver mi próxima cita al entrar</span><span class="hu-pri">Alta</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> ver mi próxima cita en el inicio <b>para</b> saber cuándo y con quién tengo consulta.</p>
+    <p class="crit"><b>Dado</b> que tengo una cita agendada, <b>cuando</b> abro el inicio, <b>entonces</b> veo especialidad, médico, fecha, hora y un acceso a todas mis citas. <b>Dado</b> que no tengo citas, <b>entonces</b> veo “No tienes citas próximas”.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-04</span><span class="hu-title">Abrir mi expediente con huella</span><span class="hu-pri">Alta</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> que mi expediente se abra con mi huella o el bloqueo del teléfono <b>para</b> que nadie más lo vea si pierdo el dispositivo.</p>
+    <p class="crit"><b>Dado</b> que toco “Expediente”, <b>cuando</b> el sistema solicita biometría, <b>entonces</b> solo después de validarla veo mis datos y consultas. <b>Dado</b> un teléfono sin huella configurada, <b>entonces</b> la app avisa y permite continuar en modo demostración.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-05</span><span class="hu-title">Confirmar mi llegada con el QR de recepción</span><span class="hu-pri">Alta</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> escanear el QR que muestra recepción <b>para</b> confirmar que ya llegué sin hacer fila.</p>
+    <p class="crit"><b>Dado</b> que recepción muestra el QR de mi cita, <b>cuando</b> abro la cámara y lo escaneo, <b>entonces</b> veo “Llegada confirmada” con especialidad, consultorio y hora. <b>Dado</b> un código inválido, <b>entonces</b> veo un error claro y puedo reintentar.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-06</span><span class="hu-title">Usar el código de respaldo si la cámara falla</span><span class="hu-pri">Media</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> escribir el código de respaldo <b>para</b> completar el check-in cuando no puedo escanear.</p>
+    <p class="crit"><b>Dado</b> que la cámara no funciona, <b>cuando</b> escribo el código de la cita, <b>entonces</b> el sistema valida y confirma la llegada. <b>Dado</b> un código ya usado, <b>entonces</b> el check-in es idempotente y no duplica la llegada.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-07</span><span class="hu-title">Consultar mis estudios y descargar el resultado</span><span class="hu-pri">Alta</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> ver mis estudios con su estado y abrir el PDF <b>para</b> llevar mis resultados a otra consulta.</p>
+    <p class="crit"><b>Dado</b> que tengo un estudio “Listo”, <b>cuando</b> abro el detalle, <b>entonces</b> veo el resultado y puedo descargarlo. <b>Dado</b> un estudio “Solicitado” o “En proceso”, <b>entonces</b> veo el estado sin un PDF disponible.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-08</span><span class="hu-title">Consultar mi receta y seguir el tratamiento</span><span class="hu-pri">Alta</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> ver mis medicamentos, dosis y frecuencia <b>para</b> no confundir mi tratamiento.</p>
+    <p class="crit"><b>Dado</b> que el médico emitió una receta, <b>cuando</b> abro “Recetas”, <b>entonces</b> veo cada medicamento con dosis, frecuencia y duración. <b>Dado</b> que la receta tiene PDF, <b>entonces</b> puedo descargarlo.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-09</span><span class="hu-title">Ver mis documentos y su huella de integridad</span><span class="hu-pri">Media</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> ver mis documentos con su huella SHA-256 <b>para</b> confiar en que no fueron alterados.</p>
+    <p class="crit"><b>Dado</b> que el expediente tiene documentos, <b>cuando</b> abro “Documentos”, <b>entonces</b> veo título, categoría, fecha y huella. <b>Dado</b> que toco “Abrir”, <b>entonces</b> se descarga y se abre con la app disponible en el teléfono.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-10</span><span class="hu-title">Activar el segundo factor</span><span class="hu-pri">Alta</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> activar 2FA con Google o Microsoft Authenticator <b>para</b> proteger mi cuenta aunque alguien conozca mi contraseña.</p>
+    <p class="crit"><b>Dado</b> que abro “Mi seguridad”, <b>cuando</b> activo el segundo factor y confirmo el código, <b>entonces</b> la app muestra los códigos de recuperación una sola vez. <b>Dado</b> que cierro sesión, <b>cuando</b> vuelvo a entrar, <b>entonces</b> se solicita el código TOTP.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-11</span><span class="hu-title">Cambiar mi contraseña y cerrar sesión</span><span class="hu-pri">Media</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> cambiar mi contraseña y cerrar sesión <b>para</b> controlar el acceso a mi cuenta.</p>
+    <p class="crit"><b>Dado</b> que escribo mi contraseña actual y una nueva de al menos 8 caracteres con letras y números, <b>cuando</b> confirmo, <b>entonces</b> se actualiza y se cierran las demás sesiones. <b>Dado</b> que toco “Cerrar sesión”, <b>entonces</b> vuelvo al login y el token se revoca.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-12</span><span class="hu-title">Ubicar el hospital en el mapa</span><span class="hu-pri">Baja</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> ver qué tan lejos estoy del hospital <b>para</b> calcular mi llegada.</p>
+    <p class="crit"><b>Dado</b> que concedo permiso de ubicación, <b>cuando</b> abro el check-in, <b>entonces</b> veo el mapa, el pin del hospital y la distancia en metros. <b>Dado</b> que niego el permiso, <b>entonces</b> veo una explicación y la app sigue funcionando sin GPS.</p>
+  </div>
+
+  <h2 id="s18">1.8 Trazabilidad y alcance</h2>
+  <p>
+    La matriz siguiente demuestra que cada requisito tiene al menos una historia de usuario y una pantalla donde se
+    verifica. También sirve como lista de comprobación para la demo.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr><th style="width:1.4cm">Requisito</th><th style="width:2.2cm">Historia(s)</th><th>Pantalla / evidencia</th><th style="width:4.5cm">Cómo se prueba</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="id">RF-01</td><td>HU-01</td><td>Login</td><td>Credenciales correctas e incorrectas</td></tr>
+      <tr><td class="id">RF-02</td><td>HU-10</td><td>Login · 2FA</td><td>Código TOTP y código de recuperación</td></tr>
+      <tr><td class="id">RF-03</td><td>HU-02</td><td>Login · diálogo</td><td>Enlace de un solo uso</td></tr>
+      <tr><td class="id">RF-04</td><td>HU-03</td><td>Inicio</td><td>Próxima cita y tratamiento</td></tr>
+      <tr><td class="id">RF-05</td><td>HU-04</td><td>Mi expediente</td><td>BiometricPrompt + historial</td></tr>
+      <tr><td class="id">RF-06</td><td>HU-03, HU-05</td><td>Citas</td><td>Estados y datos de la cita</td></tr>
+      <tr><td class="id">RF-07</td><td>HU-05</td><td>Mi QR</td><td>QR con vigencia y respaldo</td></tr>
+      <tr><td class="id">RF-08</td><td>HU-05, HU-06</td><td>Check-in</td><td>Escaneo y código de respaldo</td></tr>
+      <tr><td class="id">RF-09</td><td>HU-12</td><td>Check-in · mapa</td><td>Permiso concedido/negado</td></tr>
+      <tr><td class="id">RF-10</td><td>HU-07</td><td>Estudios · detalle</td><td>Estado y PDF</td></tr>
+      <tr><td class="id">RF-11</td><td>HU-08</td><td>Recetas</td><td>Medicamentos y PDF</td></tr>
+      <tr><td class="id">RF-12</td><td>HU-09</td><td>Documentos</td><td>Huella SHA-256 y descarga</td></tr>
+      <tr><td class="id">RF-13</td><td>HU-10, HU-11</td><td>Mi seguridad</td><td>2FA, contraseña y logout</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <b>Alcance y límites declarados.</b> El prototipo implementa 11 rutas y 3 estados/diálogos; la actividad pedía
+    de 3 a 5 pantallas como mínimo. Se conservan 5 flujos principales para el diseño detallado y se documentan
+    los demás como pantallas de apoyo. La app consume la API real del proyecto integrador; los datos son ficticios
+    de demostración y no sustituyen un expediente clínico real.
+  </div>
+</section>

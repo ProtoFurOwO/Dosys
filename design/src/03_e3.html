@@ -1,0 +1,376 @@
+<!-- 3. E3 -->
+<section class="section">
+  <p class="kicker">Entregable E3 · Interfaz</p>
+  <h1>3. Wireframes y mockups</h1>
+
+  <p class="lead">
+    El diseño visual parte de un sistema sencillo: fondo claro, verde institucional, tarjetas con bordes suaves y
+    un solo botón primario por pantalla. La app usa Material Design 3 y está pensada para leerse de un vistazo,
+    incluso con poca familiaridad digital.
+  </p>
+
+  <h2 id="s31">3.1 Sistema de diseño y Material Design 3</h2>
+  <p>
+    El sistema se construyó sobre los componentes estándar de Material 3 para que la app se sienta nativa en Android
+    y para que el prototipo sea consistente con las guías de la materia. No se usan librerías de diseño externas:
+    todo se implementa con <span class="mono">androidx.compose.material3</span>.
+  </p>
+
+  <table class="compact">
+    <thead><tr><th style="width:2.6cm">Token</th><th style="width:2.2cm">Valor</th><th>Uso</th></tr></thead>
+    <tbody>
+      <tr><td><b>Primario</b></td><td><span class="mono">#13653F</span></td><td>Botones, iconos activos, títulos y barra superior.</td></tr>
+      <tr><td><b>Primario claro</b></td><td><span class="mono">#EAF4EF</span></td><td>Fondo de tarjetas de estado, contenedores y top bar.</td></tr>
+      <tr><td><b>Superficie</b></td><td><span class="mono">#FFFFFF</span></td><td>Fondo de pantalla y tarjetas principales.</td></tr>
+      <tr><td><b>Texto</b></td><td><span class="mono">#1F2320</span></td><td>Títulos y texto principal (contraste 15.9:1 sobre blanco).</td></tr>
+      <tr><td><b>Texto secundario</b></td><td><span class="mono">#5B6560</span></td><td>Descripciones y ayudas (contraste 6.04:1).</td></tr>
+      <tr><td><b>Error</b></td><td><span class="mono">#B3261E</span></td><td>Mensajes de validación y estados de error (6.54:1).</td></tr>
+    </tbody>
+  </table>
+
+  <div class="two-box">
+    <div class="box">
+      <h4>Tipografía</h4>
+      <p>La app usa la tipografía por defecto de Material 3 (Roboto) y la escala estándar: <b>display</b> para el
+      logo de acceso, <b>titleLarge</b> para títulos de pantalla, <b>bodyMedium</b> para texto clínico y
+      <b>labelLarge</b> para botones. El documento usa Arial 11 pt por el lineamiento de entrega.</p>
+    </div>
+    <div class="box">
+      <h4>Espaciado y forma</h4>
+      <p>Rejilla de 8 dp; 16 dp de margen lateral; 12 dp entre tarjetas; radios de 12–16 dp. Los botones miden
+      52 dp de alto y las tarjetas tienen áreas táctiles completas, no solo el texto.</p>
+    </div>
+  </div>
+
+  <table class="compact">
+    <thead><tr><th style="width:3.4cm">Componente M3</th><th>Dónde se usa</th><th style="width:5.2cm">Regla de diseño</th></tr></thead>
+    <tbody>
+      <tr><td><b>TopAppBar</b></td><td>Inicio, expediente, check-in, seguridad y demás pantallas internas.</td><td>Fondo <span class="mono">primaryContainer</span>, título grande y botón de regreso con descripción accesible.</td></tr>
+      <tr><td><b>Card</b></td><td>Próxima cita, tratamiento, datos del paciente, estudios, recetas.</td><td>Una idea por tarjeta; icono + título + contenido + acción. Sin sombras fuertes.</td></tr>
+      <tr><td><b>Button</b></td><td>Iniciar sesión, abrir cámara, activar 2FA, cambiar contraseña.</td><td>Un solo botón primario por pantalla; acciones secundarias en <span class="mono">TextButton</span> u <span class="mono">OutlinedButton</span>.</td></tr>
+      <tr><td><b>OutlinedTextField</b></td><td>Credenciales, código de respaldo, contraseñas.</td><td>Etiqueta visible, icono inicial, mensaje de ayuda y error debajo del campo.</td></tr>
+      <tr><td><b>AlertDialog</b></td><td>Recuperar contraseña y confirmaciones.</td><td>Un campo por diálogo; acción principal a la derecha y “Cancelar” a la izquierda.</td></tr>
+      <tr><td><b>LinearProgressIndicator</b></td><td>Tratamiento activo.</td><td>Muestra el avance de tomas sin convertirlo en una tarea de vigilancia.</td></tr>
+      <tr><td><b>StatusChip / texto</b></td><td>Estados de cita y estudio.</td><td>El estado siempre se escribe con texto, no solo con color.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <b>Accesibilidad.</b> Contrastes AA/AAA (7.09:1 para verde sobre blanco); objetivos táctiles de 48 dp o más;
+    textos en español sin abreviaturas clínicas; errores con texto y no solo color; contenido descrito en iconos
+    (<span class="mono">contentDescription</span>); soporte de escala de fuente del sistema; el QR y el código de
+    respaldo permiten completar el check-in sin depender de la cámara.
+  </div>
+
+  <h2 id="s32">3.2 Wireframes de baja fidelidad</h2>
+  <p>
+    Los wireframes muestran la estructura antes del color: jerarquía, bloques, campos y acciones. Se dibujaron en
+    escala de grises para discutir el flujo sin distraerse con la estética. Los números negros remiten a la leyenda
+    de cada pantalla.
+  </p>
+
+  <div class="wire-pair">
+    <div class="wire">
+      <div class="phone"><img src="assets/wireframes/01-login.png" alt="Wireframe de login"></div>
+      <div class="cap"><b>Wireframe 1 · Login.</b> Logo, credenciales y recuperación.</div>
+      <div class="legend"><span>1</span> Campos + botón primario. <span>2</span> Aviso de demostración y ayuda de acceso.</div>
+    </div>
+    <div class="wire">
+      <div class="phone"><img src="assets/wireframes/02-home.png" alt="Wireframe de inicio"></div>
+      <div class="cap"><b>Wireframe 2 · Inicio.</b> Resumen y accesos rápidos.</div>
+      <div class="legend"><span>1</span> Próxima cita. <span>2</span> Tratamiento activo. La rejilla de 6 accesos + documentos se desplaza.</div>
+    </div>
+  </div>
+
+  <div class="wire-pair" style="margin-top:10pt">
+    <div class="wire">
+      <div class="phone"><img src="assets/wireframes/03-record.png" alt="Wireframe de expediente"></div>
+      <div class="cap"><b>Wireframe 3 · Mi expediente.</b> Bloqueo y datos clínicos.</div>
+      <div class="legend"><span>1</span> Compuerta de huella antes de mostrar datos. <span>2</span> Datos, alergias e historial.</div>
+    </div>
+    <div class="wire">
+      <div class="phone"><img src="assets/wireframes/04-checkin.png" alt="Wireframe de check-in"></div>
+      <div class="cap"><b>Wireframe 4 · Check-in.</b> Cámara, respaldo y mapa.</div>
+      <div class="legend"><span>1</span> Cámara + código de respaldo. <span>2</span> Mapa, distancia y confirmación de llegada.</div>
+    </div>
+  </div>
+
+  <div class="wire-pair" style="margin-top:10pt">
+    <div class="wire">
+      <div class="phone"><img src="assets/wireframes/05-security.png" alt="Wireframe de seguridad"></div>
+      <div class="cap"><b>Wireframe 5 · Mi seguridad.</b> 2FA y contraseña.</div>
+      <div class="legend"><span>1</span> Estado del segundo factor. <span>2</span> Cambio de contraseña y sesiones.</div>
+    </div>
+    <div class="wire" style="justify-content:flex-start;padding-top:10pt">
+      <div class="box" style="width:100%">
+        <h4>Elementos comunes</h4>
+        <p><b>Barra superior</b> con regreso y título. <b>Tarjetas</b> con icono, título y contenido. <b>Un botón
+        primario</b> por pantalla. <b>Campos con etiqueta</b> y ayuda. <b>Avisos</b> en texto, no solo color.</p>
+        <p style="margin-top:5pt"><b>Patrón de flujo:</b> inicio → tarjeta → detalle → regreso. Ninguna pantalla
+        interna depende de un menú lateral; todo se alcanza desde el inicio o desde la tarjeta relacionada.</p>
+      </div>
+      <div class="box" style="width:100%;margin-top:8pt">
+        <h4>Por qué no hay bottom navigation</h4>
+        <p>El paciente usa la app en ráfagas cortas (ver una cita, un resultado, hacer check-in). Una barra inferior
+        con 5 destinos ocultaría funciones y competiría con los accesos grandes. La rejilla de tarjetas es más
+        legible y permite crecer sin reentrenar al usuario.</p>
+      </div>
+    </div>
+  </div>
+
+  <h2 id="s33">3.3 Mockups de alta fidelidad</h2>
+  <p>
+    Los mockups de alta fidelidad se generaron a partir del <b>prototipo ejecutable</b>, no de una recreación.
+    Por eso muestran el estado real de la app: tipografía, colores, componentes y datos de demostración. Cada
+    página incluye la pantalla principal y un estado secundario que completa la función.
+  </p>
+
+  <!-- Mockup 1: Login -->
+  <div class="mockup-page">
+    <div class="mockup-head">
+      <p class="kicker">Mockup 1 de 5</p>
+      <h2>Inicio de sesión</h2>
+      <p class="sub">Acceso con usuario o CURP, contraseña y recuperación de cuenta.</p>
+    </div>
+    <div class="mockup-grid">
+      <div class="phone"><img src="assets/app/login.png" alt="Mockup de la pantalla de login"></div>
+      <div class="mock-notes">
+        <h3>Función real</h3>
+        <p>El paciente escribe su usuario o CURP y su contraseña. Si la cuenta tiene 2FA, la app pasa al paso de
+        código TOTP. El enlace “¿Olvidaste tu contraseña?” abre el diálogo de recuperación.</p>
+        <h3>Componentes Material 3</h3>
+        <ul>
+          <li><span class="mono">OutlinedTextField</span> con icono inicial y etiqueta visible.</li>
+          <li><span class="mono">Button</span> primario de 52 dp, ancho completo.</li>
+          <li><span class="mono">TextButton</span> para recuperación.</li>
+          <li>Marca D.O.S.Y.S con icono <span class="mono">LocalHospital</span>.</li>
+        </ul>
+        <h3>Estados</h3>
+        <p>Cargando (spinner dentro del botón), credenciales incorrectas (error genérico), 2FA requerido (pantalla
+        de código) y recuperación (diálogo modal).</p>
+        <div class="meta"><span>HU-01</span><span>HU-02</span><span>HU-10</span><span>RF-01</span><span>RF-02</span></div>
+        <div class="state-inline">
+          <img src="assets/app/recovery.png" alt="Estado de recuperación de contraseña">
+          <div class="cap"><b>Estado secundario.</b> Diálogo de recuperación: si la cuenta existe, se envía un enlace
+          de un solo uso. No revela si el usuario está registrado.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mockup 2: Home -->
+  <div class="mockup-page">
+    <div class="mockup-head">
+      <p class="kicker">Mockup 2 de 5</p>
+      <h2>Inicio</h2>
+      <p class="sub">La próxima cita, el tratamiento activo y todos los accesos en una sola pantalla.</p>
+    </div>
+    <div class="mockup-grid">
+      <div class="phone"><img src="assets/app/home.png" alt="Mockup de la pantalla de inicio"></div>
+      <div class="mock-notes">
+        <h3>Función real</h3>
+        <p>Al entrar, el paciente ve su nombre, la próxima cita con especialidad/médico/fecha y el tratamiento
+        activo con el avance de tomas. Debajo, una rejilla de seis accesos y una tarjeta de documentos.</p>
+        <h3>Componentes Material 3</h3>
+        <ul>
+          <li><span class="mono">TopAppBar</span> con saludo y acción de cerrar sesión.</li>
+          <li><span class="mono">Card</span> clicable para cita, tratamiento y accesos.</li>
+          <li><span class="mono">LinearProgressIndicator</span> para las tomas.</li>
+          <li>Iconos <span class="mono">CalendarMonth</span>, <span class="mono">Description</span>, <span class="mono">Science</span>, <span class="mono">QrCodeScanner</span>, <span class="mono">Shield</span>.</li>
+        </ul>
+        <h3>Jerarquía</h3>
+        <p>La cita ocupa el primer lugar porque es la acción más urgente; el tratamiento segundo; los accesos
+        después. El contenido es desplazable y la tarjeta de documentos queda al final.</p>
+        <div class="meta"><span>HU-03</span><span>RF-04</span><span>RF-07</span><span>RF-13</span></div>
+        <div class="state-inline">
+          <img src="assets/app/home-documents.png" alt="Inicio desplazado con la tarjeta Mis documentos">
+          <div class="cap"><b>Estado secundario.</b> Al desplazar el inicio aparece la tarjeta “Mis documentos”,
+          que abre el expediente digital con la huella SHA-256 de cada archivo.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mockup 3: Record -->
+  <div class="mockup-page">
+    <div class="mockup-head">
+      <p class="kicker">Mockup 3 de 5</p>
+      <h2>Mi expediente</h2>
+      <p class="sub">Datos del paciente e historial clínico, protegidos por huella.</p>
+    </div>
+    <div class="mockup-grid">
+      <div class="phone"><img src="assets/app/record.png" alt="Mockup de la pantalla Mi expediente"></div>
+      <div class="mock-notes">
+        <h3>Función real</h3>
+        <p>Muestra nombre, CURP, nacimiento, tipo de sangre, contacto de emergencia, alergias/antecedentes y el
+        historial de consultas con motivo y diagnóstico. La app solo lee; el médico escribe desde el portal.</p>
+        <h3>Componentes Material 3</h3>
+        <ul>
+          <li><span class="mono">ScreenScaffold</span> con <span class="mono">TopAppBar</span> y regreso.</li>
+          <li>Tarjetas de datos y de consultas, con jerarquía tipográfica.</li>
+          <li>Aviso de solo lectura al final de la pantalla.</li>
+        </ul>
+        <h3>Privacidad</h3>
+        <p>Antes de mostrar el contenido se ejecuta <span class="mono">BiometricPrompt</span>. Si el teléfono no
+        tiene huella configurada, la app avisa y permite continuar en modo demostración; esa diferencia se declara
+        en la sección 5.</p>
+        <div class="meta"><span>HU-04</span><span>RF-05</span><span>RNF-02</span></div>
+        <div class="state-inline">
+          <img src="assets/app/biometric.png" alt="Estado de bloqueo por huella">
+          <div class="cap"><b>Estado secundario.</b> Compuerta de huella: el expediente no se pinta hasta validar
+          la biometría o el bloqueo del teléfono.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mockup 4: Check-in -->
+  <div class="mockup-page">
+    <div class="mockup-head">
+      <p class="kicker">Mockup 4 de 5</p>
+      <h2>Check-in con QR</h2>
+      <p class="sub">Cámara, código de respaldo, GPS y confirmación de llegada.</p>
+    </div>
+    <div class="mockup-grid">
+      <div class="phone"><img src="assets/app/checkin.png" alt="Mockup de la pantalla de check-in"></div>
+      <div class="mock-notes">
+        <h3>Función real</h3>
+        <p>El paciente abre la cámara y escanea el QR que recepción muestra en el portal. La app envía el código a
+        la API y recibe la confirmación con especialidad, consultorio y hora. Si la cámara falla, escribe el código
+        de respaldo. La tarjeta inferior muestra sus citas.</p>
+        <h3>Componentes Material 3</h3>
+        <ul>
+          <li><span class="mono">Button</span> primario “Abrir cámara” + <span class="mono">OutlinedTextField</span> de respaldo.</li>
+          <li>Tarjeta de ubicación con mapa OSMDroid y distancia.</li>
+          <li>Tarjeta de confirmación con estado y datos de la cita.</li>
+        </ul>
+        <h3>Hardware y permisos</h3>
+        <p>Cámara con ZXing (escáner en orientación vertical), GPS con permiso explícito y mapa OpenStreetMap sin
+        API key. Si el permiso se niega, la pantalla explica y el check-in sigue disponible por código.</p>
+        <div class="meta"><span>HU-05</span><span>HU-06</span><span>HU-12</span><span>RF-08</span><span>RF-09</span></div>
+        <div class="state-inline">
+          <img src="assets/app/map.png" alt="Estado del mapa GPS">
+          <div class="cap"><b>Estado secundario.</b> Mapa real con el pin del hospital, la ubicación del paciente y
+          la distancia en metros; se abre en la app de mapas del teléfono.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mockup 5: Security -->
+  <div class="mockup-page">
+    <div class="mockup-head">
+      <p class="kicker">Mockup 5 de 5</p>
+      <h2>Mi seguridad</h2>
+      <p class="sub">Segundo factor, cambio de contraseña y códigos de recuperación.</p>
+    </div>
+    <div class="mockup-grid">
+      <div class="phone"><img src="assets/app/security.png" alt="Mockup de la pantalla Mi seguridad"></div>
+      <div class="mock-notes">
+        <h3>Función real</h3>
+        <p>El paciente activa el segundo factor con Google o Microsoft Authenticator, cambia su contraseña y
+        consulta los códigos de recuperación. Al cambiar la contraseña se cierran las demás sesiones abiertas.</p>
+        <h3>Componentes Material 3</h3>
+        <ul>
+          <li>Tarjeta de estado del segundo factor con icono <span class="mono">Shield</span>.</li>
+          <li><span class="mono">OutlinedTextField</span> para contraseña actual, nueva y confirmación.</li>
+          <li>Casilla “Mostrar contraseñas” y botón deshabilitado hasta completar el formulario.</li>
+        </ul>
+        <h3>Estados</h3>
+        <p>2FA inactivo/activo, códigos de recuperación (se muestran una sola vez), contraseña débil, contraseña
+        actual incorrecta y confirmación de cambio.</p>
+        <div class="meta"><span>HU-10</span><span>HU-11</span><span>RF-13</span><span>RNF-01</span></div>
+        <div class="state-inline">
+          <img src="assets/app/twofactor.png" alt="Estado de verificación 2FA en el login">
+          <div class="cap"><b>Estado secundario.</b> Paso 2FA del login: la contraseña ya es correcta y solo falta
+          el código de 6 dígitos del autenticador.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2 id="s34">3.4 Prototipo navegable</h2>
+  <p>
+    Los mockups del PDF son estáticos por naturaleza. Para que el profesor pueda <b>tocar la app</b>, se construyó
+    un prototipo HTML autocontenido con las mismas capturas del sistema real y zonas interactivas sobre los
+    controles. No requiere instalar nada ni conectar el backend: se abre en cualquier navegador.
+  </p>
+
+  <div class="linkbox">
+    <div>
+      <h4>Prototipo interactivo · 5 pantallas + 4 estados</h4>
+      <p>Haz clic en los elementos resaltados del teléfono o usa la barra lateral para saltar entre pantallas.</p>
+      <div class="url">https://raw.githack.com/ProtoFurOwO/Dosys/master/design/prototipo/Prototipo_DOSYS.html</div>
+      <p class="small" style="margin:0">También está en el repositorio: <span class="mono">design/prototipo/Prototipo_DOSYS.html</span>.
+      Si el enlace directo no abre, descarga el archivo y ábrelo con doble clic.</p>
+    </div>
+    <img src="assets/brand/qr-prototype.png" alt="Código QR del prototipo navegable">
+  </div>
+
+  <div class="two-box" style="margin-top:10pt">
+    <div class="box">
+      <h4>Cómo usarlo</h4>
+      <ol style="margin-bottom:0">
+        <li>Abre el enlace o escanea el QR.</li>
+        <li>Toca “Iniciar sesión” en el teléfono.</li>
+        <li>En el inicio, toca Expediente, Check-in o Mi seguridad.</li>
+        <li>Usa “Atrás” o la barra lateral para volver.</li>
+        <li>Activa “Mostrar / ocultar zonas” para ver los hotspots.</li>
+      </ol>
+    </div>
+    <div class="box">
+      <h4>Qué demuestra</h4>
+      <ul style="margin-bottom:0">
+        <li>El flujo real login → inicio → expediente / check-in / seguridad.</li>
+        <li>Los estados de recuperación, huella, mapa y 2FA.</li>
+        <li>La coherencia 1:1 con las capturas del prototipo ejecutable.</li>
+        <li>Que el diseño no es un dibujo: es la app funcionando.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <b>Nota sobre el enlace.</b> La rúbrica pide “enlace al diseño (Figma u otra)”. Se eligió un prototipo HTML
+    navegable porque reproduce la app real y permite interactuar sin cuenta de Figma. Si el docente exige Figma,
+    las cinco capturas pueden importarse a un archivo de Figma en minutos; el diseño y el PDF no cambian.
+  </div>
+
+  <h2 id="s35" style="break-before: page">3.5 Coherencia entre mockups y app</h2>
+  <p>
+    Los mockups no se dibujaron “a mano” a partir de una idea: se capturaron del prototipo que ya compila y se
+    ejecuta. Esa decisión elimina la deriva entre diseño y código y convierte la sección 5 en una verificación,
+    no en una promesa.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr><th style="width:3cm">Pantalla</th><th style="width:4.4cm">Archivo Kotlin</th><th>Función que se ve en el mockup</th><th style="width:3.6cm">Diferencia / nota</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>Login</b></td><td class="mono">ui/login/LoginScreen.kt</td><td>Credenciales, recuperación y paso 2FA.</td><td>El aviso “Demo local” se retira en producción.</td></tr>
+      <tr><td><b>Inicio</b></td><td class="mono">ui/home/HomeScreen.kt</td><td>Próxima cita, tratamiento, 7 accesos y cierre de sesión.</td><td>El contenido es desplazable; la captura muestra el primer viewport.</td></tr>
+      <tr><td><b>Mi expediente</b></td><td class="mono">ui/record/RecordScreen.kt</td><td>Perfil, alergias e historial; biometría antes de mostrar.</td><td>El emulador no tiene huella; se muestra el aviso y “Continuar”.</td></tr>
+      <tr><td><b>Check-in</b></td><td class="mono">ui/checkin/CheckInScreen.kt</td><td>Cámara, código de respaldo, mapa, confirmación y citas.</td><td>La cámara no se captura en el PDF; el estado del mapa sí.</td></tr>
+      <tr><td><b>Mi seguridad</b></td><td class="mono">ui/security/SecurityScreen.kt</td><td>2FA, contraseña y códigos de recuperación.</td><td>La captura muestra 2FA inactivo; el paso 2FA va como estado secundario.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <b>Resultado.</b> Las cinco pantallas coinciden con el prototipo en estructura, textos, colores y acciones.
+    Las diferencias son de <b>estado</b> (una cuenta con o sin 2FA, un teléfono con o sin huella), no de diseño,
+    y se justifican en la sección 5.3.
+  </div>
+
+  <h3>Criterios de aceptación visual</h3>
+  <table class="compact">
+    <thead><tr><th style="width:4.2cm">Criterio</th><th>Qué se revisó</th><th style="width:1.8cm">Cumple</th></tr></thead>
+    <tbody>
+      <tr><td><b>Jerarquía</b></td><td>Un título por pantalla; la acción principal se distingue sin competir con el contenido.</td><td>Sí</td></tr>
+      <tr><td><b>Consistencia</b></td><td>Mismos radios, colores, tipografía y espaciado en las 5 pantallas y sus estados.</td><td>Sí</td></tr>
+      <tr><td><b>Contraste</b></td><td>Verde #13653F sobre blanco (7.09:1), gris #5B6560 (6.04:1) y error #B3261E (6.54:1).</td><td>Sí</td></tr>
+      <tr><td><b>Tacto</b></td><td>Botones de 52 dp y tarjetas completas clicables; campos con altura suficiente.</td><td>Sí</td></tr>
+      <tr><td><b>Accesibilidad</b></td><td>Estados con texto, iconos con descripción y soporte de escala de fuente.</td><td>Sí</td></tr>
+      <tr><td><b>Estados</b></td><td>Carga, error, vacío, éxito y permisos denegados documentados.</td><td>Sí</td></tr>
+    </tbody>
+  </table>
+</section>

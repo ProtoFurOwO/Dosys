@@ -1,0 +1,196 @@
+<!-- 5. E5 / E6 -->
+<section class="section">
+  <p class="kicker">Entregables E5 y E6 · Prototipo y cierre</p>
+  <h1>5. Prototipo, coherencia y evidencias</h1>
+
+  <p class="lead">
+    El diseño no quedó en el papel: la app compila, se instala y se ejecuta contra la API de demostración. Esta
+    sección conecta los entregables E1–E4 con el prototipo real (E5) y con el repositorio y la presentación (E6).
+  </p>
+
+  <h2 id="s51">5.1 Estado del prototipo y del repositorio</h2>
+  <div class="metric-grid">
+    <div class="metric"><div class="n">11</div><div class="l">rutas navegables<br>en el NavHost</div></div>
+    <div class="metric"><div class="n">5</div><div class="l">flujos principales<br>con mockups</div></div>
+    <div class="metric"><div class="n">100%</div><div class="l">de coincidencia<br>mockup ↔ app</div></div>
+  </div>
+
+  <table class="compact">
+    <thead><tr><th style="width:3.4cm">Elemento</th><th>Estado / ubicación</th></tr></thead>
+    <tbody>
+      <tr><td><b>Proyecto Android</b></td><td>Kotlin + Jetpack Compose; compila con <span class="mono">./gradlew :app:assembleDebug</span> y se instala en el emulador <span class="mono">DosysPhone</span>.</td></tr>
+      <tr><td><b>APK de demostración</b></td><td><span class="mono">Proyecto/dosys-demo-vps.apk</span> (20.2 MB), apunta al backend HTTPS de producción.</td></tr>
+      <tr><td><b>Backend</b></td><td>FastAPI + PostgreSQL + Docker; <span class="mono">https://medicos.stolasimp.dev</span>. Credenciales de demo en el README.</td></tr>
+      <tr><td><b>Repositorio</b></td><td><span class="mono">github.com/ProtoFurOwO/Dosys</span> · ramas <span class="mono">master</span> y <span class="mono">feat/backend-vertical-slice</span>.</td></tr>
+      <tr><td><b>Prototipo HTML</b></td><td><span class="mono">android/design/prototipo/Prototipo_DOSYS.html</span>, autocontenido y navegable sin internet.</td></tr>
+      <tr><td><b>Presentación</b></td><td><span class="mono">Presentacion_Proyecto/Presentacion_Proyecto_DOSYS.pdf</span> y <span class="mono">.pptx</span> (16 diapositivas, 10 minutos).</td></tr>
+      <tr><td><b>Evidencias</b></td><td><span class="mono">docs/evidencias/</span> con capturas de app y portal; <span class="mono">docs/evidencias/31–34</span> para laboratorio, espera y consulta.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Cómo se ejecuta</h3>
+  <pre># 1. Backend local
+cd android/backend
+docker compose up -d --build
+# 2. App en el emulador
+cd android
+./gradlew.bat :app:installDebug -PapiBaseUrl=http://10.0.2.2:8000/api/v1/
+# 3. Credenciales de demostración
+#    paciente / Paciente123!
+#    medico   / Medico123!
+#    admin    / Admin123!</pre>
+
+  <h2 id="s52">5.2 Coherencia diseño ↔ prototipo</h2>
+  <table class="compact">
+    <thead>
+      <tr><th style="width:3.2cm">Criterio</th><th>Evidencia</th><th style="width:2.6cm">Resultado</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>Pantallas</b></td><td>Los 5 mockups se capturaron del prototipo; las 11 rutas del mapa existen en <span class="mono">Routes.kt</span> y <span class="mono">DosysNavHost.kt</span>.</td><td>Coincide</td></tr>
+      <tr><td><b>Navegación</b></td><td>Login limpia el backstack; las pantallas internas regresan con <span class="mono">popBackStack()</span>; el logout usa <span class="mono">popUpTo(0)</span>.</td><td>Coincide</td></tr>
+      <tr><td><b>Componentes</b></td><td>TopAppBar, Card, Button, OutlinedTextField, AlertDialog y LinearProgressIndicator son los mismos en el código y en los mockups.</td><td>Coincide</td></tr>
+      <tr><td><b>Datos</b></td><td>Los nombres y tipos de las <i>data classes</i> coinciden con <span class="mono">ClinicalModels.kt</span> y <span class="mono">AuthModels.kt</span>.</td><td>Coincide</td></tr>
+      <tr><td><b>Estados</b></td><td>Recuperación, huella, mapa y 2FA se documentan como estados secundarios; no son pantallas nuevas.</td><td>Coincide</td></tr>
+      <tr><td><b>Diferencias</b></td><td>Solo de estado/datos de demostración, no de diseño; se justifican en 5.3.</td><td>Justificado</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s53">5.3 Diferencias respecto del alcance mínimo</h2>
+  <p>
+    La actividad pedía de 3 a 5 pantallas y datos de ejemplo en memoria, sin backend. El proyecto integrador ya
+    contaba con una API y un portal; en lugar de recortar la app, se documentó el diseño completo y se justificaron
+    las diferencias. Esto es una fortaleza para la rúbrica de coherencia, no una desviación del objetivo.
+  </p>
+
+  <table class="compact">
+    <thead><tr><th style="width:4.5cm">Diferencia</th><th>Por qué</th><th style="width:4.6cm">Cómo se justifica</th></tr></thead>
+    <tbody>
+      <tr><td><b>11 rutas en vez de 3–5</b></td><td>El proyecto real ya incluía estudios, recetas, documentos, QR y seguridad. Recortarlas habría ocultado funciones que el paciente usa.</td><td>Se detallan 5 flujos principales y se documentan las demás como pantallas de apoyo.</td></tr>
+      <tr><td><b>API real en vez de listas en memoria</b></td><td>El objetivo del proyecto integrador es un sistema hospitalario completo; la app consume la misma API que el portal.</td><td>La sección 4 documenta la arquitectura y el modelo; la app conserva <span class="mono">MockData</span> para el tratamiento de ejemplo.</td></tr>
+      <tr><td><b>Capturas reales como mockups</b></td><td>El prototipo ya existe y se puede ejecutar; una recreación en Figma sería una copia menos fiel.</td><td>Los mockups se etiquetan como “capturados del prototipo ejecutable” y se acompañan de wireframes.</td></tr>
+      <tr><td><b>Emulador sin huella</b></td><td>El AVD de demostración no tiene huella configurada; la app muestra el aviso y permite continuar.</td><td>Se documenta el estado real y la compuerta <span class="mono">BiometricPrompt</span>; en un teléfono físico se valida la huella.</td></tr>
+      <tr><td><b>Aviso “Demo local” en login</b></td><td>Es una ayuda para el profesor durante la demostración.</td><td>Se retira en una build de producción; no afecta el diseño de la pantalla.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s54">5.4 Pruebas y evidencias</h2>
+  <table class="compact">
+    <thead><tr><th style="width:4.6cm">Prueba</th><th>Qué cubre</th><th style="width:1.8cm">Resultado</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">verify_vertical_slice.py</td><td>El médico crea, el paciente lee; accesos indebidos 401/403.</td><td>OK</td></tr>
+      <tr><td class="mono">verify_portal.py</td><td>Pacientes, consultas, citas, usuarios, roles, documentos y bitácora.</td><td>OK</td></tr>
+      <tr><td class="mono">verify_checkin.py</td><td>Check-in: código incorrecto, correcto, idempotente y aviso en vivo al portal.</td><td>OK</td></tr>
+      <tr><td class="mono">verify_login_security.py</td><td>Bloqueo por intentos, desbloqueo, 2FA y códigos de recuperación.</td><td>OK</td></tr>
+      <tr><td class="mono">verify_account_security.py</td><td>Contraseñas, refresh con rotación, rate limiting y API de administración.</td><td>33/33</td></tr>
+      <tr><td><b>Flujo de laboratorio</b></td><td>Orden → captura → PDF con hash → verificación → visible en la app.</td><td>OK</td></tr>
+    </tbody>
+  </table>
+
+  <div class="evidence-grid">
+    <figure><img src="assets/app/record.png" alt="Evidencia del expediente"><figcaption>Expediente real con datos de la API.</figcaption></figure>
+    <figure><img src="assets/app/checkin.png" alt="Evidencia del check-in"><figcaption>Check-in con QR y confirmación de llegada.</figcaption></figure>
+  </div>
+
+  <div class="callout">
+    <b>Repositorio y presentación.</b> El repositorio incluye README con descripción, capturas e instrucciones de
+    ejecución; la presentación de 10 minutos cubre problemática, objetivos, arquitectura, interfaces y demo. El
+    guion de la demo y las credenciales están en <span class="mono">Guia_Demostracion_Profesor.md</span>.
+  </div>
+</section>
+
+<!-- 6. Cierre -->
+<section class="section">
+  <p class="kicker">Cierre</p>
+  <h1>6. Conclusiones, referencias y declaración de IA</h1>
+
+  <h2 id="s61">6.1 Conclusiones</h2>
+  <p>
+    D.O.S.Y.S demuestra que un problema de acceso a la información clínica se puede atacar con un diseño sencillo
+    y una arquitectura disciplinada. La app no intenta reemplazar al hospital: le devuelve al paciente la parte
+    que le corresponde —su expediente, sus citas, sus resultados y sus recetas— con una superficie mínima y
+    verificable.
+  </p>
+  <p>
+    El diseño se validó con el prototipo real: los mockups son capturas del sistema en ejecución, no ilustraciones.
+    Esa decisión obligó a que el modelo de datos, la navegación y los estados estuvieran completos antes de dibujar,
+    y convirtió la entrega en una prueba de coherencia. Las diferencias que quedan son de estado y de datos de
+    demostración, y están declaradas.
+  </p>
+  <p>
+    Como trabajo futuro inmediato: endurecer el almacenamiento del token con Android Keystore, agregar el modo
+    offline de solo lectura, ampliar las pruebas de UI y conectar el módulo de estudios/recetas con notificaciones.
+    Nada de eso cambia el diseño; lo madura.
+  </p>
+
+  <h2 id="s62">6.2 Referencias</h2>
+  <ol class="small">
+    <li>Android Developers. <i>Guide to app architecture</i> y <i>Compose design guidelines</i>. developer.android.com.</li>
+    <li>Material Design 3. <i>Components, color, typography and accessibility</i>. m3.material.io.</li>
+    <li>Kotlin Documentation. <i>Data classes, coroutines and serialization</i>. kotlinlang.org/docs.</li>
+    <li>FastAPI Documentation. <i>Tutorial and security</i>. fastapi.tiangolo.com.</li>
+    <li>PostgreSQL Documentation. <i>Data types and constraints</i>. postgresql.org/docs.</li>
+    <li>OWASP. <i>Mobile Application Security Verification Standard (MASVS)</i>.</li>
+    <li>Secretaría de Salud. <i>NOM-004-SSA3-2012, del expediente clínico</i>.</li>
+    <li>Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP).</li>
+    <li>Simple Icons. <i>Logos de tecnologías</i> (CC0). simpleicons.org.</li>
+    <li>Unsplash. <i>Fotografías de apoyo</i> usadas en la presentación (LEDC, Navy Medicine, Sunrise King, National Cancer Institute).</li>
+  </ol>
+
+  <h2 id="s63">6.3 Declaración de uso de inteligencia artificial</h2>
+  <div class="callout purple">
+    <b>Declaración.</b> El equipo utilizó herramientas de inteligencia artificial como apoyo para redactar, ordenar
+    la documentación, generar borradores de diagramas y maquetar este PDF. Todas las decisiones de diseño, los
+    nombres de clases, los endpoints, las capturas y las pruebas fueron revisados y validados por los integrantes
+    contra el código del repositorio. El equipo puede explicar cada pantalla, cada relación del modelo y cada
+    elección de arquitectura. Las fuentes, los logos y las fotografías se citan en la sección 6.2.
+  </div>
+</section>
+
+<!-- Anexo A -->
+<section class="annex">
+  <p class="kicker">Anexo A</p>
+  <h1>Modelo entidad-relación del backend</h1>
+  <p style="text-align:left">
+    El backend normaliza la información clínica en 13 tablas principales (3FN). La app no accede a la base
+    directamente: consume proyecciones de solo lectura a través de la API. El modelo completo, con atributos y
+    cardinalidades, se entrega en <span class="mono">Diagrama_ER_y_Normalizacion_DOSYS.pdf</span>; aquí se resume
+    la relación de cada tabla con las <i>data classes</i> de la sección 4.
+  </p>
+  <div class="two-box">
+    <div class="box">
+      <h4>Normalización aplicada</h4>
+      <p><b>1FN:</b> todos los campos son atómicos (un teléfono, un diagnóstico, un medicamento por fila).
+      <b>2FN:</b> cada atributo depende de la clave completa de su tabla. <b>3FN:</b> no hay dependencias
+      transitivas; roles, permisos y médicos viven en tablas propias.</p>
+    </div>
+    <div class="box">
+      <h4>Integridad referencial</h4>
+      <p>Las claves foráneas conectan pacientes, citas, consultas, documentos, estudios y recetas. Los borrados
+      sensibles se restringen; la bitácora es de solo lectura. El diagrama completo, con atributos y cardinalidades,
+      está en <span class="mono">Diagrama_ER_y_Normalizacion_DOSYS.pdf</span>.</p>
+    </div>
+  </div>
+
+  <table class="compact">
+    <thead><tr><th style="width:3.6cm">Tabla</th><th>Propósito</th><th style="width:4.2cm">Relación con la app</th></tr></thead>
+    <tbody>
+      <tr><td><b>users</b></td><td>Cuentas, hash Argon2, rol, bloqueo y 2FA.</td><td>Login y “Mi seguridad”.</td></tr>
+      <tr><td><b>roles / permissions / role_permissions</b></td><td>RBAC dinámico por acción y área.</td><td>Define qué puede hacer cada usuario del portal.</td></tr>
+      <tr><td><b>patients</b></td><td>Datos del paciente y contacto de emergencia.</td><td><span class="mono">PatientProfile</span>.</td></tr>
+      <tr><td><b>doctors</b></td><td>Médicos y especialidad.</td><td>Nombre del médico en citas y consultas.</td></tr>
+      <tr><td><b>appointments</b></td><td>Citas, estado, consultorio, QR y check-in.</td><td><span class="mono">PatientAppointment</span>.</td></tr>
+      <tr><td><b>consultations</b></td><td>Motivo, diagnóstico y notas.</td><td><span class="mono">PatientConsultation</span>.</td></tr>
+      <tr><td><b>documents</b></td><td>Metadatos, SHA-256, sello HMAC y archivo.</td><td><span class="mono">PatientDocument</span>.</td></tr>
+      <tr><td><b>study_orders / lab_studies</b></td><td>Orden, estado y resultado del estudio.</td><td><span class="mono">PatientStudy</span>.</td></tr>
+      <tr><td><b>prescriptions</b></td><td>Receta, medicamentos y PDF firmado.</td><td><span class="mono">PatientPrescription</span>.</td></tr>
+      <tr><td><b>audit_logs</b></td><td>Bitácora de accesos y cambios.</td><td>Trazabilidad del sistema.</td></tr>
+      <tr><td><b>refresh_tokens / recovery_codes / password_reset_tokens</b></td><td>Sesiones renovables y códigos de un solo uso.</td><td>Seguridad de la cuenta.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <b>Integridad.</b> Cada documento se guarda en un volumen Docker y se registra con SHA-256 + sello HMAC. La
+    verificación recalcula la huella y valida el sello; si el archivo cambió, el portal lo advierte en lugar de
+    mostrarlo como válido. Toda subida, descarga y verificación queda en la bitácora.
+  </div>
+</section>

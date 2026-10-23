@@ -1,0 +1,153 @@
+<!-- 2. E2 -->
+<section class="section">
+  <p class="kicker">Entregable E2 · Comportamiento</p>
+  <h1>2. Casos de uso y flujo de navegación</h1>
+
+  <p class="lead">
+    El comportamiento de la app se modela desde el punto de vista del paciente. Los casos de uso describen
+    <b>qué puede hacer</b> y el mapa de navegación describe <b>cómo llega</b> a cada pantalla. Ambos se derivan
+    de las historias de la sección 1.
+  </p>
+
+  <h2 id="s21">2.1 Actores y alcance</h2>
+  <table class="compact">
+    <thead>
+      <tr><th style="width:3.2cm">Actor</th><th style="width:2.4cm">Tipo</th><th>Participación</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>Paciente</b></td><td>Principal</td><td>Inicia sesión, consulta su expediente, citas, estudios, recetas y documentos; hace check-in y gestiona su seguridad.</td></tr>
+      <tr><td><b>Recepción</b></td><td>Secundario</td><td>Agenda la cita y muestra el QR que el paciente escanea. No usa la app, pero participa en el caso de check-in.</td></tr>
+      <tr><td><b>App autenticadora</b></td><td>Secundario</td><td>Genera el código TOTP de 6 dígitos que el paciente escribe durante el segundo factor.</td></tr>
+      <tr><td><b>API / backend</b></td><td>Sistema</td><td>Valida identidad, permisos, códigos QR y estados; registra la bitácora. Es la frontera del sistema, no un actor humano.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Inventario de casos de uso</h3>
+  <table class="compact">
+    <thead><tr><th style="width:1.3cm">ID</th><th>Caso de uso</th><th style="width:3.4cm">Actor(es)</th><th style="width:4.6cm">Relación</th><th style="width:3.5cm">Pantalla</th></tr></thead>
+    <tbody>
+      <tr><td class="id">CU-01</td><td>Iniciar sesión y verificar 2FA</td><td>Paciente · App autenticadora</td><td>«include» Verificar código TOTP</td><td>Login</td></tr>
+      <tr><td class="id">CU-02</td><td>Recuperar contraseña</td><td>Paciente</td><td>—</td><td>Login · diálogo</td></tr>
+      <tr><td class="id">CU-03</td><td>Consultar expediente clínico</td><td>Paciente</td><td>«include» Validar huella</td><td>Mi expediente</td></tr>
+      <tr><td class="id">CU-04</td><td>Ver citas y estados</td><td>Paciente</td><td>—</td><td>Citas</td></tr>
+      <tr><td class="id">CU-05</td><td>Hacer check-in con QR</td><td>Paciente · Recepción</td><td>«include» Escanear QR; «extend» Código de respaldo</td><td>Check-in</td></tr>
+      <tr><td class="id">CU-06</td><td>Consultar estudios y resultados</td><td>Paciente</td><td>«include» Descargar PDF firmado</td><td>Estudios · detalle</td></tr>
+      <tr><td class="id">CU-07</td><td>Ver recetas y tratamiento</td><td>Paciente</td><td>«include» Descargar PDF firmado</td><td>Recetas</td></tr>
+      <tr><td class="id">CU-08</td><td>Ver documentos del expediente</td><td>Paciente</td><td>«include» Descargar PDF firmado</td><td>Documentos</td></tr>
+      <tr><td class="id">CU-09</td><td>Mostrar mi QR</td><td>Paciente</td><td>—</td><td>Mi QR</td></tr>
+      <tr><td class="id">CU-10</td><td>Gestionar mi seguridad</td><td>Paciente</td><td>«include» Verificar código TOTP</td><td>Mi seguridad</td></tr>
+      <tr><td class="id">CU-11</td><td>Cerrar sesión</td><td>Paciente</td><td>—</td><td>Inicio · Login</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s22">2.2 Diagrama de casos de uso</h2>
+  <figure class="diagram">
+    <img src="assets/diagrams/use-cases.svg" alt="Diagrama de casos de uso de la app del paciente">
+    <figcaption><b>Figura 2.1.</b> Casos de uso de la app. Las flechas discontinuas muestran las relaciones
+      <span class="mono">«include»</span> y <span class="mono">«extend»</span>; Recepción y la app autenticadora
+      son actores secundarios.</figcaption>
+  </figure>
+
+  <p>
+    El diagrama se leyó de arriba hacia abajo: el paciente es el actor principal y tiene acceso a once casos.
+    Los casos marcados con <span class="mono">«include»</span> siempre forman parte del caso base (por ejemplo,
+    consultar el expediente incluye validar la huella). El caso <span class="mono">«extend»</span> solo ocurre
+    cuando la cámara falla: el paciente usa el código de respaldo para completar el check-in.
+  </p>
+
+  <h2 id="s23">2.3 Descripción de casos principales</h2>
+  <p>Se detallan los cinco casos que concentran el valor de la app y que se demuestran en la presentación.</p>
+
+  <table class="compact">
+    <thead><tr><th style="width:3.2cm">Caso</th><th>Descripción, flujo y excepciones</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>CU-01</b><br>Iniciar sesión y verificar 2FA</td>
+        <td><b>Precondición:</b> el paciente tiene una cuenta activa. <b>Flujo:</b> escribe usuario/CURP y contraseña → la API valida → si la cuenta tiene 2FA, la app pide el código TOTP → al validarlo recibe los tokens y entra al inicio. <b>Excepciones:</b> credenciales incorrectas (mensaje genérico), cuenta bloqueada por intentos, código TOTP inválido o vencido. <b>Postcondición:</b> sesión iniciada y backstack limpio.</td>
+      </tr>
+      <tr>
+        <td><b>CU-03</b><br>Consultar expediente</td>
+        <td><b>Precondición:</b> sesión iniciada. <b>Flujo:</b> toca “Expediente” → la app solicita huella o bloqueo del teléfono → al validar, consulta el perfil y las consultas → muestra datos generales, alergias e historial. <b>Excepciones:</b> biometría cancelada o no configurada (aviso y modo demostración), error de red. <b>Postcondición:</b> el expediente queda visible solo en pantalla; no se escribe nada.</td>
+      </tr>
+      <tr>
+        <td><b>CU-05</b><br>Hacer check-in con QR</td>
+        <td><b>Precondición:</b> el paciente tiene una cita y recepción muestra su QR. <b>Flujo:</b> abre “Check-in” → “Abrir cámara” → ZXing lee el código → la app envía <span class="mono">POST /patients/me/appointments/{id}/check-in</span> → la API valida propiedad, código, estado y ventana → responde 200 → la app muestra especialidad, consultorio y hora. <b>Excepciones:</b> permiso de cámara denegado, código inválido, cita ya usada o fuera de ventana; se ofrece el código de respaldo. <b>Postcondición:</b> la llegada queda registrada y visible en la sala de espera del portal.</td>
+      </tr>
+      <tr>
+        <td><b>CU-06</b><br>Consultar estudios y resultados</td>
+        <td><b>Precondición:</b> el médico ordenó al menos un estudio. <b>Flujo:</b> abre “Estudios” → ve la lista con estado → toca un estudio “Listo” → ve el detalle y descarga el PDF firmado. <b>Excepciones:</b> estudio sin resultado, PDF no disponible, error de red. <b>Postcondición:</b> el paciente conserva una copia del resultado en su teléfono.</td>
+      </tr>
+      <tr>
+        <td><b>CU-10</b><br>Gestionar mi seguridad</td>
+        <td><b>Precondición:</b> sesión iniciada. <b>Flujo:</b> abre “Mi seguridad” → activa 2FA (escanea el QR en su autenticador y confirma el código) o cambia su contraseña → la API valida y actualiza → la app muestra confirmación. <b>Excepciones:</b> código inválido, contraseña actual incorrecta, contraseña nueva débil. <b>Postcondición:</b> la cuenta queda protegida y las demás sesiones se cierran si se cambió la contraseña.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Trazabilidad de los casos principales</h3>
+  <table class="compact">
+    <thead><tr><th style="width:3.2cm">Caso</th><th style="width:3.4cm">Historias</th><th style="width:2.6cm">Requisitos</th><th>Evidencia en la demo</th></tr></thead>
+    <tbody>
+      <tr><td><b>CU-01</b> Iniciar sesión</td><td>HU-01, HU-10</td><td>RF-01, RF-02</td><td>Login con contraseña y código TOTP.</td></tr>
+      <tr><td><b>CU-03</b> Consultar expediente</td><td>HU-04</td><td>RF-05</td><td>BiometricPrompt + datos e historial.</td></tr>
+      <tr><td><b>CU-05</b> Check-in</td><td>HU-05, HU-06</td><td>RF-08, RF-09</td><td>QR del portal + confirmación en la app.</td></tr>
+      <tr><td><b>CU-06</b> Estudios</td><td>HU-07</td><td>RF-10</td><td>Lista por estado + PDF con hash.</td></tr>
+      <tr><td><b>CU-10</b> Seguridad</td><td>HU-10, HU-11</td><td>RF-13</td><td>2FA, cambio de contraseña y logout.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    <b>Regla de oro del comportamiento.</b> La app del paciente es de <b>solo lectura clínica</b>. Sus únicas
+    escrituras son el inicio de sesión, el check-in y las acciones de seguridad de la cuenta. Todo lo demás
+    (diagnóstico, recetas, estudios, citas) lo produce el personal desde el portal.
+  </div>
+
+  <h2 id="s24">2.4 Mapa de navegación</h2>
+  <figure class="diagram">
+    <img src="assets/diagrams/navigation.svg" alt="Mapa de navegación de la app: 11 rutas y 3 estados">
+    <figcaption><b>Figura 2.2.</b> Mapa de navegación con las rutas reales del <span class="mono">NavHost</span>.
+      Las líneas verdes son navegación principal; las discontinuas, regreso o cierre de sesión; los recuadros
+      punteados son estados o diálogos que no son rutas del grafo.</figcaption>
+  </figure>
+
+  <p>
+    El grafo es un <b>hub</b>: el inicio concentra los accesos y cada pantalla interna regresa con
+    <span class="mono">popBackStack()</span>. Al iniciar sesión se limpia el backstack para que “atrás” no vuelva
+    al login; al cerrar sesión se limpia por completo con <span class="mono">popUpTo(0)</span>. La huella y la
+    cámara son compuertas locales, no pantallas nuevas del <span class="mono">NavHost</span>.
+  </p>
+
+  <div class="callout warn">
+    <b>Estados que no son rutas.</b> La verificación 2FA y la recuperación de contraseña son estados/diálogos del
+    login; el bloqueo por huella es una compuerta de “Mi expediente”. Se dibujan aparte para no confundirlos con
+    pantallas del grafo y para que la tabla de inventario sea exacta.
+  </div>
+
+  <h2 id="s25">2.5 Inventario de pantallas y transiciones</h2>
+  <table class="compact">
+    <thead>
+      <tr><th style="width:2.9cm">Ruta / pantalla</th><th>Propósito</th><th style="width:3.4cm">Entra desde</th><th style="width:3.4cm">Sale hacia</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>Login</b><br><span class="mono">Routes.LOGIN</span></td><td>Autenticación con usuario/CURP y contraseña; diálogo de recuperación; paso 2FA.</td><td>Inicio de la app; logout</td><td>Inicio; 2FA; diálogo de recuperación</td></tr>
+      <tr><td><b>Inicio</b><br><span class="mono">Routes.HOME</span></td><td>Próxima cita, tratamiento activo y accesos rápidos.</td><td>Login</td><td>Expediente, Citas, Check-in, Estudios, Recetas, Mi QR, Seguridad, Documentos; logout</td></tr>
+      <tr><td><b>Mi expediente</b><br><span class="mono">Routes.RECORD</span></td><td>Datos del paciente, alergias e historial de consultas; protegido por huella.</td><td>Inicio</td><td>Inicio (atrás)</td></tr>
+      <tr><td><b>Citas</b><br><span class="mono">Routes.APPOINTMENTS</span></td><td>Lista de citas y estados; acceso al check-in.</td><td>Inicio</td><td>Check-in; Inicio</td></tr>
+      <tr><td><b>Check-in</b><br><span class="mono">Routes.CHECKIN</span></td><td>Cámara QR, código de respaldo, mapa GPS y confirmación de llegada.</td><td>Inicio; Citas</td><td>Inicio; mapa</td></tr>
+      <tr><td><b>Estudios</b><br><span class="mono">Routes.STUDIES</span></td><td>Lista de estudios con estado (solicitado, en proceso, listo).</td><td>Inicio</td><td>Detalle de estudio; Inicio</td></tr>
+      <tr><td><b>Detalle de estudio</b><br><span class="mono">Routes.STUDY_DETAIL</span></td><td>Resultado del estudio y descarga del PDF.</td><td>Estudios</td><td>Estudios</td></tr>
+      <tr><td><b>Recetas</b><br><span class="mono">Routes.PRESCRIPTIONS</span></td><td>Medicamentos, dosis, frecuencia y PDF de la receta.</td><td>Inicio</td><td>Inicio</td></tr>
+      <tr><td><b>Documentos</b><br><span class="mono">Routes.DOCUMENTS</span></td><td>Documentos del expediente con categoría, fecha y SHA-256.</td><td>Inicio</td><td>Inicio</td></tr>
+      <tr><td><b>Mi QR</b><br><span class="mono">Routes.QR</span></td><td>QR personal con vigencia y código de respaldo.</td><td>Inicio</td><td>Inicio</td></tr>
+      <tr><td><b>Mi seguridad</b><br><span class="mono">Routes.SECURITY</span></td><td>Activar/desactivar 2FA, cambiar contraseña y ver códigos de recuperación.</td><td>Inicio</td><td>Inicio</td></tr>
+      <tr><td><b>Recuperar contraseña</b><br><span class="mono">diálogo modal</span></td><td>Solicitar un enlace de un solo uso.</td><td>Login</td><td>Login</td></tr>
+      <tr><td><b>Verificación 2FA</b><br><span class="mono">estado de Login</span></td><td>Escribir el código TOTP o un código de recuperación.</td><td>Login</td><td>Inicio; Login</td></tr>
+      <tr><td><b>Bloqueo por huella</b><br><span class="mono">BiometricPrompt</span></td><td>Compuerta local antes de mostrar el expediente.</td><td>Mi expediente</td><td>Mi expediente</td></tr>
+    </tbody>
+  </table>
+
+  <p class="tiny">
+    Total: 11 rutas declaradas en <span class="mono">Routes.kt</span> + 3 estados/diálogos = 14 nodos en el mapa.
+    La tabla coincide con el código real de <span class="mono">DosysNavHost.kt</span>.
+  </p>
+</section>

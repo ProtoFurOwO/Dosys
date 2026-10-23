@@ -98,6 +98,23 @@ app/src/main/java/mx/unach/dosys/
    ├─ navigation · theme · components
 ```
 
+## Documento de diseño y prototipo
+
+El diseño completo de la app (entregables E1–E4) está en:
+
+- [`design/UNACH_Diseño_Equipo5.pdf`](design/UNACH_Diseño_Equipo5.pdf) — documento de diseño con análisis, casos de uso, wireframes, mockups, arquitectura MVVM y modelo de datos.
+- [`design/prototipo/Prototipo_DOSYS.html`](design/prototipo/Prototipo_DOSYS.html) — **prototipo navegable autocontenido**: se abre en cualquier navegador y reproduce el flujo real con las capturas de la app. Versión en línea: <https://raw.githack.com/ProtoFurOwO/Dosys/master/design/prototipo/Prototipo_DOSYS.html>.
+- [`design/index.html`](design/index.html) — fuente HTML del documento.
+
+### Capturas de la app
+
+| Inicio | Mi expediente | Check-in | Mi seguridad |
+|---|---|---|---|
+| <img src="design/assets/app/home.png" width="190" alt="Inicio"> | <img src="design/assets/app/record.png" width="190" alt="Mi expediente"> | <img src="design/assets/app/checkin.png" width="190" alt="Check-in"> | <img src="design/assets/app/security.png" width="190" alt="Mi seguridad"> |
+
+> Las capturas son del prototipo ejecutable con datos ficticios de demostración. El documento incluye
+> además wireframes de baja fidelidad y el mapa de navegación completo.
+
 ## Backend (FastAPI)
 
 La app usa el backend real para inicio de sesión, perfil, citas, consultas y check-in.

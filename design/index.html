@@ -1,0 +1,1897 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UNACH · Diseño de app Android · D.O.S.Y.S</title>
+<style>@page {
+  size: Letter;
+  margin: 2.5cm;
+}
+
+:root {
+  --green: #13653F;
+  --green-mid: #2F7A5A;
+  --green-soft: #EAF4EF;
+  --green-line: #C9DED4;
+  --ink: #1F2320;
+  --muted: #5B6560;
+  --line: #D8E5DF;
+  --amber: #B45309;
+  --amber-soft: #FFF7ED;
+  --blue: #2563EB;
+  --blue-soft: #EFF6FF;
+  --purple: #6D28D9;
+  --purple-soft: #F5F3FF;
+  --red: #B3261E;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 11pt;
+  line-height: 1.45;
+  color: var(--ink);
+  background: #fff;
+}
+
+p { margin: 0 0 7pt; text-align: justify; }
+
+h1, h2, h3, h4 {
+  color: var(--green);
+  page-break-after: avoid;
+}
+
+h1 {
+  font-size: 19pt;
+  margin: 0 0 10pt;
+  padding-bottom: 5pt;
+  border-bottom: 2.2pt solid var(--green);
+  line-height: 1.15;
+}
+
+h2 {
+  font-size: 13.5pt;
+  margin: 13pt 0 5pt;
+  line-height: 1.2;
+}
+
+h3 {
+  font-size: 11.5pt;
+  margin: 10pt 0 4pt;
+  color: var(--ink);
+}
+
+h4 {
+  font-size: 10.5pt;
+  margin: 8pt 0 3pt;
+  color: var(--ink);
+}
+
+.lead {
+  font-size: 11.5pt;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.small { font-size: 9.5pt; color: var(--muted); }
+.tiny { font-size: 8.5pt; color: var(--muted); }
+.center { text-align: center; }
+.mono { font-family: Consolas, "Courier New", monospace; }
+.nowrap { white-space: nowrap; }
+
+ul, ol { margin: 3pt 0 8pt 16pt; padding: 0; }
+li { margin: 2.5pt 0; }
+li b { color: var(--ink); }
+
+/* ── Portada ─────────────────────────────────────────────────────────── */
+.cover {
+  height: 22.85cm;
+  display: flex;
+  flex-direction: column;
+  page-break-after: always;
+  position: relative;
+}
+
+.cover-band {
+  background: var(--green);
+  color: #fff;
+  border-radius: 0 0 20pt 20pt;
+  padding: 18pt 22pt 16pt;
+  display: flex;
+  align-items: center;
+  gap: 16pt;
+}
+
+.cover-band img { width: 3.8cm; height: auto; }
+.cover-band .uni { font-size: 13.5pt; font-weight: 700; line-height: 1.25; letter-spacing: .2pt; }
+.cover-band .fac { font-size: 9.5pt; opacity: .88; margin-top: 3pt; }
+
+.cover-body { flex: 1; padding: 34pt 10pt 0; display: flex; flex-direction: column; }
+.cover-kicker { color: var(--green); font-size: 10pt; font-weight: 700; letter-spacing: 2.4pt; text-transform: uppercase; }
+.cover-title {
+  font-size: 31pt;
+  line-height: 1.05;
+  color: var(--ink);
+  font-weight: 800;
+  letter-spacing: -.6pt;
+  margin: 10pt 0 8pt;
+}
+.cover-sub {
+  font-size: 14pt;
+  color: var(--green);
+  font-weight: 700;
+  margin: 0 0 6pt;
+}
+.cover-desc { font-size: 11pt; color: var(--muted); max-width: 14.5cm; line-height: 1.55; }
+
+.cover-meta {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18pt 28pt;
+  border-top: 1pt solid var(--line);
+  padding-top: 14pt;
+}
+.cover-meta .label { font-size: 8pt; letter-spacing: 1.4pt; text-transform: uppercase; color: var(--green); font-weight: 700; }
+.cover-meta .value { font-size: 10.5pt; color: var(--ink); margin-top: 3pt; line-height: 1.4; }
+
+.cover-foot {
+  margin-top: 18pt;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  font-size: 8.5pt;
+  color: var(--muted);
+}
+.cover-foot b { color: var(--green); }
+
+/* ── Índice ───────────────────────────────────────────────────────────── */
+.toc-page { page-break-after: always; }
+.toc { margin-top: 8pt; }
+.toc-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6pt;
+  padding: 5.5pt 0;
+  border-bottom: .5pt dotted #C9DED4;
+  font-size: 10.5pt;
+}
+.toc-row .num { width: 1.2cm; color: var(--green); font-weight: 700; }
+.toc-row .title { flex: 1; }
+.toc-row .page { width: 1.1cm; text-align: right; color: var(--green); font-weight: 700; }
+.toc-sub { margin-left: 1.2cm; font-size: 9.5pt; color: var(--muted); border-bottom: none; padding: 2pt 0; }
+.toc-sub .page { color: var(--muted); font-weight: 400; }
+
+/* ── Secciones ────────────────────────────────────────────────────────── */
+.section { break-before: page; }
+.section-first { break-before: auto; }
+
+.kicker {
+  color: var(--green);
+  font-size: 8.5pt;
+  font-weight: 700;
+  letter-spacing: 2pt;
+  text-transform: uppercase;
+  margin: 0 0 4pt;
+}
+
+.callout {
+  background: var(--green-soft);
+  border-left: 3.5pt solid var(--green);
+  padding: 8pt 10pt;
+  margin: 8pt 0 10pt;
+  page-break-inside: avoid;
+  font-size: 9.8pt;
+  line-height: 1.45;
+}
+.callout b { color: var(--green); }
+.callout.warn { background: #FFF8E6; border-left-color: #B45309; }
+.callout.info { background: var(--blue-soft); border-left-color: var(--blue); }
+.callout.purple { background: var(--purple-soft); border-left-color: var(--purple); }
+
+.two-col { column-count: 2; column-gap: 9mm; }
+.avoid { page-break-inside: avoid; }
+
+/* ── Tablas ───────────────────────────────────────────────────────────── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6pt 0 10pt;
+  font-size: 9.2pt;
+  line-height: 1.35;
+}
+thead { display: table-header-group; }
+th {
+  background: var(--green-soft);
+  color: var(--green);
+  text-align: left;
+  padding: 4.5pt 5pt;
+  border: .6pt solid var(--green-line);
+  font-size: 8.4pt;
+  text-transform: uppercase;
+  letter-spacing: .3pt;
+}
+td {
+  padding: 4pt 5pt;
+  border: .6pt solid var(--line);
+  vertical-align: top;
+}
+tr { page-break-inside: avoid; }
+tbody tr:nth-child(even) td { background: #FBFDFC; }
+td.id { font-weight: 700; color: var(--green); white-space: nowrap; }
+td.center, th.center { text-align: center; }
+
+table.compact { font-size: 8.7pt; }
+table.compact td, table.compact th { padding: 3.2pt 4pt; }
+
+/* ── Fichas de perfiles ───────────────────────────────────────────────── */
+.profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9pt; margin: 6pt 0 10pt; }
+.profile {
+  border: .8pt solid var(--line);
+  border-radius: 8pt;
+  padding: 9pt 10pt;
+  background: #FBFDFC;
+  page-break-inside: avoid;
+}
+.profile .avatar {
+  width: 30pt; height: 30pt; border-radius: 50%;
+  background: var(--green-soft); color: var(--green);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 11pt; float: left; margin: 0 8pt 4pt 0;
+}
+.profile h4 { margin: 0 0 2pt; font-size: 11pt; color: var(--green); }
+.profile .role { font-size: 8.5pt; color: var(--muted); margin-bottom: 5pt; }
+.profile p { font-size: 9pt; line-height: 1.4; margin: 0 0 4pt; text-align: left; }
+.profile .tags { clear: both; display: flex; flex-wrap: wrap; gap: 3pt; padding-top: 4pt; }
+.tag {
+  display: inline-block; font-size: 7.8pt; padding: 2pt 5pt; border-radius: 10pt;
+  background: var(--green-soft); color: var(--green); font-weight: 700;
+}
+.tag.blue { background: var(--blue-soft); color: var(--blue); }
+.tag.amber { background: var(--amber-soft); color: var(--amber); }
+.tag.purple { background: var(--purple-soft); color: var(--purple); }
+
+/* ── Historias de usuario ─────────────────────────────────────────────── */
+.hu {
+  border: .8pt solid var(--line);
+  border-radius: 7pt;
+  padding: 7pt 9pt;
+  margin: 0 0 7pt;
+  page-break-inside: avoid;
+  background: #fff;
+}
+.hu .hu-head { display: flex; align-items: baseline; gap: 7pt; margin-bottom: 3pt; }
+.hu .hu-id { font-size: 8.5pt; font-weight: 800; color: var(--green); letter-spacing: .5pt; }
+.hu .hu-title { font-size: 10pt; font-weight: 700; color: var(--ink); }
+.hu .hu-pri { margin-left: auto; font-size: 7.5pt; font-weight: 700; color: var(--amber); background: var(--amber-soft); padding: 1.5pt 5pt; border-radius: 8pt; }
+.hu p { font-size: 9.2pt; margin: 2pt 0; text-align: left; line-height: 1.4; }
+.hu .crit { font-size: 8.8pt; color: var(--muted); line-height: 1.4; }
+.hu .crit b { color: var(--green); }
+
+/* ── Figuras ──────────────────────────────────────────────────────────── */
+figure {
+  margin: 7pt 0 10pt;
+  page-break-inside: avoid;
+  text-align: center;
+}
+figure img { max-width: 100%; height: auto; }
+figcaption {
+  font-size: 8.5pt;
+  color: var(--muted);
+  margin-top: 4pt;
+  line-height: 1.35;
+  text-align: center;
+}
+figcaption b { color: var(--green); }
+
+.diagram img { max-width: 100%; max-height: 20.2cm; }
+.diagram-wide img { max-width: 100%; max-height: 12.5cm; }
+
+/* ── Mockups ──────────────────────────────────────────────────────────── */
+.mockup-page { break-before: page; }
+.mockup-head { margin-bottom: 8pt; }
+.mockup-head .kicker { margin-bottom: 2pt; }
+.mockup-head h2 { margin: 0; font-size: 16pt; }
+.mockup-head .sub { color: var(--muted); font-size: 9.5pt; margin-top: 2pt; }
+
+.mockup-grid {
+  display: grid;
+  grid-template-columns: 8.0cm 1fr;
+  gap: 0.7cm;
+  align-items: start;
+}
+
+.phone {
+  width: 8.0cm;
+  background: #0d1411;
+  border-radius: 1.15cm;
+  padding: 0.13cm;
+  box-shadow: 0 5pt 16pt rgba(0,0,0,.22);
+}
+.phone img {
+  width: 100%;
+  display: block;
+  border-radius: 1.0cm;
+}
+
+.mockup-page::after {
+  content: "Captura del prototipo ejecutable · 1080 × 2400 px · Android 15 (API 35) · datos ficticios de demostración";
+  display: block;
+  margin-top: 9pt;
+  padding-top: 5pt;
+  border-top: .5pt solid var(--line);
+  font-size: 8pt;
+  color: var(--muted);
+}
+
+.mock-notes { font-size: 9.4pt; line-height: 1.42; }
+.mock-notes h3 {
+  font-size: 10.5pt;
+  margin: 0 0 3pt;
+  color: var(--green);
+}
+.mock-notes p { font-size: 9.4pt; text-align: left; margin: 0 0 5pt; }
+.mock-notes ul { margin: 2pt 0 6pt 14pt; }
+.mock-notes li { margin: 1.5pt 0; }
+.mock-notes .meta {
+  display: flex; flex-wrap: wrap; gap: 3pt; margin: 4pt 0 6pt;
+}
+.mock-notes .meta span {
+  font-size: 7.5pt; font-weight: 700; padding: 2pt 5pt; border-radius: 8pt;
+  background: var(--green-soft); color: var(--green);
+}
+.mock-notes .state-inline {
+  display: grid; grid-template-columns: 3.25cm 1fr; gap: 8pt;
+  align-items: start; margin-top: 7pt; padding-top: 7pt;
+  border-top: .5pt solid var(--line);
+}
+.mock-notes .state-inline img {
+  width: 3.25cm; border-radius: 0.32cm; border: .22cm solid #0d1411;
+  display: block;
+}
+.mock-notes .state-inline .cap { font-size: 8pt; color: var(--muted); line-height: 1.35; }
+.mock-notes .state-inline .cap b { color: var(--green); }
+
+/* ── Wireframes ───────────────────────────────────────────────────────── */
+.wire-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75cm;
+  margin-top: 4pt;
+}
+.wire {
+  display: flex; flex-direction: column; align-items: center;
+}
+.wire .phone { width: 7.1cm; }
+.wire .phone img { border-radius: 0.95cm; }
+.wire .cap { font-size: 8.5pt; color: var(--muted); text-align: center; margin-top: 4pt; line-height: 1.35; }
+.wire .cap b { color: var(--green); }
+.wire .legend { font-size: 7.8pt; color: var(--muted); text-align: left; margin-top: 3pt; width: 7.1cm; line-height: 1.35; }
+.wire .legend span { color: var(--green); font-weight: 700; }
+
+/* ── Código ───────────────────────────────────────────────────────────── */
+pre {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 8pt;
+  line-height: 1.38;
+  background: #F6F9F7;
+  border-left: 3pt solid var(--green);
+  padding: 7pt 9pt;
+  white-space: pre-wrap;
+  margin: 5pt 0 9pt;
+  page-break-inside: auto;
+}
+code { font-family: Consolas, "Courier New", monospace; font-size: 9pt; background: #F1F5F3; padding: 0 2pt; }
+
+/* ── Métricas / tarjetas ──────────────────────────────────────────────── */
+.metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7pt; margin: 7pt 0 9pt; }
+.metric {
+  border: .8pt solid var(--line); border-radius: 7pt; padding: 7pt 8pt;
+  background: #FBFDFC; page-break-inside: avoid;
+}
+.metric .n { font-size: 18pt; font-weight: 800; color: var(--green); line-height: 1; }
+.metric .l { font-size: 8.2pt; color: var(--muted); margin-top: 3pt; line-height: 1.3; }
+
+.two-box { display: grid; grid-template-columns: 1fr 1fr; gap: 9pt; margin: 6pt 0 9pt; }
+.box {
+  border: .8pt solid var(--line); border-radius: 7pt; padding: 8pt 9pt;
+  background: #FBFDFC; page-break-inside: avoid;
+}
+.box h4 { margin: 0 0 3pt; color: var(--green); }
+.box p { font-size: 9.3pt; margin: 0; text-align: left; }
+
+/* ── Enlaces y QR ─────────────────────────────────────────────────────── */
+.linkbox {
+  border: 1pt solid var(--green-line);
+  border-radius: 8pt;
+  background: var(--green-soft);
+  padding: 10pt;
+  display: grid;
+  grid-template-columns: 1fr 3.1cm;
+  gap: 12pt;
+  align-items: center;
+  page-break-inside: avoid;
+}
+.linkbox .url {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 8.2pt;
+  color: var(--green);
+  word-break: break-all;
+  margin: 3pt 0 5pt;
+}
+.linkbox img { width: 3.1cm; height: 3.1cm; }
+.linkbox h4 { margin: 0 0 3pt; }
+.linkbox p { font-size: 9pt; margin: 0; text-align: left; }
+
+/* ── Evidencia ────────────────────────────────────────────────────────── */
+.evidence-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8pt; margin: 6pt 0 9pt; }
+.evidence-grid figure { margin: 0; }
+.evidence-grid img { border: .6pt solid var(--line); border-radius: 3pt; }
+
+/* ── Anexos ───────────────────────────────────────────────────────────── */
+.annex { break-before: page; }
+.annex table { font-size: 8.5pt; }
+
+/* ── Impresión ────────────────────────────────────────────────────────── */
+@media print {
+  a { color: inherit; text-decoration: none; }
+  .no-print { display: none; }
+  .cover, .toc-page, .section, .mockup-page, .annex { break-inside: auto; }
+}
+</style>
+</head>
+<body>
+<!-- Portada -->
+<section class="cover">
+  <div class="cover-band">
+    <img src="assets/brand/unach-white.png" alt="Escudo de la Universidad Autónoma de Chiapas">
+    <div>
+      <div class="uni">UNIVERSIDAD AUTÓNOMA DE CHIAPAS</div>
+      <div class="fac">Escuela de Tecnologías Digitales Aplicadas · 7° semestre, grupo N</div>
+    </div>
+  </div>
+
+  <div class="cover-body">
+    <div class="cover-kicker">Actividad de la fase de diseño</div>
+    <div class="cover-title">Diseño y prototipado<br>de una aplicación móvil<br>Android con Kotlin</div>
+    <div class="cover-sub">D.O.S.Y.S · Expediente clínico digital y seguimiento de tratamientos</div>
+    <p class="cover-desc">
+      Documento de diseño que integra los entregables <b>E1 a E4</b>: análisis del problema y requisitos,
+      casos de uso y navegación, wireframes y mockups de alta fidelidad, arquitectura MVVM y modelo de datos
+      con <i>data classes</i> de Kotlin. Incluye el enlace al prototipo navegable y la evidencia del sistema real.
+    </p>
+
+    <div class="cover-meta">
+      <div>
+        <div class="label">Asignatura</div>
+        <div class="value">Desarrollo de Software para Dispositivos Móviles</div>
+      </div>
+      <div>
+        <div class="label">Docente</div>
+        <div class="value">Lic. Carlos Alberto García Ramos</div>
+      </div>
+      <div>
+        <div class="label">Equipo 5</div>
+        <div class="value">
+          José Antonio Matuz Argueta<br>
+          Angel Daniel Manuel Torres<br>
+          Jonathan Antonio González Salinas
+        </div>
+      </div>
+      <div>
+        <div class="label">Entrega</div>
+        <div class="value">23 de octubre de 2026<br>Tuxtla Gutiérrez, Chiapas</div>
+      </div>
+    </div>
+
+    <div class="cover-foot">
+      <div><b>D.O.S.Y.S</b> · Documento de diseño · E1–E4</div>
+      <div>Incluye prototipo navegable y evidencia del sistema en funcionamiento</div>
+    </div>
+  </div>
+</section>
+
+<!-- Índice -->
+<section class="toc-page">
+  <p class="kicker">Contenido</p>
+  <h1 style="margin-bottom:4pt">Índice del documento</h1>
+  <p class="small" style="margin-bottom:10pt">
+    Los entregables E1 a E4 se integran en este documento. El E5 (prototipo) y el E6 (repositorio y presentación)
+    se documentan en la sección 5 y se entregan por separado.
+  </p>
+
+  <div class="toc">
+    <div class="toc-row"><span class="num">1</span><span class="title"><b>Análisis del problema y requisitos</b></span><span class="page" data-toc="sec1">4</span></div>
+    <div class="toc-row toc-sub"><span class="num">1.1</span><span class="title">Ficha del proyecto</span><span class="page" data-toc="s11">4</span></div>
+    <div class="toc-row toc-sub"><span class="num">1.2</span><span class="title">Problemática y justificación</span><span class="page" data-toc="s12">4</span></div>
+    <div class="toc-row toc-sub"><span class="num">1.3</span><span class="title">Objetivos</span><span class="page" data-toc="s13">5</span></div>
+    <div class="toc-row toc-sub"><span class="num">1.4</span><span class="title">Perfiles de usuario</span><span class="page" data-toc="s14">6</span></div>
+    <div class="toc-row toc-sub"><span class="num">1.5</span><span class="title">Requisitos funcionales</span><span class="page" data-toc="s15">7</span></div>
+    <div class="toc-row toc-sub"><span class="num">1.6</span><span class="title">Requisitos no funcionales</span><span class="page" data-toc="s16">7</span></div>
+    <div class="toc-row toc-sub"><span class="num">1.7</span><span class="title">Historias de usuario</span><span class="page" data-toc="s17">8</span></div>
+    <div class="toc-row toc-sub"><span class="num">1.8</span><span class="title">Trazabilidad y alcance</span><span class="page" data-toc="s18">10</span></div>
+
+    <div class="toc-row"><span class="num">2</span><span class="title"><b>Casos de uso y flujo de navegación</b></span><span class="page" data-toc="sec2">11</span></div>
+    <div class="toc-row toc-sub"><span class="num">2.1</span><span class="title">Actores y alcance</span><span class="page" data-toc="s21">11</span></div>
+    <div class="toc-row toc-sub"><span class="num">2.2</span><span class="title">Diagrama de casos de uso</span><span class="page" data-toc="s22">12</span></div>
+    <div class="toc-row toc-sub"><span class="num">2.3</span><span class="title">Descripción de casos principales</span><span class="page" data-toc="s23">12</span></div>
+    <div class="toc-row toc-sub"><span class="num">2.4</span><span class="title">Mapa de navegación</span><span class="page" data-toc="s24">14</span></div>
+    <div class="toc-row toc-sub"><span class="num">2.5</span><span class="title">Inventario de pantallas y transiciones</span><span class="page" data-toc="s25">14</span></div>
+
+    <div class="toc-row"><span class="num">3</span><span class="title"><b>Wireframes y mockups</b></span><span class="page" data-toc="sec3">16</span></div>
+    <div class="toc-row toc-sub"><span class="num">3.1</span><span class="title">Sistema de diseño y Material Design 3</span><span class="page" data-toc="s31">16</span></div>
+    <div class="toc-row toc-sub"><span class="num">3.2</span><span class="title">Wireframes de baja fidelidad</span><span class="page" data-toc="s32">17</span></div>
+    <div class="toc-row toc-sub"><span class="num">3.3</span><span class="title">Mockups de alta fidelidad</span><span class="page" data-toc="s33">20</span></div>
+    <div class="toc-row toc-sub"><span class="num">3.4</span><span class="title">Prototipo navegable</span><span class="page" data-toc="s34">25</span></div>
+    <div class="toc-row toc-sub"><span class="num">3.5</span><span class="title">Coherencia entre mockups y app</span><span class="page" data-toc="s35">27</span></div>
+
+    <div class="toc-row"><span class="num">4</span><span class="title"><b>Arquitectura y modelo de datos</b></span><span class="page" data-toc="sec4">28</span></div>
+    <div class="toc-row toc-sub"><span class="num">4.1</span><span class="title">Arquitectura MVVM y responsabilidades</span><span class="page" data-toc="s41">28</span></div>
+    <div class="toc-row toc-sub"><span class="num">4.2</span><span class="title">Arquitectura de datos y stack tecnológico</span><span class="page" data-toc="s42">29</span></div>
+    <div class="toc-row toc-sub"><span class="num">4.3</span><span class="title">Flujo de datos del check-in</span><span class="page" data-toc="s43">31</span></div>
+    <div class="toc-row toc-sub"><span class="num">4.4</span><span class="title">Modelo de datos de la app</span><span class="page" data-toc="s44">32</span></div>
+    <div class="toc-row toc-sub"><span class="num">4.5</span><span class="title">Data classes de Kotlin</span><span class="page" data-toc="s45">33</span></div>
+    <div class="toc-row toc-sub"><span class="num">4.6</span><span class="title">Diccionario de datos</span><span class="page" data-toc="s46">35</span></div>
+
+    <div class="toc-row"><span class="num">5</span><span class="title"><b>Prototipo, coherencia y evidencias</b></span><span class="page" data-toc="sec5">36</span></div>
+    <div class="toc-row toc-sub"><span class="num">5.1</span><span class="title">Estado del prototipo y del repositorio</span><span class="page" data-toc="s51">36</span></div>
+    <div class="toc-row toc-sub"><span class="num">5.2</span><span class="title">Coherencia diseño ↔ prototipo</span><span class="page" data-toc="s52">37</span></div>
+    <div class="toc-row toc-sub"><span class="num">5.3</span><span class="title">Diferencias respecto del alcance mínimo</span><span class="page" data-toc="s53">37</span></div>
+    <div class="toc-row toc-sub"><span class="num">5.4</span><span class="title">Pruebas y evidencias</span><span class="page" data-toc="s54">38</span></div>
+
+    <div class="toc-row"><span class="num">6</span><span class="title"><b>Conclusiones, referencias y declaración de IA</b></span><span class="page" data-toc="sec6">40</span></div>
+    <div class="toc-row"><span class="num">A</span><span class="title"><b>Anexo A.</b> Modelo entidad-relación del backend</span><span class="page" data-toc="anexo">41</span></div>
+  </div>
+
+  <div class="callout" style="margin-top:14pt">
+    <b>Cómo leer este documento.</b> La sección 1 responde <i>qué</i> se va a construir y para quién; la 2, <i>cómo se comporta</i>;
+    la 3, <i>cómo se ve</i>; y la 4, <i>cómo está organizado por dentro</i>. La sección 5 conecta el diseño con el prototipo real y
+    la 6 cierra con referencias y la declaración de uso de IA.
+  </div>
+
+  <h2 style="margin-top:14pt">Glosario de siglas</h2>
+  <table class="compact">
+    <thead><tr><th style="width:2.1cm">Sigla</th><th>Significado</th><th style="width:2.1cm">Sigla</th><th>Significado</th></tr></thead>
+    <tbody>
+      <tr><td><b>RF</b></td><td>Requisito funcional</td><td><b>RNF</b></td><td>Requisito no funcional</td></tr>
+      <tr><td><b>HU</b></td><td>Historia de usuario</td><td><b>CU</b></td><td>Caso de uso</td></tr>
+      <tr><td><b>MVVM</b></td><td>Model–View–ViewModel</td><td><b>M3</b></td><td>Material Design 3</td></tr>
+      <tr><td><b>JWT</b></td><td>JSON Web Token</td><td><b>RBAC</b></td><td>Control de acceso por roles</td></tr>
+      <tr><td><b>TOTP</b></td><td>Código temporal de un solo uso</td><td><b>2FA</b></td><td>Segundo factor de autenticación</td></tr>
+      <tr><td><b>SHA-256</b></td><td>Función hash de integridad</td><td><b>HMAC</b></td><td>Código de autenticación con hash</td></tr>
+      <tr><td><b>ER</b></td><td>Modelo entidad-relación</td><td><b>API</b></td><td>Interfaz de programación</td></tr>
+      <tr><td><b>APK</b></td><td>Paquete instalable de Android</td><td><b>QR</b></td><td>Código de respuesta rápida</td></tr>
+    </tbody>
+  </table>
+</section>
+<!-- 1. E1 -->
+<section class="section">
+  <p class="kicker">Entregable E1 · Análisis</p>
+  <h1>1. Análisis del problema y requisitos</h1>
+
+  <p class="lead">
+    Esta sección define el problema, los usuarios y lo que la aplicación debe hacer. El objetivo no es describir
+    la tecnología, sino dejar claro <b>por qué</b> existe D.O.S.Y.S, <b>para quién</b> se diseñó y <b>qué</b> debe
+    poder hacer el paciente desde su teléfono.
+  </p>
+
+  <h2 id="s11">1.1 Ficha del proyecto</h2>
+  <table class="compact">
+    <tbody>
+      <tr><td style="width:4.2cm"><b>Nombre</b></td><td>D.O.S.Y.S — Expediente clínico digital y seguimiento de tratamientos</td></tr>
+      <tr><td><b>Tipo de solución</b></td><td>Aplicación Android nativa (Kotlin + Jetpack Compose) para el paciente, portal web para el personal y API REST con PostgreSQL.</td></tr>
+      <tr><td><b>Problema central</b></td><td>El paciente no puede consultar de forma oportuna su expediente, citas, estudios, recetas ni documentos; el hospital trabaja con papel y sin trazabilidad.</td></tr>
+      <tr><td><b>Usuarios</b></td><td>Paciente (actor principal de la app), médicos, recepción y laboratorio (portal).</td></tr>
+      <tr><td><b>Alcance de la app</b></td><td>11 rutas de navegación y 3 estados/diálogos, agrupados en 5 flujos principales: acceso, inicio, expediente, check-in y seguridad.</td></tr>
+      <tr><td><b>Stack</b></td><td>Android API 26+, Kotlin, Jetpack Compose, Material 3, Navigation Compose, Retrofit, kotlinx.serialization, DataStore, ZXing, OSMDroid, BiometricPrompt; FastAPI, PostgreSQL, Docker, Nginx y Cloudflare.</td></tr>
+      <tr><td><b>Repositorio</b></td><td><span class="mono">github.com/ProtoFurOwO/Dosys</span></td></tr>
+      <tr><td><b>Prototipo</b></td><td>APK de depuración <span class="mono">dosys-demo-vps.apk</span> + prototipo navegable HTML autocontenido.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="metric-grid">
+    <div class="metric"><div class="n">13</div><div class="l">requisitos funcionales<br>trazables a pantallas</div></div>
+    <div class="metric"><div class="n">7</div><div class="l">requisitos no funcionales<br>de calidad y seguridad</div></div>
+    <div class="metric"><div class="n">12</div><div class="l">historias de usuario<br>con criterios de aceptación</div></div>
+  </div>
+
+  <h2 id="s12">1.2 Problemática y justificación</h2>
+  <p>
+    En México, la información clínica de los pacientes permanece concentrada dentro de las instituciones de salud.
+    El paciente rara vez puede consultar sus resultados de laboratorio, sus recetas, sus citas o su historial
+    médico: esa información la tiene el hospital y, en la mayoría de los casos, no se le entrega de forma completa
+    ni oportuna. Como consecuencia, el paciente desconoce su propio estado de salud y difícilmente puede dar
+    seguimiento a un tratamiento.
+  </p>
+  <p>
+    Al mismo tiempo, dentro del hospital los procesos siguen apoyándose en el papel. La búsqueda del expediente
+    antes de cada consulta retrasa la atención; los resultados de estudios se extravían o se repiten por no existir
+    un registro digital unificado; y las solicitudes de estudios se trasladan manualmente entre el consultorio y el
+    área encargada de realizarlos. A esto se suma que el manejo de información tan sensible —alergias, enfermedades
+    crónicas, diagnósticos y tratamientos— ocurre, en muchos casos, sin un registro de quién la consulta o la modifica.
+  </p>
+  <p>
+    D.O.S.Y.S atiende esa doble necesidad: <b>digitalizar la operación clínica</b> y <b>devolver al paciente el acceso
+    a su propia información</b>, con una superficie de solo lectura y con controles de seguridad verificables. La app
+    no pretende sustituir el juicio médico ni el expediente institucional: es la ventana del paciente al expediente
+    que el hospital ya produce.
+  </p>
+
+  <div class="two-box">
+    <div class="box">
+      <h4>Lo que hoy falla</h4>
+      <ul style="margin-bottom:0">
+        <li>El paciente no ve su expediente, citas, estudios ni recetas.</li>
+        <li>Los resultados se pierden o se repiten por falta de un registro único.</li>
+        <li>La llegada se anota a mano y genera filas en recepción.</li>
+        <li>No hay trazabilidad de quién consulta o modifica el expediente.</li>
+        <li>La adherencia al tratamiento se pierde entre dosis y horarios.</li>
+      </ul>
+    </div>
+    <div class="box">
+      <h4>Lo que aporta D.O.S.Y.S</h4>
+      <ul style="margin-bottom:0">
+        <li>Expediente y agenda centralizados; el paciente ve lo que el médico registra.</li>
+        <li>Check-in con QR y confirmación en vivo en la sala de espera.</li>
+        <li>Estudios y recetas en PDF con huella SHA-256 y sello del servidor.</li>
+        <li>Roles, permisos, JWT, Argon2, 2FA y bitácora de auditoría.</li>
+        <li>App nativa con cámara, GPS y huella, sin servicios de pago.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 id="s13">1.3 Objetivos</h2>
+  <div class="callout">
+    <b>Objetivo general.</b> Diseñar y prototipar una aplicación móvil Android para el paciente de una clínica,
+    aplicando análisis centrado en el usuario, Material Design 3, arquitectura MVVM y un modelo de datos coherente,
+    de modo que el paciente pueda consultar su información clínica y confirmar su llegada de forma segura, clara y trazable.
+  </div>
+  <ol>
+    <li><b>Analizar</b> el problema y a los usuarios para definir requisitos funcionales, no funcionales e historias de usuario verificables.</li>
+    <li><b>Modelar</b> el comportamiento con casos de uso y un mapa de navegación que cubra todas las pantallas y transiciones.</li>
+    <li><b>Diseñar</b> la interfaz con wireframes y mockups de alta fidelidad, aplicando Material Design 3 y criterios de accesibilidad.</li>
+    <li><b>Proponer</b> una arquitectura MVVM con responsabilidades claras y un modelo de datos representado con <i>data classes</i> de Kotlin.</li>
+    <li><b>Construir</b> un prototipo navegable en Kotlin que reproduzca el diseño y se ejecute sin errores.</li>
+    <li><b>Documentar</b> y presentar el trabajo con control de versiones, evidencia de pruebas y un repositorio reproducible.</li>
+  </ol>
+
+  <h2 id="s14">1.4 Perfiles de usuario</h2>
+  <p>
+    Se definieron dos perfiles de paciente con necesidades distintas y un perfil secundario del personal clínico.
+    Los tres influyen en decisiones de diseño: claridad para quien tiene poca familiaridad digital, rapidez para
+    quien ya vive en el teléfono y confianza para quien toma decisiones clínicas.
+  </p>
+
+  <div class="profile-grid">
+    <div class="profile">
+      <div class="avatar">MA</div>
+      <h4>María Argüeta · 46 años</h4>
+      <div class="role">Paciente con hipertensión · Tuxtla Gutiérrez</div>
+      <p><b>Contexto.</b> Usa WhatsApp y Facebook, pero desconfía de las apps bancarias. Va a consulta cada mes y guarda sus recetas en papel.</p>
+      <p><b>Necesita.</b> Ver su próxima cita, sus medicamentos y sus resultados sin depender de una llamada; letras grandes, botones claros y mensajes en español.</p>
+      <p><b>Le frustra.</b> Hacer fila para preguntar algo que debería estar en su teléfono y no entender los términos técnicos.</p>
+      <div class="tags"><span class="tag">Baja alfabetización digital</span><span class="tag">Crónica</span><span class="tag">Accesibilidad</span></div>
+    </div>
+
+    <div class="profile">
+      <div class="avatar">JM</div>
+      <h4>José Antonio Matuz · 23 años</h4>
+      <div class="role">Paciente joven · estudiante universitario</div>
+      <p><b>Contexto.</b> Vive con el teléfono; usa apps bancarias, QR y autenticadores. Le molesta cargar papeles o volver al hospital por un resultado.</p>
+      <p><b>Necesita.</b> Check-in rápido con la cámara, PDFs descargables, 2FA y una sesión que no le pida la contraseña cada vez.</p>
+      <p><b>Le frustra.</b> Las filas, los portales que no funcionan en el celular y tener que llamar para confirmar una cita.</p>
+      <div class="tags"><span class="tag">Nativo digital</span><span class="tag">Autonomía</span><span class="tag amber">Check-in QR</span></div>
+    </div>
+
+    <div class="profile">
+      <div class="avatar">DL</div>
+      <h4>Dra. López Hernández · 38 años</h4>
+      <div class="role">Médica general · usuaria del portal clínico</div>
+      <p><b>Contexto.</b> Atiende consulta general, ordena estudios y emite recetas. Necesita ver el historial completo antes de decidir.</p>
+      <p><b>Necesita.</b> Abrir el expediente en segundos, saber quién ya llegó, ordenar estudios y dejar la próxima cita sin empalmes.</p>
+      <p><b>Le frustra.</b> Buscar carpetas, repetir estudios por extravío y no tener un registro de lo que se consultó.</p>
+      <div class="tags"><span class="tag blue">Portal web</span><span class="tag blue">Expediente</span><span class="tag blue">Laboratorio</span></div>
+    </div>
+
+    <div class="profile">
+      <div class="avatar">+</div>
+      <h4>Otros actores del sistema</h4>
+      <div class="role">Recepción · laboratorio · administración</div>
+      <p><b>Recepción.</b> Agenda citas, muestra el QR y confirma la llegada; ve la sala de espera por consultorio.</p>
+      <p><b>Laboratorio.</b> Recibe órdenes, captura resultados y genera el PDF con huella SHA-256.</p>
+      <p><b>Administración.</b> Gestiona usuarios, roles, permisos y consulta la bitácora de auditoría.</p>
+      <div class="tags"><span class="tag purple">Portal</span><span class="tag purple">RBAC</span><span class="tag purple">Auditoría</span></div>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <b>Decisión de diseño derivada de los perfiles.</b> La app usa una barra superior con títulos grandes,
+    tarjetas con iconos y texto, y un solo botón primario por pantalla. Las acciones destructivas o sensibles
+    (cambiar contraseña, desactivar 2FA) se separan en tarjetas propias para evitar toques accidentales.
+  </div>
+
+  <h2 id="s15">1.5 Requisitos funcionales</h2>
+  <p>
+    Cada requisito describe una capacidad observable desde la app. La columna <b>Pantalla</b> conecta el requisito
+    con el mapa de navegación de la sección 2 y con los mockups de la sección 3.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr><th style="width:1.3cm">ID</th><th>Requisito funcional</th><th style="width:1.7cm">Prioridad</th><th style="width:4.2cm">Pantalla / evidencia</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="id">RF-01</td><td>Permitir el acceso con usuario o CURP y contraseña, mostrando un error genérico si las credenciales no coinciden.</td><td>Alta</td><td>Login</td></tr>
+      <tr><td class="id">RF-02</td><td>Solicitar un código TOTP de 6 dígitos cuando la cuenta tiene el segundo factor activo, con opción de código de recuperación.</td><td>Alta</td><td>Login · 2FA</td></tr>
+      <tr><td class="id">RF-03</td><td>Permitir la recuperación de contraseña mediante un enlace de un solo uso enviado al correo registrado.</td><td>Media</td><td>Login · diálogo</td></tr>
+      <tr><td class="id">RF-04</td><td>Mostrar en el inicio la próxima cita, el tratamiento activo y los accesos rápidos a la información del paciente.</td><td>Alta</td><td>Inicio</td></tr>
+      <tr><td class="id">RF-05</td><td>Mostrar el expediente del paciente (datos generales, alergias y consultas) después de validar su identidad con huella o bloqueo del teléfono.</td><td>Alta</td><td>Mi expediente</td></tr>
+      <tr><td class="id">RF-06</td><td>Listar las citas con especialidad, médico, fecha, lugar y estado (agendada, confirmada, atendida, cancelada).</td><td>Alta</td><td>Citas</td></tr>
+      <tr><td class="id">RF-07</td><td>Mostrar un QR personal del paciente con vigencia de 3 minutos y un código de respaldo.</td><td>Media</td><td>Mi QR</td></tr>
+      <tr><td class="id">RF-08</td><td>Escanear con la cámara el QR de la cita que muestra recepción y confirmar la llegada al hospital.</td><td>Alta</td><td>Check-in</td></tr>
+      <tr><td class="id">RF-09</td><td>Mostrar la ubicación del hospital en un mapa, la ubicación del paciente y la distancia en metros, usando GPS y OpenStreetMap.</td><td>Media</td><td>Check-in · mapa</td></tr>
+      <tr><td class="id">RF-10</td><td>Listar los estudios solicitados con su estado (solicitado, en proceso, listo), abrir el detalle y descargar el resultado en PDF.</td><td>Alta</td><td>Estudios · detalle</td></tr>
+      <tr><td class="id">RF-11</td><td>Listar las recetas con medicamento, dosis, frecuencia y duración, y permitir descargar la receta en PDF.</td><td>Alta</td><td>Recetas</td></tr>
+      <tr><td class="id">RF-12</td><td>Listar los documentos del expediente con su categoría, fecha y huella SHA-256, y permitir abrirlos o descargarlos.</td><td>Alta</td><td>Documentos</td></tr>
+      <tr><td class="id">RF-13</td><td>Permitir activar/desactivar el segundo factor, cambiar la contraseña y cerrar la sesión desde “Mi seguridad”.</td><td>Alta</td><td>Mi seguridad</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s16">1.6 Requisitos no funcionales</h2>
+  <table class="compact">
+    <thead>
+      <tr><th style="width:1.3cm">ID</th><th>Requisito no funcional</th><th style="width:4.4cm">Criterio verificable</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="id">RNF-01</td><td><b>Seguridad de sesión.</b> El acceso usa JWT de 30 minutos y refresh de 7 días con rotación; las contraseñas se guardan con Argon2.</td><td>El token caducado devuelve 401; el refresh se revoca al cerrar sesión.</td></tr>
+      <tr><td class="id">RNF-02</td><td><b>Privacidad y solo lectura.</b> El paciente solo puede leer su propia información; las escrituras se limitan a login, check-in y seguridad de la cuenta.</td><td>Un paciente no puede consultar el expediente de otro (403).</td></tr>
+      <tr><td class="id">RNF-03</td><td><b>Usabilidad y accesibilidad.</b> Material Design 3, textos en español, objetivos táctiles de al menos 48 dp y contraste mínimo AA.</td><td>Verde #13653F sobre blanco: 7.09:1; gris #5B6560: 6.04:1.</td></tr>
+      <tr><td class="id">RNF-04</td><td><b>Compatibilidad.</b> Android 8.0 (API 26) o superior, orientación vertical y tamaño de pantalla de teléfono.</td><td>La app instala y navega en API 26+ sin cambios de layout.</td></tr>
+      <tr><td class="id">RNF-05</td><td><b>Rendimiento percibido.</b> Las pantallas muestran indicadores de carga y no bloquean el hilo principal durante las llamadas de red.</td><td>Estado de carga visible; la navegación sigue respondiendo.</td></tr>
+      <tr><td class="id">RNF-06</td><td><b>Disponibilidad y errores.</b> Si la API no responde, la app muestra un mensaje claro y no pierde la sesión; el check-in es idempotente.</td><td>Repetir el check-in no duplica la llegada; el error se muestra en pantalla.</td></tr>
+      <tr><td class="id">RNF-07</td><td><b>Mantenibilidad y trazabilidad.</b> Código organizado por capas (ui, data, core), nombres claros, Git y bitácora de auditoría en el servidor.</td><td>El proyecto compila; cada acceso sensible queda en <span class="mono">audit_log</span>.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s17">1.7 Historias de usuario</h2>
+  <p>
+    Las historias se escribieron con el formato <b>Como… quiero… para…</b> y criterios de aceptación
+    <b>Dado / Cuando / Entonces</b>. Cada una se puede probar sin ambigüedad y se relaciona con un requisito.
+  </p>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-01</span><span class="hu-title">Iniciar sesión con mis credenciales</span><span class="hu-pri">Alta</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> entrar con mi usuario o CURP y mi contraseña <b>para</b> consultar mi información clínica.</p>
+    <p class="crit"><b>Dado</b> que tengo una cuenta activa, <b>cuando</b> escribo credenciales correctas y toco “Iniciar sesión”, <b>entonces</b> llego al inicio y veo mi nombre. <b>Dado</b> que escribo una contraseña incorrecta, <b>cuando</b> intento entrar, <b>entonces</b> veo un mensaje genérico y puedo reintentar.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-02</span><span class="hu-title">Recuperar mi contraseña sin ir al hospital</span><span class="hu-pri">Media</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> solicitar un enlace de recuperación <b>para</b> volver a entrar si olvidé mi contraseña.</p>
+    <p class="crit"><b>Dado</b> que toco “¿Olvidaste tu contraseña?”, <b>cuando</b> escribo mi usuario o correo, <b>entonces</b> veo un mensaje neutro (“si la cuenta existe, se enviará un enlace”). <b>Dado</b> un enlace vencido o ya usado, <b>cuando</b> lo abro, <b>entonces</b> el sistema lo rechaza.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-03</span><span class="hu-title">Ver mi próxima cita al entrar</span><span class="hu-pri">Alta</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> ver mi próxima cita en el inicio <b>para</b> saber cuándo y con quién tengo consulta.</p>
+    <p class="crit"><b>Dado</b> que tengo una cita agendada, <b>cuando</b> abro el inicio, <b>entonces</b> veo especialidad, médico, fecha, hora y un acceso a todas mis citas. <b>Dado</b> que no tengo citas, <b>entonces</b> veo “No tienes citas próximas”.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-04</span><span class="hu-title">Abrir mi expediente con huella</span><span class="hu-pri">Alta</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> que mi expediente se abra con mi huella o el bloqueo del teléfono <b>para</b> que nadie más lo vea si pierdo el dispositivo.</p>
+    <p class="crit"><b>Dado</b> que toco “Expediente”, <b>cuando</b> el sistema solicita biometría, <b>entonces</b> solo después de validarla veo mis datos y consultas. <b>Dado</b> un teléfono sin huella configurada, <b>entonces</b> la app avisa y permite continuar en modo demostración.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-05</span><span class="hu-title">Confirmar mi llegada con el QR de recepción</span><span class="hu-pri">Alta</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> escanear el QR que muestra recepción <b>para</b> confirmar que ya llegué sin hacer fila.</p>
+    <p class="crit"><b>Dado</b> que recepción muestra el QR de mi cita, <b>cuando</b> abro la cámara y lo escaneo, <b>entonces</b> veo “Llegada confirmada” con especialidad, consultorio y hora. <b>Dado</b> un código inválido, <b>entonces</b> veo un error claro y puedo reintentar.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-06</span><span class="hu-title">Usar el código de respaldo si la cámara falla</span><span class="hu-pri">Media</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> escribir el código de respaldo <b>para</b> completar el check-in cuando no puedo escanear.</p>
+    <p class="crit"><b>Dado</b> que la cámara no funciona, <b>cuando</b> escribo el código de la cita, <b>entonces</b> el sistema valida y confirma la llegada. <b>Dado</b> un código ya usado, <b>entonces</b> el check-in es idempotente y no duplica la llegada.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-07</span><span class="hu-title">Consultar mis estudios y descargar el resultado</span><span class="hu-pri">Alta</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> ver mis estudios con su estado y abrir el PDF <b>para</b> llevar mis resultados a otra consulta.</p>
+    <p class="crit"><b>Dado</b> que tengo un estudio “Listo”, <b>cuando</b> abro el detalle, <b>entonces</b> veo el resultado y puedo descargarlo. <b>Dado</b> un estudio “Solicitado” o “En proceso”, <b>entonces</b> veo el estado sin un PDF disponible.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-08</span><span class="hu-title">Consultar mi receta y seguir el tratamiento</span><span class="hu-pri">Alta</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> ver mis medicamentos, dosis y frecuencia <b>para</b> no confundir mi tratamiento.</p>
+    <p class="crit"><b>Dado</b> que el médico emitió una receta, <b>cuando</b> abro “Recetas”, <b>entonces</b> veo cada medicamento con dosis, frecuencia y duración. <b>Dado</b> que la receta tiene PDF, <b>entonces</b> puedo descargarlo.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-09</span><span class="hu-title">Ver mis documentos y su huella de integridad</span><span class="hu-pri">Media</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> ver mis documentos con su huella SHA-256 <b>para</b> confiar en que no fueron alterados.</p>
+    <p class="crit"><b>Dado</b> que el expediente tiene documentos, <b>cuando</b> abro “Documentos”, <b>entonces</b> veo título, categoría, fecha y huella. <b>Dado</b> que toco “Abrir”, <b>entonces</b> se descarga y se abre con la app disponible en el teléfono.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-10</span><span class="hu-title">Activar el segundo factor</span><span class="hu-pri">Alta</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> activar 2FA con Google o Microsoft Authenticator <b>para</b> proteger mi cuenta aunque alguien conozca mi contraseña.</p>
+    <p class="crit"><b>Dado</b> que abro “Mi seguridad”, <b>cuando</b> activo el segundo factor y confirmo el código, <b>entonces</b> la app muestra los códigos de recuperación una sola vez. <b>Dado</b> que cierro sesión, <b>cuando</b> vuelvo a entrar, <b>entonces</b> se solicita el código TOTP.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-11</span><span class="hu-title">Cambiar mi contraseña y cerrar sesión</span><span class="hu-pri">Media</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> cambiar mi contraseña y cerrar sesión <b>para</b> controlar el acceso a mi cuenta.</p>
+    <p class="crit"><b>Dado</b> que escribo mi contraseña actual y una nueva de al menos 8 caracteres con letras y números, <b>cuando</b> confirmo, <b>entonces</b> se actualiza y se cierran las demás sesiones. <b>Dado</b> que toco “Cerrar sesión”, <b>entonces</b> vuelvo al login y el token se revoca.</p>
+  </div>
+
+  <div class="hu">
+    <div class="hu-head"><span class="hu-id">HU-12</span><span class="hu-title">Ubicar el hospital en el mapa</span><span class="hu-pri">Baja</span></div>
+    <p><b>Como</b> paciente, <b>quiero</b> ver qué tan lejos estoy del hospital <b>para</b> calcular mi llegada.</p>
+    <p class="crit"><b>Dado</b> que concedo permiso de ubicación, <b>cuando</b> abro el check-in, <b>entonces</b> veo el mapa, el pin del hospital y la distancia en metros. <b>Dado</b> que niego el permiso, <b>entonces</b> veo una explicación y la app sigue funcionando sin GPS.</p>
+  </div>
+
+  <h2 id="s18">1.8 Trazabilidad y alcance</h2>
+  <p>
+    La matriz siguiente demuestra que cada requisito tiene al menos una historia de usuario y una pantalla donde se
+    verifica. También sirve como lista de comprobación para la demo.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr><th style="width:1.4cm">Requisito</th><th style="width:2.2cm">Historia(s)</th><th>Pantalla / evidencia</th><th style="width:4.5cm">Cómo se prueba</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="id">RF-01</td><td>HU-01</td><td>Login</td><td>Credenciales correctas e incorrectas</td></tr>
+      <tr><td class="id">RF-02</td><td>HU-10</td><td>Login · 2FA</td><td>Código TOTP y código de recuperación</td></tr>
+      <tr><td class="id">RF-03</td><td>HU-02</td><td>Login · diálogo</td><td>Enlace de un solo uso</td></tr>
+      <tr><td class="id">RF-04</td><td>HU-03</td><td>Inicio</td><td>Próxima cita y tratamiento</td></tr>
+      <tr><td class="id">RF-05</td><td>HU-04</td><td>Mi expediente</td><td>BiometricPrompt + historial</td></tr>
+      <tr><td class="id">RF-06</td><td>HU-03, HU-05</td><td>Citas</td><td>Estados y datos de la cita</td></tr>
+      <tr><td class="id">RF-07</td><td>HU-05</td><td>Mi QR</td><td>QR con vigencia y respaldo</td></tr>
+      <tr><td class="id">RF-08</td><td>HU-05, HU-06</td><td>Check-in</td><td>Escaneo y código de respaldo</td></tr>
+      <tr><td class="id">RF-09</td><td>HU-12</td><td>Check-in · mapa</td><td>Permiso concedido/negado</td></tr>
+      <tr><td class="id">RF-10</td><td>HU-07</td><td>Estudios · detalle</td><td>Estado y PDF</td></tr>
+      <tr><td class="id">RF-11</td><td>HU-08</td><td>Recetas</td><td>Medicamentos y PDF</td></tr>
+      <tr><td class="id">RF-12</td><td>HU-09</td><td>Documentos</td><td>Huella SHA-256 y descarga</td></tr>
+      <tr><td class="id">RF-13</td><td>HU-10, HU-11</td><td>Mi seguridad</td><td>2FA, contraseña y logout</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <b>Alcance y límites declarados.</b> El prototipo implementa 11 rutas y 3 estados/diálogos; la actividad pedía
+    de 3 a 5 pantallas como mínimo. Se conservan 5 flujos principales para el diseño detallado y se documentan
+    los demás como pantallas de apoyo. La app consume la API real del proyecto integrador; los datos son ficticios
+    de demostración y no sustituyen un expediente clínico real.
+  </div>
+</section>
+<!-- 2. E2 -->
+<section class="section">
+  <p class="kicker">Entregable E2 · Comportamiento</p>
+  <h1>2. Casos de uso y flujo de navegación</h1>
+
+  <p class="lead">
+    El comportamiento de la app se modela desde el punto de vista del paciente. Los casos de uso describen
+    <b>qué puede hacer</b> y el mapa de navegación describe <b>cómo llega</b> a cada pantalla. Ambos se derivan
+    de las historias de la sección 1.
+  </p>
+
+  <h2 id="s21">2.1 Actores y alcance</h2>
+  <table class="compact">
+    <thead>
+      <tr><th style="width:3.2cm">Actor</th><th style="width:2.4cm">Tipo</th><th>Participación</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>Paciente</b></td><td>Principal</td><td>Inicia sesión, consulta su expediente, citas, estudios, recetas y documentos; hace check-in y gestiona su seguridad.</td></tr>
+      <tr><td><b>Recepción</b></td><td>Secundario</td><td>Agenda la cita y muestra el QR que el paciente escanea. No usa la app, pero participa en el caso de check-in.</td></tr>
+      <tr><td><b>App autenticadora</b></td><td>Secundario</td><td>Genera el código TOTP de 6 dígitos que el paciente escribe durante el segundo factor.</td></tr>
+      <tr><td><b>API / backend</b></td><td>Sistema</td><td>Valida identidad, permisos, códigos QR y estados; registra la bitácora. Es la frontera del sistema, no un actor humano.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Inventario de casos de uso</h3>
+  <table class="compact">
+    <thead><tr><th style="width:1.3cm">ID</th><th>Caso de uso</th><th style="width:3.4cm">Actor(es)</th><th style="width:4.6cm">Relación</th><th style="width:3.5cm">Pantalla</th></tr></thead>
+    <tbody>
+      <tr><td class="id">CU-01</td><td>Iniciar sesión y verificar 2FA</td><td>Paciente · App autenticadora</td><td>«include» Verificar código TOTP</td><td>Login</td></tr>
+      <tr><td class="id">CU-02</td><td>Recuperar contraseña</td><td>Paciente</td><td>—</td><td>Login · diálogo</td></tr>
+      <tr><td class="id">CU-03</td><td>Consultar expediente clínico</td><td>Paciente</td><td>«include» Validar huella</td><td>Mi expediente</td></tr>
+      <tr><td class="id">CU-04</td><td>Ver citas y estados</td><td>Paciente</td><td>—</td><td>Citas</td></tr>
+      <tr><td class="id">CU-05</td><td>Hacer check-in con QR</td><td>Paciente · Recepción</td><td>«include» Escanear QR; «extend» Código de respaldo</td><td>Check-in</td></tr>
+      <tr><td class="id">CU-06</td><td>Consultar estudios y resultados</td><td>Paciente</td><td>«include» Descargar PDF firmado</td><td>Estudios · detalle</td></tr>
+      <tr><td class="id">CU-07</td><td>Ver recetas y tratamiento</td><td>Paciente</td><td>«include» Descargar PDF firmado</td><td>Recetas</td></tr>
+      <tr><td class="id">CU-08</td><td>Ver documentos del expediente</td><td>Paciente</td><td>«include» Descargar PDF firmado</td><td>Documentos</td></tr>
+      <tr><td class="id">CU-09</td><td>Mostrar mi QR</td><td>Paciente</td><td>—</td><td>Mi QR</td></tr>
+      <tr><td class="id">CU-10</td><td>Gestionar mi seguridad</td><td>Paciente</td><td>«include» Verificar código TOTP</td><td>Mi seguridad</td></tr>
+      <tr><td class="id">CU-11</td><td>Cerrar sesión</td><td>Paciente</td><td>—</td><td>Inicio · Login</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s22">2.2 Diagrama de casos de uso</h2>
+  <figure class="diagram">
+    <img src="assets/diagrams/use-cases.svg" alt="Diagrama de casos de uso de la app del paciente">
+    <figcaption><b>Figura 2.1.</b> Casos de uso de la app. Las flechas discontinuas muestran las relaciones
+      <span class="mono">«include»</span> y <span class="mono">«extend»</span>; Recepción y la app autenticadora
+      son actores secundarios.</figcaption>
+  </figure>
+
+  <p>
+    El diagrama se leyó de arriba hacia abajo: el paciente es el actor principal y tiene acceso a once casos.
+    Los casos marcados con <span class="mono">«include»</span> siempre forman parte del caso base (por ejemplo,
+    consultar el expediente incluye validar la huella). El caso <span class="mono">«extend»</span> solo ocurre
+    cuando la cámara falla: el paciente usa el código de respaldo para completar el check-in.
+  </p>
+
+  <h2 id="s23">2.3 Descripción de casos principales</h2>
+  <p>Se detallan los cinco casos que concentran el valor de la app y que se demuestran en la presentación.</p>
+
+  <table class="compact">
+    <thead><tr><th style="width:3.2cm">Caso</th><th>Descripción, flujo y excepciones</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>CU-01</b><br>Iniciar sesión y verificar 2FA</td>
+        <td><b>Precondición:</b> el paciente tiene una cuenta activa. <b>Flujo:</b> escribe usuario/CURP y contraseña → la API valida → si la cuenta tiene 2FA, la app pide el código TOTP → al validarlo recibe los tokens y entra al inicio. <b>Excepciones:</b> credenciales incorrectas (mensaje genérico), cuenta bloqueada por intentos, código TOTP inválido o vencido. <b>Postcondición:</b> sesión iniciada y backstack limpio.</td>
+      </tr>
+      <tr>
+        <td><b>CU-03</b><br>Consultar expediente</td>
+        <td><b>Precondición:</b> sesión iniciada. <b>Flujo:</b> toca “Expediente” → la app solicita huella o bloqueo del teléfono → al validar, consulta el perfil y las consultas → muestra datos generales, alergias e historial. <b>Excepciones:</b> biometría cancelada o no configurada (aviso y modo demostración), error de red. <b>Postcondición:</b> el expediente queda visible solo en pantalla; no se escribe nada.</td>
+      </tr>
+      <tr>
+        <td><b>CU-05</b><br>Hacer check-in con QR</td>
+        <td><b>Precondición:</b> el paciente tiene una cita y recepción muestra su QR. <b>Flujo:</b> abre “Check-in” → “Abrir cámara” → ZXing lee el código → la app envía <span class="mono">POST /patients/me/appointments/{id}/check-in</span> → la API valida propiedad, código, estado y ventana → responde 200 → la app muestra especialidad, consultorio y hora. <b>Excepciones:</b> permiso de cámara denegado, código inválido, cita ya usada o fuera de ventana; se ofrece el código de respaldo. <b>Postcondición:</b> la llegada queda registrada y visible en la sala de espera del portal.</td>
+      </tr>
+      <tr>
+        <td><b>CU-06</b><br>Consultar estudios y resultados</td>
+        <td><b>Precondición:</b> el médico ordenó al menos un estudio. <b>Flujo:</b> abre “Estudios” → ve la lista con estado → toca un estudio “Listo” → ve el detalle y descarga el PDF firmado. <b>Excepciones:</b> estudio sin resultado, PDF no disponible, error de red. <b>Postcondición:</b> el paciente conserva una copia del resultado en su teléfono.</td>
+      </tr>
+      <tr>
+        <td><b>CU-10</b><br>Gestionar mi seguridad</td>
+        <td><b>Precondición:</b> sesión iniciada. <b>Flujo:</b> abre “Mi seguridad” → activa 2FA (escanea el QR en su autenticador y confirma el código) o cambia su contraseña → la API valida y actualiza → la app muestra confirmación. <b>Excepciones:</b> código inválido, contraseña actual incorrecta, contraseña nueva débil. <b>Postcondición:</b> la cuenta queda protegida y las demás sesiones se cierran si se cambió la contraseña.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Trazabilidad de los casos principales</h3>
+  <table class="compact">
+    <thead><tr><th style="width:3.2cm">Caso</th><th style="width:3.4cm">Historias</th><th style="width:2.6cm">Requisitos</th><th>Evidencia en la demo</th></tr></thead>
+    <tbody>
+      <tr><td><b>CU-01</b> Iniciar sesión</td><td>HU-01, HU-10</td><td>RF-01, RF-02</td><td>Login con contraseña y código TOTP.</td></tr>
+      <tr><td><b>CU-03</b> Consultar expediente</td><td>HU-04</td><td>RF-05</td><td>BiometricPrompt + datos e historial.</td></tr>
+      <tr><td><b>CU-05</b> Check-in</td><td>HU-05, HU-06</td><td>RF-08, RF-09</td><td>QR del portal + confirmación en la app.</td></tr>
+      <tr><td><b>CU-06</b> Estudios</td><td>HU-07</td><td>RF-10</td><td>Lista por estado + PDF con hash.</td></tr>
+      <tr><td><b>CU-10</b> Seguridad</td><td>HU-10, HU-11</td><td>RF-13</td><td>2FA, cambio de contraseña y logout.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    <b>Regla de oro del comportamiento.</b> La app del paciente es de <b>solo lectura clínica</b>. Sus únicas
+    escrituras son el inicio de sesión, el check-in y las acciones de seguridad de la cuenta. Todo lo demás
+    (diagnóstico, recetas, estudios, citas) lo produce el personal desde el portal.
+  </div>
+
+  <h2 id="s24">2.4 Mapa de navegación</h2>
+  <figure class="diagram">
+    <img src="assets/diagrams/navigation.svg" alt="Mapa de navegación de la app: 11 rutas y 3 estados">
+    <figcaption><b>Figura 2.2.</b> Mapa de navegación con las rutas reales del <span class="mono">NavHost</span>.
+      Las líneas verdes son navegación principal; las discontinuas, regreso o cierre de sesión; los recuadros
+      punteados son estados o diálogos que no son rutas del grafo.</figcaption>
+  </figure>
+
+  <p>
+    El grafo es un <b>hub</b>: el inicio concentra los accesos y cada pantalla interna regresa con
+    <span class="mono">popBackStack()</span>. Al iniciar sesión se limpia el backstack para que “atrás” no vuelva
+    al login; al cerrar sesión se limpia por completo con <span class="mono">popUpTo(0)</span>. La huella y la
+    cámara son compuertas locales, no pantallas nuevas del <span class="mono">NavHost</span>.
+  </p>
+
+  <div class="callout warn">
+    <b>Estados que no son rutas.</b> La verificación 2FA y la recuperación de contraseña son estados/diálogos del
+    login; el bloqueo por huella es una compuerta de “Mi expediente”. Se dibujan aparte para no confundirlos con
+    pantallas del grafo y para que la tabla de inventario sea exacta.
+  </div>
+
+  <h2 id="s25">2.5 Inventario de pantallas y transiciones</h2>
+  <table class="compact">
+    <thead>
+      <tr><th style="width:2.9cm">Ruta / pantalla</th><th>Propósito</th><th style="width:3.4cm">Entra desde</th><th style="width:3.4cm">Sale hacia</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>Login</b><br><span class="mono">Routes.LOGIN</span></td><td>Autenticación con usuario/CURP y contraseña; diálogo de recuperación; paso 2FA.</td><td>Inicio de la app; logout</td><td>Inicio; 2FA; diálogo de recuperación</td></tr>
+      <tr><td><b>Inicio</b><br><span class="mono">Routes.HOME</span></td><td>Próxima cita, tratamiento activo y accesos rápidos.</td><td>Login</td><td>Expediente, Citas, Check-in, Estudios, Recetas, Mi QR, Seguridad, Documentos; logout</td></tr>
+      <tr><td><b>Mi expediente</b><br><span class="mono">Routes.RECORD</span></td><td>Datos del paciente, alergias e historial de consultas; protegido por huella.</td><td>Inicio</td><td>Inicio (atrás)</td></tr>
+      <tr><td><b>Citas</b><br><span class="mono">Routes.APPOINTMENTS</span></td><td>Lista de citas y estados; acceso al check-in.</td><td>Inicio</td><td>Check-in; Inicio</td></tr>
+      <tr><td><b>Check-in</b><br><span class="mono">Routes.CHECKIN</span></td><td>Cámara QR, código de respaldo, mapa GPS y confirmación de llegada.</td><td>Inicio; Citas</td><td>Inicio; mapa</td></tr>
+      <tr><td><b>Estudios</b><br><span class="mono">Routes.STUDIES</span></td><td>Lista de estudios con estado (solicitado, en proceso, listo).</td><td>Inicio</td><td>Detalle de estudio; Inicio</td></tr>
+      <tr><td><b>Detalle de estudio</b><br><span class="mono">Routes.STUDY_DETAIL</span></td><td>Resultado del estudio y descarga del PDF.</td><td>Estudios</td><td>Estudios</td></tr>
+      <tr><td><b>Recetas</b><br><span class="mono">Routes.PRESCRIPTIONS</span></td><td>Medicamentos, dosis, frecuencia y PDF de la receta.</td><td>Inicio</td><td>Inicio</td></tr>
+      <tr><td><b>Documentos</b><br><span class="mono">Routes.DOCUMENTS</span></td><td>Documentos del expediente con categoría, fecha y SHA-256.</td><td>Inicio</td><td>Inicio</td></tr>
+      <tr><td><b>Mi QR</b><br><span class="mono">Routes.QR</span></td><td>QR personal con vigencia y código de respaldo.</td><td>Inicio</td><td>Inicio</td></tr>
+      <tr><td><b>Mi seguridad</b><br><span class="mono">Routes.SECURITY</span></td><td>Activar/desactivar 2FA, cambiar contraseña y ver códigos de recuperación.</td><td>Inicio</td><td>Inicio</td></tr>
+      <tr><td><b>Recuperar contraseña</b><br><span class="mono">diálogo modal</span></td><td>Solicitar un enlace de un solo uso.</td><td>Login</td><td>Login</td></tr>
+      <tr><td><b>Verificación 2FA</b><br><span class="mono">estado de Login</span></td><td>Escribir el código TOTP o un código de recuperación.</td><td>Login</td><td>Inicio; Login</td></tr>
+      <tr><td><b>Bloqueo por huella</b><br><span class="mono">BiometricPrompt</span></td><td>Compuerta local antes de mostrar el expediente.</td><td>Mi expediente</td><td>Mi expediente</td></tr>
+    </tbody>
+  </table>
+
+  <p class="tiny">
+    Total: 11 rutas declaradas en <span class="mono">Routes.kt</span> + 3 estados/diálogos = 14 nodos en el mapa.
+    La tabla coincide con el código real de <span class="mono">DosysNavHost.kt</span>.
+  </p>
+</section>
+<!-- 3. E3 -->
+<section class="section">
+  <p class="kicker">Entregable E3 · Interfaz</p>
+  <h1>3. Wireframes y mockups</h1>
+
+  <p class="lead">
+    El diseño visual parte de un sistema sencillo: fondo claro, verde institucional, tarjetas con bordes suaves y
+    un solo botón primario por pantalla. La app usa Material Design 3 y está pensada para leerse de un vistazo,
+    incluso con poca familiaridad digital.
+  </p>
+
+  <h2 id="s31">3.1 Sistema de diseño y Material Design 3</h2>
+  <p>
+    El sistema se construyó sobre los componentes estándar de Material 3 para que la app se sienta nativa en Android
+    y para que el prototipo sea consistente con las guías de la materia. No se usan librerías de diseño externas:
+    todo se implementa con <span class="mono">androidx.compose.material3</span>.
+  </p>
+
+  <table class="compact">
+    <thead><tr><th style="width:2.6cm">Token</th><th style="width:2.2cm">Valor</th><th>Uso</th></tr></thead>
+    <tbody>
+      <tr><td><b>Primario</b></td><td><span class="mono">#13653F</span></td><td>Botones, iconos activos, títulos y barra superior.</td></tr>
+      <tr><td><b>Primario claro</b></td><td><span class="mono">#EAF4EF</span></td><td>Fondo de tarjetas de estado, contenedores y top bar.</td></tr>
+      <tr><td><b>Superficie</b></td><td><span class="mono">#FFFFFF</span></td><td>Fondo de pantalla y tarjetas principales.</td></tr>
+      <tr><td><b>Texto</b></td><td><span class="mono">#1F2320</span></td><td>Títulos y texto principal (contraste 15.9:1 sobre blanco).</td></tr>
+      <tr><td><b>Texto secundario</b></td><td><span class="mono">#5B6560</span></td><td>Descripciones y ayudas (contraste 6.04:1).</td></tr>
+      <tr><td><b>Error</b></td><td><span class="mono">#B3261E</span></td><td>Mensajes de validación y estados de error (6.54:1).</td></tr>
+    </tbody>
+  </table>
+
+  <div class="two-box">
+    <div class="box">
+      <h4>Tipografía</h4>
+      <p>La app usa la tipografía por defecto de Material 3 (Roboto) y la escala estándar: <b>display</b> para el
+      logo de acceso, <b>titleLarge</b> para títulos de pantalla, <b>bodyMedium</b> para texto clínico y
+      <b>labelLarge</b> para botones. El documento usa Arial 11 pt por el lineamiento de entrega.</p>
+    </div>
+    <div class="box">
+      <h4>Espaciado y forma</h4>
+      <p>Rejilla de 8 dp; 16 dp de margen lateral; 12 dp entre tarjetas; radios de 12–16 dp. Los botones miden
+      52 dp de alto y las tarjetas tienen áreas táctiles completas, no solo el texto.</p>
+    </div>
+  </div>
+
+  <table class="compact">
+    <thead><tr><th style="width:3.4cm">Componente M3</th><th>Dónde se usa</th><th style="width:5.2cm">Regla de diseño</th></tr></thead>
+    <tbody>
+      <tr><td><b>TopAppBar</b></td><td>Inicio, expediente, check-in, seguridad y demás pantallas internas.</td><td>Fondo <span class="mono">primaryContainer</span>, título grande y botón de regreso con descripción accesible.</td></tr>
+      <tr><td><b>Card</b></td><td>Próxima cita, tratamiento, datos del paciente, estudios, recetas.</td><td>Una idea por tarjeta; icono + título + contenido + acción. Sin sombras fuertes.</td></tr>
+      <tr><td><b>Button</b></td><td>Iniciar sesión, abrir cámara, activar 2FA, cambiar contraseña.</td><td>Un solo botón primario por pantalla; acciones secundarias en <span class="mono">TextButton</span> u <span class="mono">OutlinedButton</span>.</td></tr>
+      <tr><td><b>OutlinedTextField</b></td><td>Credenciales, código de respaldo, contraseñas.</td><td>Etiqueta visible, icono inicial, mensaje de ayuda y error debajo del campo.</td></tr>
+      <tr><td><b>AlertDialog</b></td><td>Recuperar contraseña y confirmaciones.</td><td>Un campo por diálogo; acción principal a la derecha y “Cancelar” a la izquierda.</td></tr>
+      <tr><td><b>LinearProgressIndicator</b></td><td>Tratamiento activo.</td><td>Muestra el avance de tomas sin convertirlo en una tarea de vigilancia.</td></tr>
+      <tr><td><b>StatusChip / texto</b></td><td>Estados de cita y estudio.</td><td>El estado siempre se escribe con texto, no solo con color.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <b>Accesibilidad.</b> Contrastes AA/AAA (7.09:1 para verde sobre blanco); objetivos táctiles de 48 dp o más;
+    textos en español sin abreviaturas clínicas; errores con texto y no solo color; contenido descrito en iconos
+    (<span class="mono">contentDescription</span>); soporte de escala de fuente del sistema; el QR y el código de
+    respaldo permiten completar el check-in sin depender de la cámara.
+  </div>
+
+  <h2 id="s32">3.2 Wireframes de baja fidelidad</h2>
+  <p>
+    Los wireframes muestran la estructura antes del color: jerarquía, bloques, campos y acciones. Se dibujaron en
+    escala de grises para discutir el flujo sin distraerse con la estética. Los números negros remiten a la leyenda
+    de cada pantalla.
+  </p>
+
+  <div class="wire-pair">
+    <div class="wire">
+      <div class="phone"><img src="assets/wireframes/01-login.png" alt="Wireframe de login"></div>
+      <div class="cap"><b>Wireframe 1 · Login.</b> Logo, credenciales y recuperación.</div>
+      <div class="legend"><span>1</span> Campos + botón primario. <span>2</span> Aviso de demostración y ayuda de acceso.</div>
+    </div>
+    <div class="wire">
+      <div class="phone"><img src="assets/wireframes/02-home.png" alt="Wireframe de inicio"></div>
+      <div class="cap"><b>Wireframe 2 · Inicio.</b> Resumen y accesos rápidos.</div>
+      <div class="legend"><span>1</span> Próxima cita. <span>2</span> Tratamiento activo. La rejilla de 6 accesos + documentos se desplaza.</div>
+    </div>
+  </div>
+
+  <div class="wire-pair" style="margin-top:10pt">
+    <div class="wire">
+      <div class="phone"><img src="assets/wireframes/03-record.png" alt="Wireframe de expediente"></div>
+      <div class="cap"><b>Wireframe 3 · Mi expediente.</b> Bloqueo y datos clínicos.</div>
+      <div class="legend"><span>1</span> Compuerta de huella antes de mostrar datos. <span>2</span> Datos, alergias e historial.</div>
+    </div>
+    <div class="wire">
+      <div class="phone"><img src="assets/wireframes/04-checkin.png" alt="Wireframe de check-in"></div>
+      <div class="cap"><b>Wireframe 4 · Check-in.</b> Cámara, respaldo y mapa.</div>
+      <div class="legend"><span>1</span> Cámara + código de respaldo. <span>2</span> Mapa, distancia y confirmación de llegada.</div>
+    </div>
+  </div>
+
+  <div class="wire-pair" style="margin-top:10pt">
+    <div class="wire">
+      <div class="phone"><img src="assets/wireframes/05-security.png" alt="Wireframe de seguridad"></div>
+      <div class="cap"><b>Wireframe 5 · Mi seguridad.</b> 2FA y contraseña.</div>
+      <div class="legend"><span>1</span> Estado del segundo factor. <span>2</span> Cambio de contraseña y sesiones.</div>
+    </div>
+    <div class="wire" style="justify-content:flex-start;padding-top:10pt">
+      <div class="box" style="width:100%">
+        <h4>Elementos comunes</h4>
+        <p><b>Barra superior</b> con regreso y título. <b>Tarjetas</b> con icono, título y contenido. <b>Un botón
+        primario</b> por pantalla. <b>Campos con etiqueta</b> y ayuda. <b>Avisos</b> en texto, no solo color.</p>
+        <p style="margin-top:5pt"><b>Patrón de flujo:</b> inicio → tarjeta → detalle → regreso. Ninguna pantalla
+        interna depende de un menú lateral; todo se alcanza desde el inicio o desde la tarjeta relacionada.</p>
+      </div>
+      <div class="box" style="width:100%;margin-top:8pt">
+        <h4>Por qué no hay bottom navigation</h4>
+        <p>El paciente usa la app en ráfagas cortas (ver una cita, un resultado, hacer check-in). Una barra inferior
+        con 5 destinos ocultaría funciones y competiría con los accesos grandes. La rejilla de tarjetas es más
+        legible y permite crecer sin reentrenar al usuario.</p>
+      </div>
+    </div>
+  </div>
+
+  <h2 id="s33">3.3 Mockups de alta fidelidad</h2>
+  <p>
+    Los mockups de alta fidelidad se generaron a partir del <b>prototipo ejecutable</b>, no de una recreación.
+    Por eso muestran el estado real de la app: tipografía, colores, componentes y datos de demostración. Cada
+    página incluye la pantalla principal y un estado secundario que completa la función.
+  </p>
+
+  <!-- Mockup 1: Login -->
+  <div class="mockup-page">
+    <div class="mockup-head">
+      <p class="kicker">Mockup 1 de 5</p>
+      <h2>Inicio de sesión</h2>
+      <p class="sub">Acceso con usuario o CURP, contraseña y recuperación de cuenta.</p>
+    </div>
+    <div class="mockup-grid">
+      <div class="phone"><img src="assets/app/login.png" alt="Mockup de la pantalla de login"></div>
+      <div class="mock-notes">
+        <h3>Función real</h3>
+        <p>El paciente escribe su usuario o CURP y su contraseña. Si la cuenta tiene 2FA, la app pasa al paso de
+        código TOTP. El enlace “¿Olvidaste tu contraseña?” abre el diálogo de recuperación.</p>
+        <h3>Componentes Material 3</h3>
+        <ul>
+          <li><span class="mono">OutlinedTextField</span> con icono inicial y etiqueta visible.</li>
+          <li><span class="mono">Button</span> primario de 52 dp, ancho completo.</li>
+          <li><span class="mono">TextButton</span> para recuperación.</li>
+          <li>Marca D.O.S.Y.S con icono <span class="mono">LocalHospital</span>.</li>
+        </ul>
+        <h3>Estados</h3>
+        <p>Cargando (spinner dentro del botón), credenciales incorrectas (error genérico), 2FA requerido (pantalla
+        de código) y recuperación (diálogo modal).</p>
+        <div class="meta"><span>HU-01</span><span>HU-02</span><span>HU-10</span><span>RF-01</span><span>RF-02</span></div>
+        <div class="state-inline">
+          <img src="assets/app/recovery.png" alt="Estado de recuperación de contraseña">
+          <div class="cap"><b>Estado secundario.</b> Diálogo de recuperación: si la cuenta existe, se envía un enlace
+          de un solo uso. No revela si el usuario está registrado.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mockup 2: Home -->
+  <div class="mockup-page">
+    <div class="mockup-head">
+      <p class="kicker">Mockup 2 de 5</p>
+      <h2>Inicio</h2>
+      <p class="sub">La próxima cita, el tratamiento activo y todos los accesos en una sola pantalla.</p>
+    </div>
+    <div class="mockup-grid">
+      <div class="phone"><img src="assets/app/home.png" alt="Mockup de la pantalla de inicio"></div>
+      <div class="mock-notes">
+        <h3>Función real</h3>
+        <p>Al entrar, el paciente ve su nombre, la próxima cita con especialidad/médico/fecha y el tratamiento
+        activo con el avance de tomas. Debajo, una rejilla de seis accesos y una tarjeta de documentos.</p>
+        <h3>Componentes Material 3</h3>
+        <ul>
+          <li><span class="mono">TopAppBar</span> con saludo y acción de cerrar sesión.</li>
+          <li><span class="mono">Card</span> clicable para cita, tratamiento y accesos.</li>
+          <li><span class="mono">LinearProgressIndicator</span> para las tomas.</li>
+          <li>Iconos <span class="mono">CalendarMonth</span>, <span class="mono">Description</span>, <span class="mono">Science</span>, <span class="mono">QrCodeScanner</span>, <span class="mono">Shield</span>.</li>
+        </ul>
+        <h3>Jerarquía</h3>
+        <p>La cita ocupa el primer lugar porque es la acción más urgente; el tratamiento segundo; los accesos
+        después. El contenido es desplazable y la tarjeta de documentos queda al final.</p>
+        <div class="meta"><span>HU-03</span><span>RF-04</span><span>RF-07</span><span>RF-13</span></div>
+        <div class="state-inline">
+          <img src="assets/app/home-documents.png" alt="Inicio desplazado con la tarjeta Mis documentos">
+          <div class="cap"><b>Estado secundario.</b> Al desplazar el inicio aparece la tarjeta “Mis documentos”,
+          que abre el expediente digital con la huella SHA-256 de cada archivo.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mockup 3: Record -->
+  <div class="mockup-page">
+    <div class="mockup-head">
+      <p class="kicker">Mockup 3 de 5</p>
+      <h2>Mi expediente</h2>
+      <p class="sub">Datos del paciente e historial clínico, protegidos por huella.</p>
+    </div>
+    <div class="mockup-grid">
+      <div class="phone"><img src="assets/app/record.png" alt="Mockup de la pantalla Mi expediente"></div>
+      <div class="mock-notes">
+        <h3>Función real</h3>
+        <p>Muestra nombre, CURP, nacimiento, tipo de sangre, contacto de emergencia, alergias/antecedentes y el
+        historial de consultas con motivo y diagnóstico. La app solo lee; el médico escribe desde el portal.</p>
+        <h3>Componentes Material 3</h3>
+        <ul>
+          <li><span class="mono">ScreenScaffold</span> con <span class="mono">TopAppBar</span> y regreso.</li>
+          <li>Tarjetas de datos y de consultas, con jerarquía tipográfica.</li>
+          <li>Aviso de solo lectura al final de la pantalla.</li>
+        </ul>
+        <h3>Privacidad</h3>
+        <p>Antes de mostrar el contenido se ejecuta <span class="mono">BiometricPrompt</span>. Si el teléfono no
+        tiene huella configurada, la app avisa y permite continuar en modo demostración; esa diferencia se declara
+        en la sección 5.</p>
+        <div class="meta"><span>HU-04</span><span>RF-05</span><span>RNF-02</span></div>
+        <div class="state-inline">
+          <img src="assets/app/biometric.png" alt="Estado de bloqueo por huella">
+          <div class="cap"><b>Estado secundario.</b> Compuerta de huella: el expediente no se pinta hasta validar
+          la biometría o el bloqueo del teléfono.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mockup 4: Check-in -->
+  <div class="mockup-page">
+    <div class="mockup-head">
+      <p class="kicker">Mockup 4 de 5</p>
+      <h2>Check-in con QR</h2>
+      <p class="sub">Cámara, código de respaldo, GPS y confirmación de llegada.</p>
+    </div>
+    <div class="mockup-grid">
+      <div class="phone"><img src="assets/app/checkin.png" alt="Mockup de la pantalla de check-in"></div>
+      <div class="mock-notes">
+        <h3>Función real</h3>
+        <p>El paciente abre la cámara y escanea el QR que recepción muestra en el portal. La app envía el código a
+        la API y recibe la confirmación con especialidad, consultorio y hora. Si la cámara falla, escribe el código
+        de respaldo. La tarjeta inferior muestra sus citas.</p>
+        <h3>Componentes Material 3</h3>
+        <ul>
+          <li><span class="mono">Button</span> primario “Abrir cámara” + <span class="mono">OutlinedTextField</span> de respaldo.</li>
+          <li>Tarjeta de ubicación con mapa OSMDroid y distancia.</li>
+          <li>Tarjeta de confirmación con estado y datos de la cita.</li>
+        </ul>
+        <h3>Hardware y permisos</h3>
+        <p>Cámara con ZXing (escáner en orientación vertical), GPS con permiso explícito y mapa OpenStreetMap sin
+        API key. Si el permiso se niega, la pantalla explica y el check-in sigue disponible por código.</p>
+        <div class="meta"><span>HU-05</span><span>HU-06</span><span>HU-12</span><span>RF-08</span><span>RF-09</span></div>
+        <div class="state-inline">
+          <img src="assets/app/map.png" alt="Estado del mapa GPS">
+          <div class="cap"><b>Estado secundario.</b> Mapa real con el pin del hospital, la ubicación del paciente y
+          la distancia en metros; se abre en la app de mapas del teléfono.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mockup 5: Security -->
+  <div class="mockup-page">
+    <div class="mockup-head">
+      <p class="kicker">Mockup 5 de 5</p>
+      <h2>Mi seguridad</h2>
+      <p class="sub">Segundo factor, cambio de contraseña y códigos de recuperación.</p>
+    </div>
+    <div class="mockup-grid">
+      <div class="phone"><img src="assets/app/security.png" alt="Mockup de la pantalla Mi seguridad"></div>
+      <div class="mock-notes">
+        <h3>Función real</h3>
+        <p>El paciente activa el segundo factor con Google o Microsoft Authenticator, cambia su contraseña y
+        consulta los códigos de recuperación. Al cambiar la contraseña se cierran las demás sesiones abiertas.</p>
+        <h3>Componentes Material 3</h3>
+        <ul>
+          <li>Tarjeta de estado del segundo factor con icono <span class="mono">Shield</span>.</li>
+          <li><span class="mono">OutlinedTextField</span> para contraseña actual, nueva y confirmación.</li>
+          <li>Casilla “Mostrar contraseñas” y botón deshabilitado hasta completar el formulario.</li>
+        </ul>
+        <h3>Estados</h3>
+        <p>2FA inactivo/activo, códigos de recuperación (se muestran una sola vez), contraseña débil, contraseña
+        actual incorrecta y confirmación de cambio.</p>
+        <div class="meta"><span>HU-10</span><span>HU-11</span><span>RF-13</span><span>RNF-01</span></div>
+        <div class="state-inline">
+          <img src="assets/app/twofactor.png" alt="Estado de verificación 2FA en el login">
+          <div class="cap"><b>Estado secundario.</b> Paso 2FA del login: la contraseña ya es correcta y solo falta
+          el código de 6 dígitos del autenticador.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2 id="s34">3.4 Prototipo navegable</h2>
+  <p>
+    Los mockups del PDF son estáticos por naturaleza. Para que el profesor pueda <b>tocar la app</b>, se construyó
+    un prototipo HTML autocontenido con las mismas capturas del sistema real y zonas interactivas sobre los
+    controles. No requiere instalar nada ni conectar el backend: se abre en cualquier navegador.
+  </p>
+
+  <div class="linkbox">
+    <div>
+      <h4>Prototipo interactivo · 5 pantallas + 4 estados</h4>
+      <p>Haz clic en los elementos resaltados del teléfono o usa la barra lateral para saltar entre pantallas.</p>
+      <div class="url">https://raw.githack.com/ProtoFurOwO/Dosys/master/design/prototipo/Prototipo_DOSYS.html</div>
+      <p class="small" style="margin:0">También está en el repositorio: <span class="mono">design/prototipo/Prototipo_DOSYS.html</span>.
+      Si el enlace directo no abre, descarga el archivo y ábrelo con doble clic.</p>
+    </div>
+    <img src="assets/brand/qr-prototype.png" alt="Código QR del prototipo navegable">
+  </div>
+
+  <div class="two-box" style="margin-top:10pt">
+    <div class="box">
+      <h4>Cómo usarlo</h4>
+      <ol style="margin-bottom:0">
+        <li>Abre el enlace o escanea el QR.</li>
+        <li>Toca “Iniciar sesión” en el teléfono.</li>
+        <li>En el inicio, toca Expediente, Check-in o Mi seguridad.</li>
+        <li>Usa “Atrás” o la barra lateral para volver.</li>
+        <li>Activa “Mostrar / ocultar zonas” para ver los hotspots.</li>
+      </ol>
+    </div>
+    <div class="box">
+      <h4>Qué demuestra</h4>
+      <ul style="margin-bottom:0">
+        <li>El flujo real login → inicio → expediente / check-in / seguridad.</li>
+        <li>Los estados de recuperación, huella, mapa y 2FA.</li>
+        <li>La coherencia 1:1 con las capturas del prototipo ejecutable.</li>
+        <li>Que el diseño no es un dibujo: es la app funcionando.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <b>Nota sobre el enlace.</b> La rúbrica pide “enlace al diseño (Figma u otra)”. Se eligió un prototipo HTML
+    navegable porque reproduce la app real y permite interactuar sin cuenta de Figma. Si el docente exige Figma,
+    las cinco capturas pueden importarse a un archivo de Figma en minutos; el diseño y el PDF no cambian.
+  </div>
+
+  <h2 id="s35" style="break-before: page">3.5 Coherencia entre mockups y app</h2>
+  <p>
+    Los mockups no se dibujaron “a mano” a partir de una idea: se capturaron del prototipo que ya compila y se
+    ejecuta. Esa decisión elimina la deriva entre diseño y código y convierte la sección 5 en una verificación,
+    no en una promesa.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr><th style="width:3cm">Pantalla</th><th style="width:4.4cm">Archivo Kotlin</th><th>Función que se ve en el mockup</th><th style="width:3.6cm">Diferencia / nota</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>Login</b></td><td class="mono">ui/login/LoginScreen.kt</td><td>Credenciales, recuperación y paso 2FA.</td><td>El aviso “Demo local” se retira en producción.</td></tr>
+      <tr><td><b>Inicio</b></td><td class="mono">ui/home/HomeScreen.kt</td><td>Próxima cita, tratamiento, 7 accesos y cierre de sesión.</td><td>El contenido es desplazable; la captura muestra el primer viewport.</td></tr>
+      <tr><td><b>Mi expediente</b></td><td class="mono">ui/record/RecordScreen.kt</td><td>Perfil, alergias e historial; biometría antes de mostrar.</td><td>El emulador no tiene huella; se muestra el aviso y “Continuar”.</td></tr>
+      <tr><td><b>Check-in</b></td><td class="mono">ui/checkin/CheckInScreen.kt</td><td>Cámara, código de respaldo, mapa, confirmación y citas.</td><td>La cámara no se captura en el PDF; el estado del mapa sí.</td></tr>
+      <tr><td><b>Mi seguridad</b></td><td class="mono">ui/security/SecurityScreen.kt</td><td>2FA, contraseña y códigos de recuperación.</td><td>La captura muestra 2FA inactivo; el paso 2FA va como estado secundario.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <b>Resultado.</b> Las cinco pantallas coinciden con el prototipo en estructura, textos, colores y acciones.
+    Las diferencias son de <b>estado</b> (una cuenta con o sin 2FA, un teléfono con o sin huella), no de diseño,
+    y se justifican en la sección 5.3.
+  </div>
+
+  <h3>Criterios de aceptación visual</h3>
+  <table class="compact">
+    <thead><tr><th style="width:4.2cm">Criterio</th><th>Qué se revisó</th><th style="width:1.8cm">Cumple</th></tr></thead>
+    <tbody>
+      <tr><td><b>Jerarquía</b></td><td>Un título por pantalla; la acción principal se distingue sin competir con el contenido.</td><td>Sí</td></tr>
+      <tr><td><b>Consistencia</b></td><td>Mismos radios, colores, tipografía y espaciado en las 5 pantallas y sus estados.</td><td>Sí</td></tr>
+      <tr><td><b>Contraste</b></td><td>Verde #13653F sobre blanco (7.09:1), gris #5B6560 (6.04:1) y error #B3261E (6.54:1).</td><td>Sí</td></tr>
+      <tr><td><b>Tacto</b></td><td>Botones de 52 dp y tarjetas completas clicables; campos con altura suficiente.</td><td>Sí</td></tr>
+      <tr><td><b>Accesibilidad</b></td><td>Estados con texto, iconos con descripción y soporte de escala de fuente.</td><td>Sí</td></tr>
+      <tr><td><b>Estados</b></td><td>Carga, error, vacío, éxito y permisos denegados documentados.</td><td>Sí</td></tr>
+    </tbody>
+  </table>
+</section>
+<!-- 4. E4 -->
+<section class="section">
+  <p class="kicker">Entregable E4 · Arquitectura</p>
+  <h1>4. Arquitectura y modelo de datos</h1>
+
+  <p class="lead">
+    La app sigue el patrón <b>MVVM</b> con un flujo unidireccional de datos: la interfaz observa un estado
+    inmutable, el ViewModel lo produce y el repositorio decide de dónde sale. La misma arquitectura se conecta con
+    una API REST y con un modelo de datos de solo lectura representado por <i>data classes</i> de Kotlin.
+  </p>
+
+  <h2 id="s41">4.1 Arquitectura MVVM y responsabilidades</h2>
+  <figure class="diagram">
+    <img src="assets/diagrams/mvvm.svg" alt="Diagrama de arquitectura MVVM de D.O.S.Y.S">
+    <figcaption><b>Figura 4.1.</b> Capas de la app y flujo de datos. La UI no conoce Retrofit; el ViewModel no
+      conoce Android <span class="mono">Context</span>; el repositorio es la única fuente de verdad.</figcaption>
+  </figure>
+
+  <table class="compact">
+    <thead>
+      <tr><th style="width:2.5cm">Capa</th><th style="width:5.4cm">Componentes reales</th><th>Responsabilidad</th><th style="width:3.7cm">Regla de diseño</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>UI</b></td><td class="mono">LoginScreen, HomeScreen, RecordScreen, CheckInScreen, SecurityScreen, ScreenScaffold, theme/</td><td>Renderiza el estado, captura eventos, aplica Material 3 y accesibilidad. No valida reglas de negocio.</td><td>Un composable por pantalla; componentes reutilizables.</td></tr>
+      <tr><td><b>ViewModel</b></td><td class="mono">LoginViewModel, HomeViewModel, RecordViewModel, CheckInViewModel, SecurityViewModel</td><td>Expone <span class="mono">StateFlow&lt;UiState&gt;</span>, valida entradas, lanza corrutinas y sobrevive a cambios de configuración.</td><td>Sin referencias a <span class="mono">Context</span> ni a vistas.</td></tr>
+      <tr><td><b>Repository</b></td><td class="mono">AuthRepository, PatientRepository, SecurityRepository</td><td>Única fuente de verdad; mapea DTO → modelo de dominio, centraliza errores y decide qué datos expone.</td><td>La UI nunca llama a Retrofit directamente.</td></tr>
+      <tr><td><b>Data</b></td><td class="mono">ApiService, NetworkModule, TokenRefresher, SessionManager, MockData</td><td>HTTP con Retrofit/OkHttp, serialización, almacenamiento del token en DataStore y refresco automático en 401.</td><td>El token no se incluye en respaldos.</td></tr>
+      <tr><td><b>Core</b></td><td class="mono">ServiceLocator, SessionManager, BiometricGate, ZXing, OSMDroid</td><td>DI manual, sesión, biometría, cámara y mapa. Son dependencias transversales, no capas de negocio.</td><td>Inyección explícita, sin frameworks pesados.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Flujo unidireccional</h3>
+  <p>
+    El usuario toca un botón → la UI emite un evento → el ViewModel actualiza su estado o llama al repositorio →
+    el repositorio consulta la API → el ViewModel recibe el resultado y publica un nuevo <span class="mono">UiState</span>
+    → Compose recompone solo lo que cambió. Este ciclo se repite en todas las pantallas y explica por qué la app
+    puede mostrar estados de carga, error y éxito sin lógica duplicada.
+  </p>
+
+  <pre>// Ejemplo real de la capa de presentación
+class HomeViewModel(
+    private val repository: PatientRepository = ServiceLocator.patientRepository,
+) : ViewModel() {
+    private val _state = MutableStateFlow(HomeUiState())
+    val state: StateFlow&lt;HomeUiState&gt; = _state.asStateFlow()
+
+    fun load() = viewModelScope.launch {
+        _state.update { it.copy(isLoading = true, error = null) }
+        runCatching { repository.nextAppointment() }
+            .onSuccess { appointment -&gt;
+                _state.update { it.copy(isLoading = false, nextAppointment = appointment) }
+            }
+            .onFailure { error -&gt;
+                _state.update { it.copy(isLoading = false, error = error.message) }
+            }
+    }
+}</pre>
+
+  <h2 id="s42">4.2 Arquitectura de datos y stack tecnológico</h2>
+  <p>
+    La arquitectura de datos muestra <b>con qué software está hecho</b> el sistema y <b>por dónde viajan los datos</b>.
+    Se organiza en cuatro zonas —clientes, borde, servidor y datos— más una banda de seguridad transversal. Los
+    logos son de Simple Icons (CC0) y de sus respectivas marcas.
+  </p>
+
+  <figure class="diagram">
+    <img src="assets/diagrams/data-architecture.svg" alt="Arquitectura de datos y stack tecnológico con logos">
+    <figcaption><b>Figura 4.2.</b> Arquitectura de datos: app y portal → Cloudflare/Nginx → FastAPI → PostgreSQL,
+      volumen de documentos, Resend y OpenStreetMap. La seguridad (JWT, Argon2, RBAC, SHA-256, auditoría) cruza
+      todas las capas.</figcaption>
+  </figure>
+
+  <table class="compact">
+    <thead><tr><th style="width:3cm">Zona</th><th>Qué contiene</th><th style="width:5.2cm">Protocolo / frontera</th></tr></thead>
+    <tbody>
+      <tr><td><b>Clientes</b></td><td>App Android (Kotlin, Compose, M3, Retrofit, ZXing, OSMDroid, Biometric) y portal web (HTML + Jinja2).</td><td>HTTPS · REST/JSON · cookies HttpOnly en el portal.</td></tr>
+      <tr><td><b>Borde</b></td><td>Cloudflare (DNS/TLS), Nginx Proxy Manager y Let's Encrypt.</td><td>TLS 1.2/1.3, HSTS, proxy inverso y límites de tamaño.</td></tr>
+      <tr><td><b>Servidor</b></td><td>Ubuntu VPS, Docker Compose, FastAPI/Uvicorn, Pydantic, SQLAlchemy/Alembic, Jinja2, ReportLab, PyJWT, Argon2, PyOTP.</td><td>API REST, validación, generación de PDF y correo.</td></tr>
+      <tr><td><b>Datos</b></td><td>PostgreSQL (13 tablas, 3FN), volumen Docker para PDFs, Resend para correo y OpenStreetMap para tiles.</td><td>SQL asyncpg por red interna; archivos con SHA-256 + HMAC.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <b>Por qué esta arquitectura.</b> La app no guarda datos clínicos: los pide a la API en cada consulta. Eso
+    reduce el riesgo si el teléfono se pierde y garantiza que el paciente vea siempre la misma información que el
+    hospital. PostgreSQL nunca publica puertos; el único punto expuesto es el proxy HTTPS.
+  </div>
+
+  <h2 id="s43">4.3 Flujo de datos del check-in</h2>
+  <figure class="diagram-wide">
+    <img src="assets/diagrams/sequence-checkin.svg" alt="Diagrama de secuencia del check-in con QR">
+    <figcaption><b>Figura 4.3.</b> Secuencia real del check-in: el portal muestra el QR, la app lo escanea, la API
+      valida y PostgreSQL registra la llegada; la sala de espera del portal se actualiza.</figcaption>
+  </figure>
+  <p>
+    El check-in es el mejor ejemplo de la arquitectura porque cruza las cuatro capas: cámara (UI), ViewModel,
+    repositorio, Retrofit, API, PostgreSQL y portal. La operación es <b>idempotente</b>: si el paciente repite la
+    llamada, la llegada no se duplica. Además, la app nunca escribe datos clínicos; solo confirma la llegada.
+  </p>
+
+  <table class="compact">
+    <thead><tr><th style="width:1.2cm">Paso</th><th style="width:3.4cm">Responsable</th><th>Qué ocurre</th><th style="width:4.6cm">Evidencia / regla</th></tr></thead>
+    <tbody>
+      <tr><td class="id">1</td><td>Recepción (portal)</td><td>Abre la cita y muestra el QR con su código de respaldo.</td><td>Cada cita genera un código único.</td></tr>
+      <tr><td class="id">2</td><td>App (UI)</td><td>El paciente toca “Abrir cámara” y escanea el QR.</td><td>ZXing en orientación vertical.</td></tr>
+      <tr><td class="id">3</td><td>App (ViewModel)</td><td>Envía el código al repositorio y muestra estado de carga.</td><td>No bloquea el hilo principal.</td></tr>
+      <tr><td class="id">4</td><td>API (FastAPI)</td><td>Valida JWT, propiedad de la cita, código, estado y ventana.</td><td>401/403/400/409 según el caso.</td></tr>
+      <tr><td class="id">5</td><td>PostgreSQL</td><td>Actualiza <span class="mono">checked_in_at</span> y registra la auditoría.</td><td>Operación idempotente.</td></tr>
+      <tr><td class="id">6</td><td>API → App</td><td>Responde 200 con especialidad, consultorio y hora.</td><td>La app muestra “Llegada confirmada”.</td></tr>
+      <tr><td class="id">7</td><td>Portal</td><td>La sala de espera refleja la llegada del paciente.</td><td>El médico abre la consulta precargada.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s44">4.4 Modelo de datos de la app</h2>
+  <figure class="diagram">
+    <img src="assets/diagrams/class-diagram.svg" alt="Diagrama de clases con las data classes de Kotlin">
+    <figcaption><b>Figura 4.4.</b> Modelo de datos de la app: <span class="mono">PatientProfile</span> es la raíz;
+      citas, consultas, documentos, estudios y recetas cuelgan de ella. Las clases de sesión y seguridad se agrupan
+      aparte.</figcaption>
+  </figure>
+
+  <p>
+    El modelo de la app es una <b>proyección de solo lectura</b> del modelo del backend. No todas las tablas se
+    exponen: el paciente ve únicamente lo que necesita. Los identificadores (<span class="mono">patientId</span>,
+    <span class="mono">documentId</span>) referencian entidades del servidor y permiten navegar sin duplicar datos.
+  </p>
+
+  <table class="compact">
+    <thead><tr><th style="width:4.4cm">Relación</th><th>Cardinalidad</th><th>Cómo se representa</th></tr></thead>
+    <tbody>
+      <tr><td><b>PatientProfile → PatientAppointment</b></td><td>1 a 0..*</td><td>El perfil autenticado consulta sus citas; la cita no repite el perfil completo.</td></tr>
+      <tr><td><b>PatientProfile → PatientConsultation</b></td><td>1 a 0..*</td><td>Cada consulta conserva <span class="mono">patientId</span> y los datos del médico.</td></tr>
+      <tr><td><b>PatientProfile → PatientDocument</b></td><td>1 a 0..*</td><td>Documentos del expediente con <span class="mono">sha256</span> y metadatos.</td></tr>
+      <tr><td><b>PatientProfile → PatientStudy</b></td><td>1 a 0..*</td><td>Estudios solicitados; <span class="mono">documentId</span> apunta al resultado cuando está listo.</td></tr>
+      <tr><td><b>PatientProfile → PatientPrescription</b></td><td>1 a 0..*</td><td>Recetas emitidas; <span class="mono">documentId</span> apunta al PDF firmado.</td></tr>
+      <tr><td><b>PatientPrescription → PatientPrescriptionItem</b></td><td>1 a 1..*</td><td>Lista de medicamentos con dosis, frecuencia y duración.</td></tr>
+      <tr><td><b>PatientStudy / PatientPrescription → PatientDocument</b></td><td>0..1 a 0..1</td><td>El documento es el PDF que el paciente descarga; el hash permite verificarlo.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s45">4.5 Data classes de Kotlin</h2>
+  <p>
+    Las clases siguientes son las que existen en el proyecto (<span class="mono">data/model/ClinicalModels.kt</span>
+    y <span class="mono">data/model/AuthModels.kt</span>). Se anotan con <span class="mono">@Serializable</span> y
+    <span class="mono">@SerialName</span> para mapear el JSON del backend sin acoplar los nombres de Kotlin a los
+    de la API.
+  </p>
+
+  <pre>@Serializable
+data class PatientProfile(
+    val id: Int,
+    @SerialName("full_name") val fullName: String,
+    val curp: String? = null,
+    @SerialName("blood_type") val bloodType: String? = null,
+    @SerialName("birth_date") val birthDate: String? = null,
+    @SerialName("emergency_contact") val emergencyContact: String? = null,
+)
+
+@Serializable
+data class PatientAppointment(
+    val id: Int,
+    val specialty: String,
+    @SerialName("doctor_name") val doctorName: String? = null,
+    @SerialName("scheduled_at") val scheduledAt: String,
+    val location: String,
+    val status: AppointmentStatus,
+    val notes: String? = null,
+    @SerialName("checked_in_at") val checkedInAt: String? = null,
+)
+
+@Serializable
+enum class AppointmentStatus {
+    @SerialName("scheduled") SCHEDULED,
+    @SerialName("confirmed") CONFIRMED,
+    @SerialName("attended") ATTENDED,
+    @SerialName("cancelled") CANCELLED,
+}</pre>
+
+  <pre>@Serializable
+data class PatientConsultation(
+    val id: Int,
+    @SerialName("patient_id") val patientId: Int,
+    @SerialName("doctor_name") val doctorName: String,
+    val specialty: String,
+    val reason: String,
+    val diagnosis: String,
+    val notes: String? = null,
+    @SerialName("created_at") val createdAt: String,
+)
+
+@Serializable
+data class PatientDocument(
+    val id: Int,
+    val title: String,
+    val category: String,
+    @SerialName("original_name") val originalName: String,
+    @SerialName("content_type") val contentType: String,
+    @SerialName("size_bytes") val sizeBytes: Long,
+    val sha256: String,
+    @SerialName("created_at") val createdAt: String,
+)
+
+@Serializable
+data class PatientStudy(
+    val id: Int,
+    @SerialName("study_name") val studyName: String,
+    val category: String = "",
+    val status: String = "",
+    @SerialName("requested_at") val requestedAt: String = "",
+    @SerialName("performed_at") val performedAt: String? = null,
+    @SerialName("document_id") val documentId: Int? = null,
+)</pre>
+
+  <pre>@Serializable
+data class PatientPrescription(
+    val id: Int,
+    @SerialName("created_at") val createdAt: String = "",
+    val notes: String? = null,
+    @SerialName("document_id") val documentId: Int? = null,
+    val items: List&lt;PatientPrescriptionItem&gt; = emptyList(),
+)
+
+@Serializable
+data class PatientPrescriptionItem(
+    val medication: String,
+    val dose: String = "",
+    val frequency: String = "",
+    val duration: String? = null,
+)
+
+// Sesión y seguridad (extracto)
+@Serializable
+data class LoginRequest(
+    val username: String,
+    val password: String,
+)
+
+@Serializable
+data class LoginResponse(
+    @SerialName("access_token") val accessToken: String? = null,
+    @SerialName("refresh_token") val refreshToken: String? = null,
+    val role: String = "",
+    @SerialName("requires_2fa") val requires2fa: Boolean = false,
+    @SerialName("challenge_token") val challengeToken: String? = null,
+)
+
+@Serializable
+data class TwoFactorStatus(
+    val enabled: Boolean = false,
+    @SerialName("recovery_codes_remaining") val recoveryCodesRemaining: Int = 0,
+)</pre>
+
+  <h2 id="s46">4.6 Diccionario de datos</h2>
+  <table class="compact">
+    <thead><tr><th style="width:4.2cm">Clase · campo</th><th style="width:2.6cm">Tipo</th><th>Descripción</th></tr></thead>
+    <tbody>
+      <tr><td><b>PatientProfile.id</b></td><td>Int</td><td>Identificador del paciente autenticado.</td></tr>
+      <tr><td><b>PatientProfile.fullName</b></td><td>String</td><td>Nombre completo que se muestra en el inicio y el expediente.</td></tr>
+      <tr><td><b>PatientProfile.curp</b></td><td>String?</td><td>CURP; puede ser nula si el hospital no la capturó.</td></tr>
+      <tr><td><b>PatientProfile.bloodType</b></td><td>String?</td><td>Tipo de sangre; dato sensible de solo lectura.</td></tr>
+      <tr><td><b>PatientAppointment.status</b></td><td>AppointmentStatus</td><td>Enum: scheduled, confirmed, attended, cancelled.</td></tr>
+      <tr><td><b>PatientAppointment.checkedInAt</b></td><td>String?</td><td>Fecha/hora ISO-8601 de la llegada; nula si no hay check-in.</td></tr>
+      <tr><td><b>PatientConsultation.diagnosis</b></td><td>String</td><td>Diagnóstico registrado por el médico; la app solo lo muestra.</td></tr>
+      <tr><td><b>PatientDocument.sha256</b></td><td>String</td><td>Huella del archivo; permite verificar integridad.</td></tr>
+      <tr><td><b>PatientDocument.sizeBytes</b></td><td>Long</td><td>Tamaño del archivo en bytes (máximo 10 MB en el portal).</td></tr>
+      <tr><td><b>PatientStudy.status</b></td><td>String</td><td>Estado del estudio: solicitado, en proceso o listo.</td></tr>
+      <tr><td><b>PatientStudy.documentId</b></td><td>Int?</td><td>Documento con el resultado; nulo mientras no esté listo.</td></tr>
+      <tr><td><b>PatientPrescription.items</b></td><td>List&lt;Item&gt;</td><td>Medicamentos de la receta; una receta puede tener varios.</td></tr>
+      <tr><td><b>LoginResponse.requires2fa</b></td><td>Boolean</td><td>Indica que la contraseña es correcta pero falta el TOTP.</td></tr>
+      <tr><td><b>TwoFactorStatus.enabled</b></td><td>Boolean</td><td>Estado del segundo factor en “Mi seguridad”.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <b>Modelo relacional completo.</b> El backend normaliza 13 tablas en 3FN (usuarios, roles, permisos,
+    pacientes, médicos, citas, consultas, documentos, auditoría, tokens, códigos de recuperación, estudios y
+    recetas). El diagrama entidad-relación se incluye en el <b>Anexo A</b> y en el archivo
+    <span class="mono">Diagrama_ER_y_Normalizacion_DOSYS.pdf</span>.
+  </div>
+
+  <div class="two-box">
+    <div class="box">
+      <h4>¿Por qué data classes y no entidades?</h4>
+      <p>La app no es un ORM: consume JSON. Las <i>data classes</i> son inmutables, serializables y fáciles de
+      comparar; el mapeo con <span class="mono">@SerialName</span> desacopla los nombres del backend de los de
+      Kotlin. Así el contrato se puede versionar sin romper la UI.</p>
+    </div>
+    <div class="box">
+      <h4>¿Por qué solo lectura?</h4>
+      <p>El paciente no debe poder alterar un diagnóstico, una receta o un resultado. La app solo envía login,
+      check-in y acciones de seguridad; todo lo clínico lo escribe el personal desde el portal y queda en la
+      bitácora.</p>
+    </div>
+  </div>
+</section>
+<!-- 5. E5 / E6 -->
+<section class="section">
+  <p class="kicker">Entregables E5 y E6 · Prototipo y cierre</p>
+  <h1>5. Prototipo, coherencia y evidencias</h1>
+
+  <p class="lead">
+    El diseño no quedó en el papel: la app compila, se instala y se ejecuta contra la API de demostración. Esta
+    sección conecta los entregables E1–E4 con el prototipo real (E5) y con el repositorio y la presentación (E6).
+  </p>
+
+  <h2 id="s51">5.1 Estado del prototipo y del repositorio</h2>
+  <div class="metric-grid">
+    <div class="metric"><div class="n">11</div><div class="l">rutas navegables<br>en el NavHost</div></div>
+    <div class="metric"><div class="n">5</div><div class="l">flujos principales<br>con mockups</div></div>
+    <div class="metric"><div class="n">100%</div><div class="l">de coincidencia<br>mockup ↔ app</div></div>
+  </div>
+
+  <table class="compact">
+    <thead><tr><th style="width:3.4cm">Elemento</th><th>Estado / ubicación</th></tr></thead>
+    <tbody>
+      <tr><td><b>Proyecto Android</b></td><td>Kotlin + Jetpack Compose; compila con <span class="mono">./gradlew :app:assembleDebug</span> y se instala en el emulador <span class="mono">DosysPhone</span>.</td></tr>
+      <tr><td><b>APK de demostración</b></td><td><span class="mono">Proyecto/dosys-demo-vps.apk</span> (20.2 MB), apunta al backend HTTPS de producción.</td></tr>
+      <tr><td><b>Backend</b></td><td>FastAPI + PostgreSQL + Docker; <span class="mono">https://medicos.stolasimp.dev</span>. Credenciales de demo en el README.</td></tr>
+      <tr><td><b>Repositorio</b></td><td><span class="mono">github.com/ProtoFurOwO/Dosys</span> · ramas <span class="mono">master</span> y <span class="mono">feat/backend-vertical-slice</span>.</td></tr>
+      <tr><td><b>Prototipo HTML</b></td><td><span class="mono">android/design/prototipo/Prototipo_DOSYS.html</span>, autocontenido y navegable sin internet.</td></tr>
+      <tr><td><b>Presentación</b></td><td><span class="mono">Presentacion_Proyecto/Presentacion_Proyecto_DOSYS.pdf</span> y <span class="mono">.pptx</span> (16 diapositivas, 10 minutos).</td></tr>
+      <tr><td><b>Evidencias</b></td><td><span class="mono">docs/evidencias/</span> con capturas de app y portal; <span class="mono">docs/evidencias/31–34</span> para laboratorio, espera y consulta.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Cómo se ejecuta</h3>
+  <pre># 1. Backend local
+cd android/backend
+docker compose up -d --build
+# 2. App en el emulador
+cd android
+./gradlew.bat :app:installDebug -PapiBaseUrl=http://10.0.2.2:8000/api/v1/
+# 3. Credenciales de demostración
+#    paciente / Paciente123!
+#    medico   / Medico123!
+#    admin    / Admin123!</pre>
+
+  <h2 id="s52">5.2 Coherencia diseño ↔ prototipo</h2>
+  <table class="compact">
+    <thead>
+      <tr><th style="width:3.2cm">Criterio</th><th>Evidencia</th><th style="width:2.6cm">Resultado</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>Pantallas</b></td><td>Los 5 mockups se capturaron del prototipo; las 11 rutas del mapa existen en <span class="mono">Routes.kt</span> y <span class="mono">DosysNavHost.kt</span>.</td><td>Coincide</td></tr>
+      <tr><td><b>Navegación</b></td><td>Login limpia el backstack; las pantallas internas regresan con <span class="mono">popBackStack()</span>; el logout usa <span class="mono">popUpTo(0)</span>.</td><td>Coincide</td></tr>
+      <tr><td><b>Componentes</b></td><td>TopAppBar, Card, Button, OutlinedTextField, AlertDialog y LinearProgressIndicator son los mismos en el código y en los mockups.</td><td>Coincide</td></tr>
+      <tr><td><b>Datos</b></td><td>Los nombres y tipos de las <i>data classes</i> coinciden con <span class="mono">ClinicalModels.kt</span> y <span class="mono">AuthModels.kt</span>.</td><td>Coincide</td></tr>
+      <tr><td><b>Estados</b></td><td>Recuperación, huella, mapa y 2FA se documentan como estados secundarios; no son pantallas nuevas.</td><td>Coincide</td></tr>
+      <tr><td><b>Diferencias</b></td><td>Solo de estado/datos de demostración, no de diseño; se justifican en 5.3.</td><td>Justificado</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s53">5.3 Diferencias respecto del alcance mínimo</h2>
+  <p>
+    La actividad pedía de 3 a 5 pantallas y datos de ejemplo en memoria, sin backend. El proyecto integrador ya
+    contaba con una API y un portal; en lugar de recortar la app, se documentó el diseño completo y se justificaron
+    las diferencias. Esto es una fortaleza para la rúbrica de coherencia, no una desviación del objetivo.
+  </p>
+
+  <table class="compact">
+    <thead><tr><th style="width:4.5cm">Diferencia</th><th>Por qué</th><th style="width:4.6cm">Cómo se justifica</th></tr></thead>
+    <tbody>
+      <tr><td><b>11 rutas en vez de 3–5</b></td><td>El proyecto real ya incluía estudios, recetas, documentos, QR y seguridad. Recortarlas habría ocultado funciones que el paciente usa.</td><td>Se detallan 5 flujos principales y se documentan las demás como pantallas de apoyo.</td></tr>
+      <tr><td><b>API real en vez de listas en memoria</b></td><td>El objetivo del proyecto integrador es un sistema hospitalario completo; la app consume la misma API que el portal.</td><td>La sección 4 documenta la arquitectura y el modelo; la app conserva <span class="mono">MockData</span> para el tratamiento de ejemplo.</td></tr>
+      <tr><td><b>Capturas reales como mockups</b></td><td>El prototipo ya existe y se puede ejecutar; una recreación en Figma sería una copia menos fiel.</td><td>Los mockups se etiquetan como “capturados del prototipo ejecutable” y se acompañan de wireframes.</td></tr>
+      <tr><td><b>Emulador sin huella</b></td><td>El AVD de demostración no tiene huella configurada; la app muestra el aviso y permite continuar.</td><td>Se documenta el estado real y la compuerta <span class="mono">BiometricPrompt</span>; en un teléfono físico se valida la huella.</td></tr>
+      <tr><td><b>Aviso “Demo local” en login</b></td><td>Es una ayuda para el profesor durante la demostración.</td><td>Se retira en una build de producción; no afecta el diseño de la pantalla.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s54">5.4 Pruebas y evidencias</h2>
+  <table class="compact">
+    <thead><tr><th style="width:4.6cm">Prueba</th><th>Qué cubre</th><th style="width:1.8cm">Resultado</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">verify_vertical_slice.py</td><td>El médico crea, el paciente lee; accesos indebidos 401/403.</td><td>OK</td></tr>
+      <tr><td class="mono">verify_portal.py</td><td>Pacientes, consultas, citas, usuarios, roles, documentos y bitácora.</td><td>OK</td></tr>
+      <tr><td class="mono">verify_checkin.py</td><td>Check-in: código incorrecto, correcto, idempotente y aviso en vivo al portal.</td><td>OK</td></tr>
+      <tr><td class="mono">verify_login_security.py</td><td>Bloqueo por intentos, desbloqueo, 2FA y códigos de recuperación.</td><td>OK</td></tr>
+      <tr><td class="mono">verify_account_security.py</td><td>Contraseñas, refresh con rotación, rate limiting y API de administración.</td><td>33/33</td></tr>
+      <tr><td><b>Flujo de laboratorio</b></td><td>Orden → captura → PDF con hash → verificación → visible en la app.</td><td>OK</td></tr>
+    </tbody>
+  </table>
+
+  <div class="evidence-grid">
+    <figure><img src="assets/app/record.png" alt="Evidencia del expediente"><figcaption>Expediente real con datos de la API.</figcaption></figure>
+    <figure><img src="assets/app/checkin.png" alt="Evidencia del check-in"><figcaption>Check-in con QR y confirmación de llegada.</figcaption></figure>
+  </div>
+
+  <div class="callout">
+    <b>Repositorio y presentación.</b> El repositorio incluye README con descripción, capturas e instrucciones de
+    ejecución; la presentación de 10 minutos cubre problemática, objetivos, arquitectura, interfaces y demo. El
+    guion de la demo y las credenciales están en <span class="mono">Guia_Demostracion_Profesor.md</span>.
+  </div>
+</section>
+
+<!-- 6. Cierre -->
+<section class="section">
+  <p class="kicker">Cierre</p>
+  <h1>6. Conclusiones, referencias y declaración de IA</h1>
+
+  <h2 id="s61">6.1 Conclusiones</h2>
+  <p>
+    D.O.S.Y.S demuestra que un problema de acceso a la información clínica se puede atacar con un diseño sencillo
+    y una arquitectura disciplinada. La app no intenta reemplazar al hospital: le devuelve al paciente la parte
+    que le corresponde —su expediente, sus citas, sus resultados y sus recetas— con una superficie mínima y
+    verificable.
+  </p>
+  <p>
+    El diseño se validó con el prototipo real: los mockups son capturas del sistema en ejecución, no ilustraciones.
+    Esa decisión obligó a que el modelo de datos, la navegación y los estados estuvieran completos antes de dibujar,
+    y convirtió la entrega en una prueba de coherencia. Las diferencias que quedan son de estado y de datos de
+    demostración, y están declaradas.
+  </p>
+  <p>
+    Como trabajo futuro inmediato: endurecer el almacenamiento del token con Android Keystore, agregar el modo
+    offline de solo lectura, ampliar las pruebas de UI y conectar el módulo de estudios/recetas con notificaciones.
+    Nada de eso cambia el diseño; lo madura.
+  </p>
+
+  <h2 id="s62">6.2 Referencias</h2>
+  <ol class="small">
+    <li>Android Developers. <i>Guide to app architecture</i> y <i>Compose design guidelines</i>. developer.android.com.</li>
+    <li>Material Design 3. <i>Components, color, typography and accessibility</i>. m3.material.io.</li>
+    <li>Kotlin Documentation. <i>Data classes, coroutines and serialization</i>. kotlinlang.org/docs.</li>
+    <li>FastAPI Documentation. <i>Tutorial and security</i>. fastapi.tiangolo.com.</li>
+    <li>PostgreSQL Documentation. <i>Data types and constraints</i>. postgresql.org/docs.</li>
+    <li>OWASP. <i>Mobile Application Security Verification Standard (MASVS)</i>.</li>
+    <li>Secretaría de Salud. <i>NOM-004-SSA3-2012, del expediente clínico</i>.</li>
+    <li>Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP).</li>
+    <li>Simple Icons. <i>Logos de tecnologías</i> (CC0). simpleicons.org.</li>
+    <li>Unsplash. <i>Fotografías de apoyo</i> usadas en la presentación (LEDC, Navy Medicine, Sunrise King, National Cancer Institute).</li>
+  </ol>
+
+  <h2 id="s63">6.3 Declaración de uso de inteligencia artificial</h2>
+  <div class="callout purple">
+    <b>Declaración.</b> El equipo utilizó herramientas de inteligencia artificial como apoyo para redactar, ordenar
+    la documentación, generar borradores de diagramas y maquetar este PDF. Todas las decisiones de diseño, los
+    nombres de clases, los endpoints, las capturas y las pruebas fueron revisados y validados por los integrantes
+    contra el código del repositorio. El equipo puede explicar cada pantalla, cada relación del modelo y cada
+    elección de arquitectura. Las fuentes, los logos y las fotografías se citan en la sección 6.2.
+  </div>
+</section>
+
+<!-- Anexo A -->
+<section class="annex">
+  <p class="kicker">Anexo A</p>
+  <h1>Modelo entidad-relación del backend</h1>
+  <p style="text-align:left">
+    El backend normaliza la información clínica en 13 tablas principales (3FN). La app no accede a la base
+    directamente: consume proyecciones de solo lectura a través de la API. El modelo completo, con atributos y
+    cardinalidades, se entrega en <span class="mono">Diagrama_ER_y_Normalizacion_DOSYS.pdf</span>; aquí se resume
+    la relación de cada tabla con las <i>data classes</i> de la sección 4.
+  </p>
+  <div class="two-box">
+    <div class="box">
+      <h4>Normalización aplicada</h4>
+      <p><b>1FN:</b> todos los campos son atómicos (un teléfono, un diagnóstico, un medicamento por fila).
+      <b>2FN:</b> cada atributo depende de la clave completa de su tabla. <b>3FN:</b> no hay dependencias
+      transitivas; roles, permisos y médicos viven en tablas propias.</p>
+    </div>
+    <div class="box">
+      <h4>Integridad referencial</h4>
+      <p>Las claves foráneas conectan pacientes, citas, consultas, documentos, estudios y recetas. Los borrados
+      sensibles se restringen; la bitácora es de solo lectura. El diagrama completo, con atributos y cardinalidades,
+      está en <span class="mono">Diagrama_ER_y_Normalizacion_DOSYS.pdf</span>.</p>
+    </div>
+  </div>
+
+  <table class="compact">
+    <thead><tr><th style="width:3.6cm">Tabla</th><th>Propósito</th><th style="width:4.2cm">Relación con la app</th></tr></thead>
+    <tbody>
+      <tr><td><b>users</b></td><td>Cuentas, hash Argon2, rol, bloqueo y 2FA.</td><td>Login y “Mi seguridad”.</td></tr>
+      <tr><td><b>roles / permissions / role_permissions</b></td><td>RBAC dinámico por acción y área.</td><td>Define qué puede hacer cada usuario del portal.</td></tr>
+      <tr><td><b>patients</b></td><td>Datos del paciente y contacto de emergencia.</td><td><span class="mono">PatientProfile</span>.</td></tr>
+      <tr><td><b>doctors</b></td><td>Médicos y especialidad.</td><td>Nombre del médico en citas y consultas.</td></tr>
+      <tr><td><b>appointments</b></td><td>Citas, estado, consultorio, QR y check-in.</td><td><span class="mono">PatientAppointment</span>.</td></tr>
+      <tr><td><b>consultations</b></td><td>Motivo, diagnóstico y notas.</td><td><span class="mono">PatientConsultation</span>.</td></tr>
+      <tr><td><b>documents</b></td><td>Metadatos, SHA-256, sello HMAC y archivo.</td><td><span class="mono">PatientDocument</span>.</td></tr>
+      <tr><td><b>study_orders / lab_studies</b></td><td>Orden, estado y resultado del estudio.</td><td><span class="mono">PatientStudy</span>.</td></tr>
+      <tr><td><b>prescriptions</b></td><td>Receta, medicamentos y PDF firmado.</td><td><span class="mono">PatientPrescription</span>.</td></tr>
+      <tr><td><b>audit_logs</b></td><td>Bitácora de accesos y cambios.</td><td>Trazabilidad del sistema.</td></tr>
+      <tr><td><b>refresh_tokens / recovery_codes / password_reset_tokens</b></td><td>Sesiones renovables y códigos de un solo uso.</td><td>Seguridad de la cuenta.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <b>Integridad.</b> Cada documento se guarda en un volumen Docker y se registra con SHA-256 + sello HMAC. La
+    verificación recalcula la huella y valida el sello; si el archivo cambió, el portal lo advierte en lugar de
+    mostrarlo como válido. Toda subida, descarga y verificación queda en la bitácora.
+  </div>
+</section>
+
+</body>
+</html>

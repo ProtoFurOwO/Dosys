@@ -1,0 +1,295 @@
+<!-- 4. E4 -->
+<section class="section">
+  <p class="kicker">Entregable E4 · Arquitectura</p>
+  <h1>4. Arquitectura y modelo de datos</h1>
+
+  <p class="lead">
+    La app sigue el patrón <b>MVVM</b> con un flujo unidireccional de datos: la interfaz observa un estado
+    inmutable, el ViewModel lo produce y el repositorio decide de dónde sale. La misma arquitectura se conecta con
+    una API REST y con un modelo de datos de solo lectura representado por <i>data classes</i> de Kotlin.
+  </p>
+
+  <h2 id="s41">4.1 Arquitectura MVVM y responsabilidades</h2>
+  <figure class="diagram">
+    <img src="assets/diagrams/mvvm.svg" alt="Diagrama de arquitectura MVVM de D.O.S.Y.S">
+    <figcaption><b>Figura 4.1.</b> Capas de la app y flujo de datos. La UI no conoce Retrofit; el ViewModel no
+      conoce Android <span class="mono">Context</span>; el repositorio es la única fuente de verdad.</figcaption>
+  </figure>
+
+  <table class="compact">
+    <thead>
+      <tr><th style="width:2.5cm">Capa</th><th style="width:5.4cm">Componentes reales</th><th>Responsabilidad</th><th style="width:3.7cm">Regla de diseño</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>UI</b></td><td class="mono">LoginScreen, HomeScreen, RecordScreen, CheckInScreen, SecurityScreen, ScreenScaffold, theme/</td><td>Renderiza el estado, captura eventos, aplica Material 3 y accesibilidad. No valida reglas de negocio.</td><td>Un composable por pantalla; componentes reutilizables.</td></tr>
+      <tr><td><b>ViewModel</b></td><td class="mono">LoginViewModel, HomeViewModel, RecordViewModel, CheckInViewModel, SecurityViewModel</td><td>Expone <span class="mono">StateFlow&lt;UiState&gt;</span>, valida entradas, lanza corrutinas y sobrevive a cambios de configuración.</td><td>Sin referencias a <span class="mono">Context</span> ni a vistas.</td></tr>
+      <tr><td><b>Repository</b></td><td class="mono">AuthRepository, PatientRepository, SecurityRepository</td><td>Única fuente de verdad; mapea DTO → modelo de dominio, centraliza errores y decide qué datos expone.</td><td>La UI nunca llama a Retrofit directamente.</td></tr>
+      <tr><td><b>Data</b></td><td class="mono">ApiService, NetworkModule, TokenRefresher, SessionManager, MockData</td><td>HTTP con Retrofit/OkHttp, serialización, almacenamiento del token en DataStore y refresco automático en 401.</td><td>El token no se incluye en respaldos.</td></tr>
+      <tr><td><b>Core</b></td><td class="mono">ServiceLocator, SessionManager, BiometricGate, ZXing, OSMDroid</td><td>DI manual, sesión, biometría, cámara y mapa. Son dependencias transversales, no capas de negocio.</td><td>Inyección explícita, sin frameworks pesados.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Flujo unidireccional</h3>
+  <p>
+    El usuario toca un botón → la UI emite un evento → el ViewModel actualiza su estado o llama al repositorio →
+    el repositorio consulta la API → el ViewModel recibe el resultado y publica un nuevo <span class="mono">UiState</span>
+    → Compose recompone solo lo que cambió. Este ciclo se repite en todas las pantallas y explica por qué la app
+    puede mostrar estados de carga, error y éxito sin lógica duplicada.
+  </p>
+
+  <pre>// Ejemplo real de la capa de presentación
+class HomeViewModel(
+    private val repository: PatientRepository = ServiceLocator.patientRepository,
+) : ViewModel() {
+    private val _state = MutableStateFlow(HomeUiState())
+    val state: StateFlow&lt;HomeUiState&gt; = _state.asStateFlow()
+
+    fun load() = viewModelScope.launch {
+        _state.update { it.copy(isLoading = true, error = null) }
+        runCatching { repository.nextAppointment() }
+            .onSuccess { appointment -&gt;
+                _state.update { it.copy(isLoading = false, nextAppointment = appointment) }
+            }
+            .onFailure { error -&gt;
+                _state.update { it.copy(isLoading = false, error = error.message) }
+            }
+    }
+}</pre>
+
+  <h2 id="s42">4.2 Arquitectura de datos y stack tecnológico</h2>
+  <p>
+    La arquitectura de datos muestra <b>con qué software está hecho</b> el sistema y <b>por dónde viajan los datos</b>.
+    Se organiza en cuatro zonas —clientes, borde, servidor y datos— más una banda de seguridad transversal. Los
+    logos son de Simple Icons (CC0) y de sus respectivas marcas.
+  </p>
+
+  <figure class="diagram">
+    <img src="assets/diagrams/data-architecture.svg" alt="Arquitectura de datos y stack tecnológico con logos">
+    <figcaption><b>Figura 4.2.</b> Arquitectura de datos: app y portal → Cloudflare/Nginx → FastAPI → PostgreSQL,
+      volumen de documentos, Resend y OpenStreetMap. La seguridad (JWT, Argon2, RBAC, SHA-256, auditoría) cruza
+      todas las capas.</figcaption>
+  </figure>
+
+  <table class="compact">
+    <thead><tr><th style="width:3cm">Zona</th><th>Qué contiene</th><th style="width:5.2cm">Protocolo / frontera</th></tr></thead>
+    <tbody>
+      <tr><td><b>Clientes</b></td><td>App Android (Kotlin, Compose, M3, Retrofit, ZXing, OSMDroid, Biometric) y portal web (HTML + Jinja2).</td><td>HTTPS · REST/JSON · cookies HttpOnly en el portal.</td></tr>
+      <tr><td><b>Borde</b></td><td>Cloudflare (DNS/TLS), Nginx Proxy Manager y Let's Encrypt.</td><td>TLS 1.2/1.3, HSTS, proxy inverso y límites de tamaño.</td></tr>
+      <tr><td><b>Servidor</b></td><td>Ubuntu VPS, Docker Compose, FastAPI/Uvicorn, Pydantic, SQLAlchemy/Alembic, Jinja2, ReportLab, PyJWT, Argon2, PyOTP.</td><td>API REST, validación, generación de PDF y correo.</td></tr>
+      <tr><td><b>Datos</b></td><td>PostgreSQL (13 tablas, 3FN), volumen Docker para PDFs, Resend para correo y OpenStreetMap para tiles.</td><td>SQL asyncpg por red interna; archivos con SHA-256 + HMAC.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <b>Por qué esta arquitectura.</b> La app no guarda datos clínicos: los pide a la API en cada consulta. Eso
+    reduce el riesgo si el teléfono se pierde y garantiza que el paciente vea siempre la misma información que el
+    hospital. PostgreSQL nunca publica puertos; el único punto expuesto es el proxy HTTPS.
+  </div>
+
+  <h2 id="s43">4.3 Flujo de datos del check-in</h2>
+  <figure class="diagram-wide">
+    <img src="assets/diagrams/sequence-checkin.svg" alt="Diagrama de secuencia del check-in con QR">
+    <figcaption><b>Figura 4.3.</b> Secuencia real del check-in: el portal muestra el QR, la app lo escanea, la API
+      valida y PostgreSQL registra la llegada; la sala de espera del portal se actualiza.</figcaption>
+  </figure>
+  <p>
+    El check-in es el mejor ejemplo de la arquitectura porque cruza las cuatro capas: cámara (UI), ViewModel,
+    repositorio, Retrofit, API, PostgreSQL y portal. La operación es <b>idempotente</b>: si el paciente repite la
+    llamada, la llegada no se duplica. Además, la app nunca escribe datos clínicos; solo confirma la llegada.
+  </p>
+
+  <table class="compact">
+    <thead><tr><th style="width:1.2cm">Paso</th><th style="width:3.4cm">Responsable</th><th>Qué ocurre</th><th style="width:4.6cm">Evidencia / regla</th></tr></thead>
+    <tbody>
+      <tr><td class="id">1</td><td>Recepción (portal)</td><td>Abre la cita y muestra el QR con su código de respaldo.</td><td>Cada cita genera un código único.</td></tr>
+      <tr><td class="id">2</td><td>App (UI)</td><td>El paciente toca “Abrir cámara” y escanea el QR.</td><td>ZXing en orientación vertical.</td></tr>
+      <tr><td class="id">3</td><td>App (ViewModel)</td><td>Envía el código al repositorio y muestra estado de carga.</td><td>No bloquea el hilo principal.</td></tr>
+      <tr><td class="id">4</td><td>API (FastAPI)</td><td>Valida JWT, propiedad de la cita, código, estado y ventana.</td><td>401/403/400/409 según el caso.</td></tr>
+      <tr><td class="id">5</td><td>PostgreSQL</td><td>Actualiza <span class="mono">checked_in_at</span> y registra la auditoría.</td><td>Operación idempotente.</td></tr>
+      <tr><td class="id">6</td><td>API → App</td><td>Responde 200 con especialidad, consultorio y hora.</td><td>La app muestra “Llegada confirmada”.</td></tr>
+      <tr><td class="id">7</td><td>Portal</td><td>La sala de espera refleja la llegada del paciente.</td><td>El médico abre la consulta precargada.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s44">4.4 Modelo de datos de la app</h2>
+  <figure class="diagram">
+    <img src="assets/diagrams/class-diagram.svg" alt="Diagrama de clases con las data classes de Kotlin">
+    <figcaption><b>Figura 4.4.</b> Modelo de datos de la app: <span class="mono">PatientProfile</span> es la raíz;
+      citas, consultas, documentos, estudios y recetas cuelgan de ella. Las clases de sesión y seguridad se agrupan
+      aparte.</figcaption>
+  </figure>
+
+  <p>
+    El modelo de la app es una <b>proyección de solo lectura</b> del modelo del backend. No todas las tablas se
+    exponen: el paciente ve únicamente lo que necesita. Los identificadores (<span class="mono">patientId</span>,
+    <span class="mono">documentId</span>) referencian entidades del servidor y permiten navegar sin duplicar datos.
+  </p>
+
+  <table class="compact">
+    <thead><tr><th style="width:4.4cm">Relación</th><th>Cardinalidad</th><th>Cómo se representa</th></tr></thead>
+    <tbody>
+      <tr><td><b>PatientProfile → PatientAppointment</b></td><td>1 a 0..*</td><td>El perfil autenticado consulta sus citas; la cita no repite el perfil completo.</td></tr>
+      <tr><td><b>PatientProfile → PatientConsultation</b></td><td>1 a 0..*</td><td>Cada consulta conserva <span class="mono">patientId</span> y los datos del médico.</td></tr>
+      <tr><td><b>PatientProfile → PatientDocument</b></td><td>1 a 0..*</td><td>Documentos del expediente con <span class="mono">sha256</span> y metadatos.</td></tr>
+      <tr><td><b>PatientProfile → PatientStudy</b></td><td>1 a 0..*</td><td>Estudios solicitados; <span class="mono">documentId</span> apunta al resultado cuando está listo.</td></tr>
+      <tr><td><b>PatientProfile → PatientPrescription</b></td><td>1 a 0..*</td><td>Recetas emitidas; <span class="mono">documentId</span> apunta al PDF firmado.</td></tr>
+      <tr><td><b>PatientPrescription → PatientPrescriptionItem</b></td><td>1 a 1..*</td><td>Lista de medicamentos con dosis, frecuencia y duración.</td></tr>
+      <tr><td><b>PatientStudy / PatientPrescription → PatientDocument</b></td><td>0..1 a 0..1</td><td>El documento es el PDF que el paciente descarga; el hash permite verificarlo.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s45">4.5 Data classes de Kotlin</h2>
+  <p>
+    Las clases siguientes son las que existen en el proyecto (<span class="mono">data/model/ClinicalModels.kt</span>
+    y <span class="mono">data/model/AuthModels.kt</span>). Se anotan con <span class="mono">@Serializable</span> y
+    <span class="mono">@SerialName</span> para mapear el JSON del backend sin acoplar los nombres de Kotlin a los
+    de la API.
+  </p>
+
+  <pre>@Serializable
+data class PatientProfile(
+    val id: Int,
+    @SerialName("full_name") val fullName: String,
+    val curp: String? = null,
+    @SerialName("blood_type") val bloodType: String? = null,
+    @SerialName("birth_date") val birthDate: String? = null,
+    @SerialName("emergency_contact") val emergencyContact: String? = null,
+)
+
+@Serializable
+data class PatientAppointment(
+    val id: Int,
+    val specialty: String,
+    @SerialName("doctor_name") val doctorName: String? = null,
+    @SerialName("scheduled_at") val scheduledAt: String,
+    val location: String,
+    val status: AppointmentStatus,
+    val notes: String? = null,
+    @SerialName("checked_in_at") val checkedInAt: String? = null,
+)
+
+@Serializable
+enum class AppointmentStatus {
+    @SerialName("scheduled") SCHEDULED,
+    @SerialName("confirmed") CONFIRMED,
+    @SerialName("attended") ATTENDED,
+    @SerialName("cancelled") CANCELLED,
+}</pre>
+
+  <pre>@Serializable
+data class PatientConsultation(
+    val id: Int,
+    @SerialName("patient_id") val patientId: Int,
+    @SerialName("doctor_name") val doctorName: String,
+    val specialty: String,
+    val reason: String,
+    val diagnosis: String,
+    val notes: String? = null,
+    @SerialName("created_at") val createdAt: String,
+)
+
+@Serializable
+data class PatientDocument(
+    val id: Int,
+    val title: String,
+    val category: String,
+    @SerialName("original_name") val originalName: String,
+    @SerialName("content_type") val contentType: String,
+    @SerialName("size_bytes") val sizeBytes: Long,
+    val sha256: String,
+    @SerialName("created_at") val createdAt: String,
+)
+
+@Serializable
+data class PatientStudy(
+    val id: Int,
+    @SerialName("study_name") val studyName: String,
+    val category: String = "",
+    val status: String = "",
+    @SerialName("requested_at") val requestedAt: String = "",
+    @SerialName("performed_at") val performedAt: String? = null,
+    @SerialName("document_id") val documentId: Int? = null,
+)</pre>
+
+  <pre>@Serializable
+data class PatientPrescription(
+    val id: Int,
+    @SerialName("created_at") val createdAt: String = "",
+    val notes: String? = null,
+    @SerialName("document_id") val documentId: Int? = null,
+    val items: List&lt;PatientPrescriptionItem&gt; = emptyList(),
+)
+
+@Serializable
+data class PatientPrescriptionItem(
+    val medication: String,
+    val dose: String = "",
+    val frequency: String = "",
+    val duration: String? = null,
+)
+
+// Sesión y seguridad (extracto)
+@Serializable
+data class LoginRequest(
+    val username: String,
+    val password: String,
+)
+
+@Serializable
+data class LoginResponse(
+    @SerialName("access_token") val accessToken: String? = null,
+    @SerialName("refresh_token") val refreshToken: String? = null,
+    val role: String = "",
+    @SerialName("requires_2fa") val requires2fa: Boolean = false,
+    @SerialName("challenge_token") val challengeToken: String? = null,
+)
+
+@Serializable
+data class TwoFactorStatus(
+    val enabled: Boolean = false,
+    @SerialName("recovery_codes_remaining") val recoveryCodesRemaining: Int = 0,
+)</pre>
+
+  <h2 id="s46">4.6 Diccionario de datos</h2>
+  <table class="compact">
+    <thead><tr><th style="width:4.2cm">Clase · campo</th><th style="width:2.6cm">Tipo</th><th>Descripción</th></tr></thead>
+    <tbody>
+      <tr><td><b>PatientProfile.id</b></td><td>Int</td><td>Identificador del paciente autenticado.</td></tr>
+      <tr><td><b>PatientProfile.fullName</b></td><td>String</td><td>Nombre completo que se muestra en el inicio y el expediente.</td></tr>
+      <tr><td><b>PatientProfile.curp</b></td><td>String?</td><td>CURP; puede ser nula si el hospital no la capturó.</td></tr>
+      <tr><td><b>PatientProfile.bloodType</b></td><td>String?</td><td>Tipo de sangre; dato sensible de solo lectura.</td></tr>
+      <tr><td><b>PatientAppointment.status</b></td><td>AppointmentStatus</td><td>Enum: scheduled, confirmed, attended, cancelled.</td></tr>
+      <tr><td><b>PatientAppointment.checkedInAt</b></td><td>String?</td><td>Fecha/hora ISO-8601 de la llegada; nula si no hay check-in.</td></tr>
+      <tr><td><b>PatientConsultation.diagnosis</b></td><td>String</td><td>Diagnóstico registrado por el médico; la app solo lo muestra.</td></tr>
+      <tr><td><b>PatientDocument.sha256</b></td><td>String</td><td>Huella del archivo; permite verificar integridad.</td></tr>
+      <tr><td><b>PatientDocument.sizeBytes</b></td><td>Long</td><td>Tamaño del archivo en bytes (máximo 10 MB en el portal).</td></tr>
+      <tr><td><b>PatientStudy.status</b></td><td>String</td><td>Estado del estudio: solicitado, en proceso o listo.</td></tr>
+      <tr><td><b>PatientStudy.documentId</b></td><td>Int?</td><td>Documento con el resultado; nulo mientras no esté listo.</td></tr>
+      <tr><td><b>PatientPrescription.items</b></td><td>List&lt;Item&gt;</td><td>Medicamentos de la receta; una receta puede tener varios.</td></tr>
+      <tr><td><b>LoginResponse.requires2fa</b></td><td>Boolean</td><td>Indica que la contraseña es correcta pero falta el TOTP.</td></tr>
+      <tr><td><b>TwoFactorStatus.enabled</b></td><td>Boolean</td><td>Estado del segundo factor en “Mi seguridad”.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <b>Modelo relacional completo.</b> El backend normaliza 13 tablas en 3FN (usuarios, roles, permisos,
+    pacientes, médicos, citas, consultas, documentos, auditoría, tokens, códigos de recuperación, estudios y
+    recetas). El diagrama entidad-relación se incluye en el <b>Anexo A</b> y en el archivo
+    <span class="mono">Diagrama_ER_y_Normalizacion_DOSYS.pdf</span>.
+  </div>
+
+  <div class="two-box">
+    <div class="box">
+      <h4>¿Por qué data classes y no entidades?</h4>
+      <p>La app no es un ORM: consume JSON. Las <i>data classes</i> son inmutables, serializables y fáciles de
+      comparar; el mapeo con <span class="mono">@SerialName</span> desacopla los nombres del backend de los de
+      Kotlin. Así el contrato se puede versionar sin romper la UI.</p>
+    </div>
+    <div class="box">
+      <h4>¿Por qué solo lectura?</h4>
+      <p>El paciente no debe poder alterar un diagnóstico, una receta o un resultado. La app solo envía login,
+      check-in y acciones de seguridad; todo lo clínico lo escribe el personal desde el portal y queda en la
+      bitácora.</p>
+    </div>
+  </div>
+</section>
