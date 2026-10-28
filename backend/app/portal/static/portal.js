@@ -36,6 +36,83 @@ document.addEventListener("click", (event) => {
   }
 });
 
+// Agenda: abrir los detalles de la cita desde el botón de cada tarjeta.
+const appointmentModal = document.getElementById("modal-detalle");
+if (appointmentModal) {
+  const openAppointmentModal = (card) => {
+    const value = (name) => card.getAttribute("data-" + name) || "";
+    const patientName = value("patient-name");
+    const setText = (id, text) => {
+      const element = document.getElementById(id);
+      if (element) element.textContent = text;
+      return element;
+    };
+
+    setText("detalle-avatar", patientName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join("") || "P");
+    setText("detalle-paciente", patientName);
+    setText("detalle-curp", "CURP: " + (value("patient-curp") || "No registrada"));
+    setText("detalle-medico", value("doctor-name"));
+    setText("detalle-especialidad", value("specialty"));
+    setText("detalle-horario", value("time") + " h");
+    setText("detalle-fecha", value("date"));
+    setText("detalle-consultorio", value("room"));
+    setText("detalle-checkin-code", value("checkin-code") || "N/A");
+    setText("detalle-notas", value("notes") || "Sin notas adicionales registradas.");
+
+    const badge = setText("detalle-status-badge", value("status-label"));
+    if (badge) badge.className = "modern-status-pill status-pill-" + value("status");
+
+    const arrival = setText("detalle-llegada-aviso", value("checked-in") ? "Llegó " + value("checked-in") : "Pendiente de escaneo QR");
+    if (arrival) {
+      arrival.style.color = value("checked-in") ? "#047857" : "var(--ink-muted)";
+      arrival.style.fontWeight = value("checked-in") ? "600" : "normal";
+    }
+
+    const qrLink = document.getElementById("btn-ver-qr");
+    if (qrLink) qrLink.href = "/portal/citas/" + value("apt-id");
+    const patientLink = document.getElementById("btn-ver-expediente");
+    if (patientLink) patientLink.href = "/portal/pacientes/" + value("patient-id");
+
+    const changeForm = document.getElementById("form-cambiar-estado");
+    if (changeForm) {
+      changeForm.action = "/portal/agenda/citas/" + value("apt-id") + "/estado";
+      const stateSelect = document.getElementById("cambio-estado");
+      if (stateSelect) stateSelect.value = value("status");
+      const roomSelect = document.getElementById("cambio-consultorio");
+      if (roomSelect && value("room")) roomSelect.value = value("room");
+    }
+
+    appointmentModal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+  };
+
+  const closeAppointmentModal = () => {
+    appointmentModal.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+  };
+
+  document.querySelectorAll(".card-detail-button").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const card = button.closest(".modern-card-item");
+      if (card) openAppointmentModal(card);
+    });
+  });
+
+  appointmentModal.querySelectorAll("[data-close-modal]").forEach((button) => {
+    button.addEventListener("click", closeAppointmentModal);
+  });
+  appointmentModal.addEventListener("click", (event) => {
+    if (event.target === appointmentModal) closeAppointmentModal();
+  });
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && appointmentModal.getAttribute("aria-hidden") === "false") {
+      closeAppointmentModal();
+    }
+  });
+}
+
 // Check-in en vivo: la pantalla del QR se actualiza sola cuando el paciente
 // confirma su llegada desde la app. Deja de consultar al recibir la respuesta.
 const watch = document.querySelector("[data-checkin-watch]");
