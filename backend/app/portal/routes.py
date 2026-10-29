@@ -4,13 +4,13 @@ Seguridad: cookie de sesión HttpOnly con el mismo JWT de la API, rol médico
 validado en el servidor en cada petición, y bitácora de todos los accesos.
 """
 
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 import re
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -83,6 +83,23 @@ STATUS_LABELS = {
 BLOOD_TYPES = ("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")
 
 ROOMS = ("Consultorio 1", "Consultorio 2", "Consultorio 3", "Consultorio 4")
+
+
+def agenda_room_name(raw: str | None) -> str:
+    """Normaliza la ubicación de una cita sin perder consultorios fuera de 1–4."""
+    if not raw or not raw.strip():
+        return "Sin consultorio"
+    text = raw.strip()
+    for room in ROOMS:
+        if text.lower() == room.lower():
+            return room
+    match = re.search(r"consultorio\s*(\d+)", text, re.IGNORECASE)
+    if match:
+        return f"Consultorio {int(match.group(1))}"
+    if "hospital" in text.lower():
+        return "Sin consultorio"
+    return text[:40]
+
 
 STUDY_STATUS_LABELS = {
     StudyOrderStatus.REQUESTED: "Solicitado",
@@ -1143,6 +1160,341 @@ async def appointments_page(
             "search": search,
             "created_id": creada,
         },
+    )
+
+
+# ── Agenda visual (calendario por consultorios y semanal) ────────────────────
+
+DIAS_SEMANA = ("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
+DIAS_CORTO = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
+AGENDA_TIME_SLOTS = [f"{hour:02d}:{minute:02d}" for hour in range(8, 20) for minute in (0, 30)]
+
+
+@router.get("/agenda", response_class=HTMLResponse)
+async def agenda_page(
+    request: Request,
+    fecha: str = "",
+    vista: str = "consultorios",
+    doctor_id: int = 0,
+    consultorio: str = "",
+    estado: str = "",
+    aviso: str = "",
+    error: str = "",
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await portal_staff(db, user)
+    if not has_permission(user, "appointments:read"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede consultar la agenda.")
+
+    today_date = deps.clinic_now().date()
+    try:
+        current_date = datetime.strptime(fecha, "%Y-%m-%d").date() if fecha else today_date
+    except ValueError:
+        current_date = today_date
+
+    if vista == "consultorios":
+        vista = "tablero"
+    elif vista not in ("tablero", "cuadricula", "semana"):
+        vista = "tablero"
+
+    # Rango de la semana (Lunes a Domingo)
+    week_start_date = current_date - timedelta(days=current_date.weekday())
+    week_end_date = week_start_date + timedelta(days=6)
+    range_start = datetime.combine(week_start_date, time.min, tzinfo=deps.CLINIC_TIMEZONE).astimezone(timezone.utc)
+    range_end = datetime.combine(week_end_date, time.max, tzinfo=deps.CLINIC_TIMEZONE).astimezone(timezone.utc)
+
+    # Días de la semana estructurados
+    week_days = []
+    for i in range(7):
+        d = week_start_date + timedelta(days=i)
+        week_days.append({
+            "date": d,
+            "date_str": d.isoformat(),
+            "day_name": DIAS_SEMANA[i],
+            "day_short": DIAS_CORTO[i],
+            "day_number": d.day,
+            "month_name": deps.MESES[d.month - 1],
+            "is_today": d == today_date,
+            "is_selected": d == current_date,
+            "appointment_count": 0,
+        })
+
+    # Navegación
+    if vista == "semana":
+        prev_date_str = (current_date - timedelta(days=7)).isoformat()
+        next_date_str = (current_date + timedelta(days=7)).isoformat()
+    else:
+        prev_date_str = (current_date - timedelta(days=1)).isoformat()
+        next_date_str = (current_date + timedelta(days=1)).isoformat()
+
+    # Catálogos para filtros y modal
+    doctors = list((await db.scalars(select(Doctor).order_by(Doctor.full_name.asc()))).all())
+    patients = list((await db.scalars(select(Patient).order_by(Patient.full_name.asc()))).all())
+
+    # Consulta de citas
+    query = (
+        select(Appointment, Patient, Doctor)
+        .join(Patient, Appointment.patient_id == Patient.id)
+        .outerjoin(Doctor, Appointment.doctor_id == Doctor.id)
+        .where(
+            Appointment.scheduled_at >= range_start,
+            Appointment.scheduled_at <= range_end,
+        )
+    )
+
+    if doctor_id:
+        query = query.where(Appointment.doctor_id == doctor_id)
+    if consultorio:
+        query = query.where(
+            or_(
+                Appointment.room == consultorio,
+                and_(Appointment.room.is_(None), Appointment.location == consultorio),
+            )
+        )
+    if estado:
+        try:
+            status_enum = AppointmentStatus(estado)
+            query = query.where(Appointment.status == status_enum)
+        except ValueError:
+            pass
+
+    query = query.order_by(Appointment.scheduled_at.asc())
+    rows = (await db.execute(query)).all()
+
+    appointments_list = []
+    status_counts = {
+        "total": 0,
+        "scheduled": 0,
+        "confirmed": 0,
+        "attended": 0,
+        "cancelled": 0,
+    }
+
+    day_counts: dict[str, int] = {d["date_str"]: 0 for d in week_days}
+    room_names = list(ROOMS)
+
+    for appointment, patient, doctor_row in rows:
+        local_dt = deps._local(appointment.scheduled_at)
+        apt_date = local_dt.date()
+        apt_date_str = apt_date.isoformat()
+        slot_minute = 0 if local_dt.minute < 30 else 30
+        slot_key = f"{local_dt.hour:02d}:{slot_minute:02d}"
+
+        raw_room = appointment.room or appointment.location
+        room_name = agenda_room_name(raw_room)
+        if room_name not in room_names:
+            room_names.append(room_name)
+
+        words = patient.full_name.split()
+        initials = "".join(w[0] for w in words[:2]).upper() if words else "P"
+
+        apt_dict = {
+            "id": appointment.id,
+            "patient_id": patient.id,
+            "patient_name": patient.full_name,
+            "patient_initials": initials,
+            "patient_curp": patient.curp,
+            "doctor_id": doctor_row.id if doctor_row else None,
+            "doctor_name": doctor_row.full_name if doctor_row else "Sin médico asignado",
+            "specialty": appointment.specialty,
+            "location": appointment.location,
+            "room": room_name,
+            "status": appointment.status.value,
+            "status_label": STATUS_LABELS.get(appointment.status, appointment.status.value),
+            "scheduled_at": appointment.scheduled_at,
+            "time_str": local_dt.strftime("%H:%M"),
+            "date_str": apt_date_str,
+            "slot_key": slot_key,
+            "checkin_code": appointment.checkin_code,
+            "checked_in_at": appointment.checked_in_at,
+            "checked_in_label": deps.format_time(appointment.checked_in_at) if appointment.checked_in_at else None,
+            "notes": appointment.notes or "",
+        }
+        appointments_list.append(apt_dict)
+
+        if apt_date_str in day_counts:
+            day_counts[apt_date_str] += 1
+
+        st = appointment.status.value
+        if st in status_counts:
+            status_counts[st] += 1
+        status_counts["total"] += 1
+
+    for d in week_days:
+        d["appointment_count"] = day_counts.get(d["date_str"], 0)
+
+    preferred_rooms = [room for room in ROOMS if room in room_names]
+    extra_rooms = sorted(
+        room for room in room_names if room not in ROOMS and room != "Sin consultorio"
+    )
+    room_names = preferred_rooms + extra_rooms
+    if "Sin consultorio" in room_names:
+        room_names.append("Sin consultorio")
+
+    # Citas del día seleccionado organizadas por consultorio (para la vista de Tablero)
+    room_appointments = {room: [] for room in room_names}
+    today_appointments = []
+    for apt in appointments_list:
+        if apt["date_str"] == current_date.isoformat():
+            today_appointments.append(apt)
+            room = apt["room"]
+            if room in room_appointments:
+                room_appointments[room].append(apt)
+
+    for r in room_names:
+        room_appointments[r].sort(key=lambda a: a["time_str"])
+    today_appointments.sort(key=lambda a: a["time_str"])
+
+    # Grilla por consultorios (matriz de horarios)
+    grid_consultorios = {slot: {room: [] for room in room_names} for slot in AGENDA_TIME_SLOTS}
+    for apt in appointments_list:
+        if apt["date_str"] == current_date.isoformat():
+            slot = apt["slot_key"]
+            room = apt["room"]
+            if slot in grid_consultorios and room in grid_consultorios[slot]:
+                grid_consultorios[slot][room].append(apt)
+
+    # Grilla semanal (para los 7 días de la semana)
+    grid_week = {slot: {day["date_str"]: [] for day in week_days} for slot in AGENDA_TIME_SLOTS}
+    for apt in appointments_list:
+        slot = apt["slot_key"]
+        day_str = apt["date_str"]
+        if slot in grid_week and day_str in grid_week[slot]:
+            grid_week[slot][day_str].append(apt)
+
+    await write_audit_event(
+        db,
+        user=user,
+        action="portal_read_agenda",
+        entity_type="appointment",
+        entity_id=None,
+        request=request,
+        detail=f"date={current_date.isoformat()} view={vista}",
+    )
+    await db.commit()
+
+    return templates.TemplateResponse(
+        request,
+        "agenda.html",
+        {
+            "doctor_name": doctor.full_name,
+            "active": "agenda",
+            "current_date": current_date,
+            "current_date_str": current_date.isoformat(),
+            "today_date_str": today_date.isoformat(),
+            "vista": vista,
+            "week_days": week_days,
+            "week_start_date": week_start_date,
+            "week_end_date": week_end_date,
+            "prev_date_str": prev_date_str,
+            "next_date_str": next_date_str,
+            "time_slots": AGENDA_TIME_SLOTS,
+            "rooms": room_names,
+            "room_appointments": room_appointments,
+            "today_appointments": today_appointments,
+            "grid_consultorios": grid_consultorios,
+            "grid_week": grid_week,
+            "doctors": doctors,
+            "patients": patients,
+            "selected_doctor_id": doctor_id,
+            "selected_consultorio": consultorio,
+            "selected_estado": estado,
+            "status_counts": status_counts,
+            "can_write_appointments": has_permission(user, "appointments:write"),
+            "aviso": aviso,
+            "error": error,
+        },
+    )
+
+
+@router.post("/agenda/citas/{appointment_id:int}/estado", response_class=RedirectResponse)
+async def agenda_update_status(
+    appointment_id: int,
+    request: Request,
+    nuevo_estado: str = Form(...),
+    nuevo_consultorio: str = Form(""),
+    fecha: str = Form(""),
+    vista: str = Form("consultorios"),
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    staff = await portal_staff(db, user)
+    if not has_permission(user, "appointments:write"):
+        return forbidden(request, staff.full_name, "Tu rol no puede modificar citas.")
+
+    appointment = await db.get(Appointment, appointment_id)
+    if appointment is None:
+        return RedirectResponse(
+            f"/portal/agenda?fecha={fecha}&vista={vista}&error=Cita+no+encontrada",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    try:
+        status_enum = AppointmentStatus(nuevo_estado)
+    except ValueError:
+        return RedirectResponse(
+            f"/portal/agenda?fecha={fecha}&vista={vista}&error=Estado+no+válido",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    room_value = nuevo_consultorio.strip()
+    if room_value:
+        if len(room_value) > 40:
+            return RedirectResponse(
+                f"/portal/agenda?fecha={fecha}&vista={vista}&error=Consultorio+demasiado+largo",
+                status_code=status.HTTP_303_SEE_OTHER,
+            )
+        valid_rooms = {agenda_room_name(room) for room in ROOMS}
+        valid_rooms.add(agenda_room_name(appointment.room))
+        valid_rooms.add(agenda_room_name(appointment.location))
+        db_rooms = (
+            await db.scalars(
+                select(Appointment.room).where(Appointment.room.is_not(None)).distinct()
+            )
+        ).all()
+        db_locations = (
+            await db.scalars(
+                select(Appointment.location).where(Appointment.location.is_not(None)).distinct()
+            )
+        ).all()
+        for raw in list(db_rooms) + list(db_locations):
+            if raw and raw.strip():
+                valid_rooms.add(raw.strip()[:40])
+                valid_rooms.add(agenda_room_name(raw))
+        if room_value not in valid_rooms:
+            return RedirectResponse(
+                f"/portal/agenda?fecha={fecha}&vista={vista}&error=Consultorio+no+válido",
+                status_code=status.HTTP_303_SEE_OTHER,
+            )
+
+    appointment.status = status_enum
+    if room_value:
+        appointment.room = room_value
+        appointment.location = room_value
+
+    if status_enum == AppointmentStatus.ATTENDED and appointment.checked_in_at is None:
+        appointment.checked_in_at = datetime.now(timezone.utc)
+
+    await write_audit_event(
+        db,
+        user=user,
+        action="portal_update_appointment_status",
+        entity_type="appointment",
+        entity_id=appointment.id,
+        request=request,
+        detail=f"status={status_enum.value} room={appointment.room}",
+    )
+    await db.commit()
+
+    label = STATUS_LABELS.get(status_enum, status_enum.value)
+    return RedirectResponse(
+        f"/portal/agenda?fecha={fecha}&vista={vista}&aviso=Cita+actualizada+a+{quote(label)}",
+        status_code=status.HTTP_303_SEE_OTHER,
     )
 
 

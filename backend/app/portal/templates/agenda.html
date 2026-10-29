@@ -1,0 +1,573 @@
+{% extends "panel.html" %}
+{% block title %}Agenda de Citas · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+{% set perms = request.state.permissions or [] %}
+
+<div class="agenda-dashboard">
+  <!-- Cabecera principal -->
+  <header class="agenda-hero">
+    <div class="agenda-hero-main">
+      <div class="agenda-title-badge-row">
+        <h1 class="agenda-main-title">Agenda y Calendario</h1>
+        <div class="agenda-segmented-control" role="tablist" aria-label="Modo de visualización">
+          <a class="seg-item {% if vista == 'tablero' %}is-active{% endif %}" 
+             href="/portal/agenda?vista=tablero&fecha={{ current_date_str }}&doctor_id={{ selected_doctor_id }}&consultorio={{ selected_consultorio }}&estado={{ selected_estado }}">
+            Por consultorios
+          </a>
+          <a class="seg-item {% if vista == 'cuadricula' %}is-active{% endif %}" 
+             href="/portal/agenda?vista=cuadricula&fecha={{ current_date_str }}&doctor_id={{ selected_doctor_id }}&consultorio={{ selected_consultorio }}&estado={{ selected_estado }}">
+            Matriz horaria
+          </a>
+          <a class="seg-item {% if vista == 'semana' %}is-active{% endif %}" 
+             href="/portal/agenda?vista=semana&fecha={{ current_date_str }}&doctor_id={{ selected_doctor_id }}&consultorio={{ selected_consultorio }}&estado={{ selected_estado }}">
+            Vista semanal
+          </a>
+        </div>
+      </div>
+      <p class="agenda-subtitle">
+        {% if vista == 'tablero' %}
+        Visualización ejecutiva por consultorios físicos. Citas del día organizadas cronológicamente con espacio claro.
+        {% elif vista == 'cuadricula' %}
+        Distribución de las citas por horario y consultorio.
+        {% else %}
+        Planificación semanal de lunes a domingo para revisar la carga de trabajo y disponibilidad global.
+        {% endif %}
+      </p>
+    </div>
+
+    <div class="agenda-hero-actions">
+      <a class="btn btn-line" href="/portal/citas">Lista de citas</a>
+    </div>
+  </header>
+
+  <!-- Mensajes de feedback -->
+  {% if aviso %}
+  <div class="note note-ok modern-alert" role="status">
+    <span class="alert-icon">✓</span>
+    <p>{{ aviso }}</p>
+  </div>
+  {% endif %}
+  {% if error %}
+  <div class="note note-error modern-alert" role="alert">
+    <span class="alert-icon" aria-hidden="true">!</span>
+    <p>{{ error }}</p>
+  </div>
+  {% endif %}
+
+  <!-- Tira horizontal interactiva de los 7 días de la semana -->
+  <div class="week-strip-card">
+    <div class="week-strip-header">
+      <div class="week-nav-arrows">
+        <a class="nav-arrow-btn" 
+           href="/portal/agenda?vista={{ vista }}&fecha={{ prev_date_str }}&doctor_id={{ selected_doctor_id }}&consultorio={{ selected_consultorio }}&estado={{ selected_estado }}"
+           title="Período anterior">
+          ‹
+        </a>
+        <div class="week-title-display">
+          <span class="week-range-label">
+            Semana del {{ week_start_date.day }} de {{ week_days[0].month_name }} al {{ week_end_date.day }} de {{ week_days[6].month_name }} {{ week_end_date.year }}
+          </span>
+          {% if current_date_str != today_date_str %}
+          <a class="today-jump-btn" href="/portal/agenda?vista={{ vista }}&fecha={{ today_date_str }}&doctor_id={{ selected_doctor_id }}&consultorio={{ selected_consultorio }}&estado={{ selected_estado }}">
+            Volver a Hoy
+          </a>
+          {% endif %}
+        </div>
+        <a class="nav-arrow-btn" 
+           href="/portal/agenda?vista={{ vista }}&fecha={{ next_date_str }}&doctor_id={{ selected_doctor_id }}&consultorio={{ selected_consultorio }}&estado={{ selected_estado }}"
+           title="Período siguiente">
+          ›
+        </a>
+      </div>
+
+      <form class="quick-date-picker" id="agenda-date-form" method="get" action="/portal/agenda">
+        <input type="hidden" name="vista" value="{{ vista }}">
+        <input type="hidden" name="doctor_id" value="{{ selected_doctor_id }}">
+        <input type="hidden" name="consultorio" value="{{ selected_consultorio }}">
+        <input type="hidden" name="estado" value="{{ selected_estado }}">
+        <label for="agenda-date-input" class="date-picker-label">Ir a fecha:</label>
+        <input type="date" name="fecha" id="agenda-date-input" class="date-picker-control" value="{{ current_date_str }}">
+        <button type="submit" class="date-picker-go">Ir</button>
+      </form>
+    </div>
+
+    <div class="days-strip-scroll">
+      {% for day in week_days %}
+      <a class="day-strip-item {% if day.is_selected %}is-selected{% endif %} {% if day.is_today %}is-today{% endif %}"
+         href="/portal/agenda?vista={{ vista }}&fecha={{ day.date_str }}&doctor_id={{ selected_doctor_id }}&consultorio={{ selected_consultorio }}&estado={{ selected_estado }}">
+        <div class="day-strip-head">
+          <span class="day-name-short">{{ day.day_short }}</span>
+          {% if day.is_today %}
+          <span class="today-tag">HOY</span>
+          {% endif %}
+        </div>
+        <div class="day-number-large">{{ day.day_number }}</div>
+        <div class="day-strip-foot">
+          {% if day.appointment_count > 0 %}
+          <span class="day-counter-badge has-appointments">
+            {{ day.appointment_count }} cita{% if day.appointment_count > 1 %}s{% endif %}
+          </span>
+          {% else %}
+          <span class="day-counter-badge is-empty">Libre</span>
+          {% endif %}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Barra de Filtros y Leyenda de Estados -->
+  <div class="agenda-filter-legend-panel">
+    <!-- Filtros desplegables -->
+    <form class="filters-row-clean" id="agenda-filters" method="get" action="/portal/agenda">
+      <input type="hidden" name="vista" value="{{ vista }}">
+      <input type="hidden" name="fecha" value="{{ current_date_str }}">
+
+      <div class="filter-pill-select">
+        <select name="doctor_id" aria-label="Filtrar por médico">
+          <option value="0">Todos los médicos</option>
+          {% for doc in doctors %}
+          <option value="{{ doc.id }}" {% if selected_doctor_id == doc.id %}selected{% endif %}>
+            {{ doc.full_name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="filter-pill-select">
+        <select name="consultorio" aria-label="Filtrar por consultorio">
+          <option value="">Todos los consultorios</option>
+          {% for r in rooms %}
+          <option value="{{ r }}" {% if selected_consultorio == r %}selected{% endif %}>
+            {{ r }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="filter-pill-select">
+        <select name="estado" aria-label="Filtrar por estado">
+          <option value="">Todos los estados</option>
+          <option value="scheduled" {% if selected_estado == 'scheduled' %}selected{% endif %}>Agendadas</option>
+          <option value="confirmed" {% if selected_estado == 'confirmed' %}selected{% endif %}>Confirmadas</option>
+          <option value="attended" {% if selected_estado == 'attended' %}selected{% endif %}>Atendidas</option>
+          <option value="cancelled" {% if selected_estado == 'cancelled' %}selected{% endif %}>Canceladas</option>
+        </select>
+      </div>
+
+      <button type="submit" class="filter-submit-btn">Filtrar</button>
+
+      {% if selected_doctor_id or selected_consultorio or selected_estado %}
+      <a class="clear-filters-link" href="/portal/agenda?vista={{ vista }}&fecha={{ current_date_str }}">
+        ✕ Limpiar filtros
+      </a>
+      {% endif %}
+    </form>
+
+    <!-- Leyenda de colores -->
+    <div class="color-legend-compact">
+      <span class="legend-badge-modern status-scheduled">
+        <span class="badge-dot dot-blue"></span> Agendada
+      </span>
+      <span class="legend-badge-modern status-confirmed">
+        <span class="badge-dot dot-green"></span> Confirmada
+      </span>
+      <span class="legend-badge-modern status-attended">
+        <span class="badge-dot dot-purple"></span> Atendida
+      </span>
+      <span class="legend-badge-modern status-cancelled">
+        <span class="badge-dot dot-red"></span> Cancelada
+      </span>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- VISTA 1: TABLERO POR CONSULTORIOS (La más clara y espaciosa)             -->
+  <!-- ========================================================================= -->
+  {% if vista == 'tablero' %}
+  <div class="board-view-container">
+    <div class="board-date-summary">
+      <span class="board-date-label">
+        Citas para el <strong>{{ week_days[current_date.weekday()].day_name }}, {{ current_date.day }} de {{ week_days[current_date.weekday()].month_name }} de {{ current_date.year }}</strong>
+      </span>
+      <span class="board-count-pill">
+        {{ today_appointments | length }} cita{% if (today_appointments | length) != 1 %}s{% endif %} registrada{% if (today_appointments | length) != 1 %}s{% endif %} {% if current_date_str == today_date_str %}hoy{% else %}en la fecha{% endif %}
+      </span>
+    </div>
+
+    <div class="board-columns-grid">
+      {% for room in rooms %}
+      {% set apts_in_room = room_appointments[room] %}
+      <div class="room-column-card">
+        <!-- Cabecera de la columna del consultorio -->
+        <div class="room-column-header">
+          <div class="room-column-info">
+            <div>
+              <h2 class="room-column-title">{{ room }}</h2>
+              <span class="room-badge-status {% if apts_in_room %}has-busy{% else %}is-free{% endif %}">
+                {% if apts_in_room %}
+                {{ apts_in_room | length }} cita{% if (apts_in_room | length) > 1 %}s{% endif %} programada{% if (apts_in_room | length) > 1 %}s{% endif %}
+                {% else %}
+                Libre toda la jornada
+                {% endif %}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lista de citas del consultorio -->
+        <div class="room-appointments-list">
+          {% if apts_in_room %}
+            {% for apt in apts_in_room %}
+            <article class="modern-card-item card-status-{{ apt.status }}"
+                     data-apt-id="{{ apt.id }}"
+                     data-patient-id="{{ apt.patient_id }}"
+                     data-patient-name="{{ apt.patient_name }}"
+                     data-patient-curp="{{ apt.patient_curp or '' }}"
+                     data-doctor-id="{{ apt.doctor_id }}"
+                     data-doctor-name="{{ apt.doctor_name }}"
+                     data-specialty="{{ apt.specialty }}"
+                     data-room="{{ apt.room }}"
+                     data-date="{{ apt.date_str }}"
+                     data-time="{{ apt.time_str }}"
+                     data-status="{{ apt.status }}"
+                     data-status-label="{{ apt.status_label }}"
+                     data-checkin-code="{{ apt.checkin_code or '' }}"
+                     data-checked-in="{{ apt.checked_in_label or '' }}"
+                     data-notes="{{ apt.notes or '' }}"
+                     aria-label="Cita de {{ apt.patient_name }}">
+              <div class="card-item-top">
+                <span class="card-time-highlight">
+                  {{ apt.time_str }} h
+                </span>
+                <span class="modern-status-pill status-pill-{{ apt.status }}">
+                  {{ apt.status_label }}
+                </span>
+              </div>
+
+              <div class="card-item-body">
+                <div class="patient-avatar-name-row">
+                  <span class="patient-avatar-circle">{{ apt.patient_initials }}</span>
+                  <div class="patient-name-block">
+                    <strong class="patient-name-text">{{ apt.patient_name }}</strong>
+                    <span class="patient-curp-text">{{ apt.patient_curp or 'Sin CURP' }}</span>
+                  </div>
+                </div>
+
+                <div class="card-doctor-details">
+                  <span class="detail-doctor-name">{{ apt.doctor_name }}</span>
+                  <span class="detail-specialty-badge">{{ apt.specialty }}</span>
+                </div>
+
+                {% if apt.notes %}
+                <p class="card-notes-preview">“{{ apt.notes }}”</p>
+                {% endif %}
+              </div>
+
+              <div class="card-item-footer">
+                {% if apt.checked_in_label %}
+                <span class="arrival-flag arrived" title="Check-in confirmado">
+                  ✓ Llegó {{ apt.checked_in_label }}
+                </span>
+                {% else %}
+                <span class="arrival-flag waiting">
+                  Pendiente de check-in
+                </span>
+                {% endif %}
+                <button class="btn btn-line card-detail-button" type="button"
+                        aria-label="Ver detalles de la cita de {{ apt.patient_name }}">
+                  Ver detalle
+                </button>
+              </div>
+            </article>
+            {% endfor %}
+          {% else %}
+            <!-- Estado vacío informativo -->
+            <div class="room-empty-state">
+              <p class="empty-state-title">Sin citas en {{ room }}</p>
+              <p class="empty-state-sub">No hay pacientes programados para este día en este consultorio.</p>
+            </div>
+          {% endif %}
+        </div>
+
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- VISTA 2: CUADRÍCULA HORARIA (Matriz hora x consultorio con aire)          -->
+  <!-- ========================================================================= -->
+  {% elif vista == 'cuadricula' %}
+  <div class="modern-grid-card">
+    <div class="grid-card-head">
+      <div>
+        <h2 class="grid-date-title">{{ week_days[current_date.weekday()].day_name }}, {{ current_date.day }} de {{ week_days[current_date.weekday()].month_name }}</h2>
+        <p class="grid-date-sub">Distribución de las citas del día por horario y consultorio.</p>
+      </div>
+      <span class="badge-day-label">Matriz de Consultorios</span>
+    </div>
+
+    <div class="responsive-scroll-table">
+      <table class="modern-schedule-table">
+        <thead>
+          <tr>
+            <th class="col-hour-header">Hora</th>
+            {% for room in rooms %}
+            <th class="col-room-header {% if selected_consultorio == room %}is-focused{% endif %}">
+              <span class="th-room-name">{{ room }}</span>
+              <span class="th-room-tag">Consultorio</span>
+            </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for slot in time_slots %}
+          <tr class="schedule-row">
+            <td class="cell-hour">
+              <span class="hour-text">{{ slot }}</span>
+            </td>
+            {% for room in rooms %}
+            {% set cell_apts = grid_consultorios[slot][room] %}
+            <td class="cell-slot {% if cell_apts %}has-card{% else %}is-vacant{% endif %}"
+                data-slot-date="{{ current_date_str }}"
+                data-slot-time="{{ slot }}"
+                data-slot-room="{{ room }}">
+              {% if cell_apts %}
+                {% for apt in cell_apts %}
+                <div class="grid-apt-card card-status-{{ apt.status }}"
+                     data-apt-id="{{ apt.id }}"
+                     data-patient-id="{{ apt.patient_id }}"
+                     data-patient-name="{{ apt.patient_name }}"
+                     data-patient-curp="{{ apt.patient_curp or '' }}"
+                     data-doctor-id="{{ apt.doctor_id }}"
+                     data-doctor-name="{{ apt.doctor_name }}"
+                     data-specialty="{{ apt.specialty }}"
+                     data-room="{{ apt.room }}"
+                     data-date="{{ apt.date_str }}"
+                     data-time="{{ apt.time_str }}"
+                     data-status="{{ apt.status }}"
+                     data-status-label="{{ apt.status_label }}"
+                     data-checkin-code="{{ apt.checkin_code or '' }}"
+                     data-checked-in="{{ apt.checked_in_label or '' }}"
+                     data-notes="{{ apt.notes or '' }}"
+                     tabindex="0"
+                     role="button">
+                  <div class="grid-card-top">
+                    <strong class="grid-patient-name">{{ apt.patient_name }}</strong>
+                    <span class="grid-status-dot dot-{{ apt.status }}"></span>
+                  </div>
+                  <div class="grid-card-sub">
+                    <span>{{ apt.doctor_name }}</span>
+                    <span>• {{ apt.specialty }}</span>
+                  </div>
+                </div>
+                {% endfor %}
+              {% else %}
+                <span class="vacant-static">Libre</span>
+              {% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- VISTA 3: VISTA SEMANAL (7 días con amplitud)                             -->
+  <!-- ========================================================================= -->
+  {% else %}
+  <div class="modern-grid-card">
+    <div class="grid-card-head">
+      <div>
+        <h2 class="grid-date-title">Semana del {{ week_start_date.day }} de {{ week_days[0].month_name }} al {{ week_end_date.day }} de {{ week_days[6].month_name }}</h2>
+        <p class="grid-date-sub">Vista consolidada de lunes a domingo. Toca cualquier cita para ver detalles o cancelarla.</p>
+      </div>
+      <span class="badge-day-label">Vista Semanal</span>
+    </div>
+
+    <div class="responsive-scroll-table">
+      <table class="modern-schedule-table weekly-view-table">
+        <thead>
+          <tr>
+            <th class="col-hour-header">Hora</th>
+            {% for day in week_days %}
+            <th class="col-day-header {% if day.is_today %}th-is-today{% endif %} {% if day.is_selected %}th-is-selected{% endif %}">
+              <span class="th-day-name">{{ day.day_name }}</span>
+              <span class="th-day-number {% if day.is_today %}number-today{% endif %}">{{ day.day_number }}</span>
+              <span class="th-day-month">{{ day.month_name }}</span>
+            </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for slot in time_slots %}
+          <tr class="schedule-row">
+            <td class="cell-hour">
+              <span class="hour-text">{{ slot }}</span>
+            </td>
+            {% for day in week_days %}
+            {% set cell_apts = grid_week[slot][day.date_str] %}
+            <td class="cell-slot {% if day.is_today %}cell-is-today{% endif %} {% if cell_apts %}has-card{% else %}is-vacant{% endif %}"
+                data-slot-date="{{ day.date_str }}"
+                data-slot-time="{{ slot }}"
+                data-slot-room="{{ selected_consultorio or 'Consultorio 1' }}">
+              {% if cell_apts %}
+                {% for apt in cell_apts %}
+                <div class="grid-apt-card card-status-{{ apt.status }}"
+                     data-apt-id="{{ apt.id }}"
+                     data-patient-id="{{ apt.patient_id }}"
+                     data-patient-name="{{ apt.patient_name }}"
+                     data-patient-curp="{{ apt.patient_curp or '' }}"
+                     data-doctor-id="{{ apt.doctor_id }}"
+                     data-doctor-name="{{ apt.doctor_name }}"
+                     data-specialty="{{ apt.specialty }}"
+                     data-room="{{ apt.room }}"
+                     data-date="{{ apt.date_str }}"
+                     data-time="{{ apt.time_str }}"
+                     data-status="{{ apt.status }}"
+                     data-status-label="{{ apt.status_label }}"
+                     data-checkin-code="{{ apt.checkin_code or '' }}"
+                     data-checked-in="{{ apt.checked_in_label or '' }}"
+                     data-notes="{{ apt.notes or '' }}"
+                     tabindex="0"
+                     role="button">
+                  <div class="grid-card-top">
+                    <strong class="grid-patient-name">{{ apt.patient_name }}</strong>
+                    <span class="room-pill-tiny">{{ apt.room }}</span>
+                  </div>
+                  <div class="grid-card-sub">
+                    <span>{{ apt.specialty }}</span>
+                  </div>
+                  <div class="grid-card-foot">
+                    <span class="modern-status-pill status-pill-{{ apt.status }}">{{ apt.status_label }}</span>
+                  </div>
+                </div>
+                {% endfor %}
+              {% else %}
+                <span class="vacant-static">Libre</span>
+              {% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL 2: DETALLE Y ACCIONES DE CITA EXISTENTE                             -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop" id="modal-detalle" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modal-detalle-title">
+  <div class="modal-dialog modal-dialog-elevated">
+    <div class="modal-header-modern">
+
+      <div class="modal-header-texts">
+        <h2 id="modal-detalle-title">Detalles de la cita</h2>
+        <span class="modern-status-pill status-pill-scheduled" id="detalle-status-badge">Agendada</span>
+      </div>
+      <button type="button" class="modal-close-icon" data-close-modal aria-label="Cerrar">&times;</button>
+    </div>
+
+    <div class="modal-body-detail">
+      <!-- Tarjeta del Paciente -->
+      <div class="detail-patient-hero">
+        <div class="patient-big-avatar" id="detalle-avatar">JM</div>
+        <div class="patient-hero-info">
+          <h3 class="patient-hero-name" id="detalle-paciente">Nombre del paciente</h3>
+          <p class="patient-hero-curp" id="detalle-curp">CURP: ------------------</p>
+        </div>
+      </div>
+
+      <!-- Cuadrícula de Datos de la Cita -->
+      <div class="detail-specs-grid">
+        <div class="spec-card">
+          <span class="spec-title">Fecha y Horario</span>
+          <span class="spec-value" id="detalle-horario">10:00 h</span>
+          <small class="spec-sub" id="detalle-fecha">2026-10-28</small>
+        </div>
+
+        <div class="spec-card">
+          <span class="spec-title">Consultorio Asignado</span>
+          <span class="spec-value" id="detalle-consultorio">Consultorio 1</span>
+          <small class="spec-sub">Hospital D.O.S.Y.S</small>
+        </div>
+
+        <div class="spec-card">
+          <span class="spec-title">Médico Tratante</span>
+          <span class="spec-value" id="detalle-medico">Dr. Nombre</span>
+          <small class="spec-sub" id="detalle-especialidad">Medicina General</small>
+        </div>
+
+        <div class="spec-card">
+          <span class="spec-title">Código Check-in QR</span>
+          <span class="spec-value code-accent" id="detalle-checkin-code">A7K9M2</span>
+          <small class="spec-sub" id="detalle-llegada-aviso">Pendiente de escaneo</small>
+        </div>
+      </div>
+
+      <!-- Notas -->
+      <div class="detail-notes-box">
+        <strong class="notes-heading">Notas registradas:</strong>
+        <p class="notes-body" id="detalle-notas">Sin notas adicionales.</p>
+      </div>
+
+      <!-- Accesos Directos Clave -->
+      <div class="detail-buttons-row">
+        <a class="btn btn-primary" id="btn-ver-qr" href="#" target="_blank">
+          Ver QR para check-in
+        </a>
+        <a class="btn btn-line" id="btn-ver-expediente" href="#" target="_blank">
+          Abrir historial clínico
+        </a>
+      </div>
+
+      <!-- Panel de Actualización de Estado / Cambio de Consultorio -->
+      {% if can_write_appointments %}
+      <div class="admin-change-card">
+        <h4 class="admin-change-title">Modificar Estado o Reasignar Consultorio</h4>
+        <form id="form-cambiar-estado" method="post" action="">
+          <input type="hidden" name="vista" value="{{ vista }}">
+          <input type="hidden" name="fecha" value="{{ current_date_str }}">
+
+          <div class="form-row-duo">
+            <div class="form-group-card">
+              <label for="cambio-estado" class="label-heading">Cambiar Estado</label>
+              <select id="cambio-estado" name="nuevo_estado" class="modern-select">
+                <option value="scheduled">Agendada (pendiente)</option>
+                <option value="confirmed">Confirmada por el paciente</option>
+                <option value="attended">Atendida (consulta concluida)</option>
+                <option value="cancelled">Cancelada</option>
+              </select>
+            </div>
+
+            <div class="form-group-card">
+              <label for="cambio-consultorio" class="label-heading">Reasignar Consultorio</label>
+              <select id="cambio-consultorio" name="nuevo_consultorio" class="modern-select">
+                {% for r in rooms %}
+                <option value="{{ r }}">{{ r }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="admin-change-actions">
+            <button class="btn btn-line btn-sm" type="submit">Guardar cambios</button>
+          </div>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- JAVASCRIPT DE INTERACTIVIDAD FLUIDA Y MODALES                             -->
+<!-- ========================================================================= -->
+
+{% endblock %}
