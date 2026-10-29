@@ -82,6 +82,7 @@ Con los contenedores levantados:
 py -3.12 scripts\verify_vertical_slice.py   # API: médico crea, paciente lee, RBAC 401/403
 py -3.12 scripts\verify_portal.py           # Portal: pacientes, consultas, citas, usuarios, credenciales y bitácora
 py -3.12 scripts\verify_checkin.py          # Check-in: código incorrecto 400, correcto 200 e idempotente
+py -3.12 scripts\verify_agenda.py           # Agenda: vistas, filtros por URL, modal, estado y consultorio dinámico
 py -3.12 scripts\verify_login_security.py   # Login: bloqueo 423, desbloqueo, 2FA y códigos de recuperación
 py -3.12 scripts\verify_account_security.py # Cuentas: cambio y recuperación de contraseña, refresh con rotación, rate limit y API admin
 py -3.12 scripts\demo_api_seguridad.py     # Demostración guiada para la presentación: 401, JWT con permisos, 403 por rol, firma y rotación

@@ -1663,6 +1663,25 @@ body.login {
   background: var(--surface);
 }
 
+.date-picker-go,
+.filter-submit-btn {
+  padding: 6px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.date-picker-go:hover,
+.filter-submit-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* 7 Días de la semana */
 .days-strip-scroll {
   display: grid;
@@ -2420,6 +2439,11 @@ body.login {
 .grid-apt-card:hover {
   transform: translateY(-1px);
   box-shadow: none;
+}
+
+.grid-apt-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .grid-card-top {

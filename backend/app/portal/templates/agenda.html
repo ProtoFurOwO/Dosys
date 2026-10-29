@@ -80,10 +80,15 @@
         </a>
       </div>
 
-      <div class="quick-date-picker">
+      <form class="quick-date-picker" id="agenda-date-form" method="get" action="/portal/agenda">
+        <input type="hidden" name="vista" value="{{ vista }}">
+        <input type="hidden" name="doctor_id" value="{{ selected_doctor_id }}">
+        <input type="hidden" name="consultorio" value="{{ selected_consultorio }}">
+        <input type="hidden" name="estado" value="{{ selected_estado }}">
         <label for="agenda-date-input" class="date-picker-label">Ir a fecha:</label>
-        <input type="date" id="agenda-date-input" class="date-picker-control" value="{{ current_date_str }}">
-      </div>
+        <input type="date" name="fecha" id="agenda-date-input" class="date-picker-control" value="{{ current_date_str }}">
+        <button type="submit" class="date-picker-go">Ir</button>
+      </form>
     </div>
 
     <div class="days-strip-scroll">
@@ -119,7 +124,7 @@
       <input type="hidden" name="fecha" value="{{ current_date_str }}">
 
       <div class="filter-pill-select">
-        <select name="doctor_id" onchange="this.form.submit()" aria-label="Filtrar por médico">
+        <select name="doctor_id" aria-label="Filtrar por médico">
           <option value="0">Todos los médicos</option>
           {% for doc in doctors %}
           <option value="{{ doc.id }}" {% if selected_doctor_id == doc.id %}selected{% endif %}>
@@ -130,7 +135,7 @@
       </div>
 
       <div class="filter-pill-select">
-        <select name="consultorio" onchange="this.form.submit()" aria-label="Filtrar por consultorio">
+        <select name="consultorio" aria-label="Filtrar por consultorio">
           <option value="">Todos los consultorios</option>
           {% for r in rooms %}
           <option value="{{ r }}" {% if selected_consultorio == r %}selected{% endif %}>
@@ -141,7 +146,7 @@
       </div>
 
       <div class="filter-pill-select">
-        <select name="estado" onchange="this.form.submit()" aria-label="Filtrar por estado">
+        <select name="estado" aria-label="Filtrar por estado">
           <option value="">Todos los estados</option>
           <option value="scheduled" {% if selected_estado == 'scheduled' %}selected{% endif %}>Agendadas</option>
           <option value="confirmed" {% if selected_estado == 'confirmed' %}selected{% endif %}>Confirmadas</option>
@@ -149,6 +154,8 @@
           <option value="cancelled" {% if selected_estado == 'cancelled' %}selected{% endif %}>Canceladas</option>
         </select>
       </div>
+
+      <button type="submit" class="filter-submit-btn">Filtrar</button>
 
       {% if selected_doctor_id or selected_consultorio or selected_estado %}
       <a class="clear-filters-link" href="/portal/agenda?vista={{ vista }}&fecha={{ current_date_str }}">
@@ -184,7 +191,7 @@
         Citas para el <strong>{{ week_days[current_date.weekday()].day_name }}, {{ current_date.day }} de {{ week_days[current_date.weekday()].month_name }} de {{ current_date.year }}</strong>
       </span>
       <span class="board-count-pill">
-        {{ today_appointments | length }} cita{% if (today_appointments | length) != 1 %}s{% endif %} registrada{% if (today_appointments | length) != 1 %}s{% endif %} hoy
+        {{ today_appointments | length }} cita{% if (today_appointments | length) != 1 %}s{% endif %} registrada{% if (today_appointments | length) != 1 %}s{% endif %} {% if current_date_str == today_date_str %}hoy{% else %}en la fecha{% endif %}
       </span>
     </div>
 
@@ -216,7 +223,7 @@
                      data-apt-id="{{ apt.id }}"
                      data-patient-id="{{ apt.patient_id }}"
                      data-patient-name="{{ apt.patient_name }}"
-                     data-patient-curp="{{ apt.patient_curp }}"
+                     data-patient-curp="{{ apt.patient_curp or '' }}"
                      data-doctor-id="{{ apt.doctor_id }}"
                      data-doctor-name="{{ apt.doctor_name }}"
                      data-specialty="{{ apt.specialty }}"
@@ -225,9 +232,9 @@
                      data-time="{{ apt.time_str }}"
                      data-status="{{ apt.status }}"
                      data-status-label="{{ apt.status_label }}"
-                     data-checkin-code="{{ apt.checkin_code }}"
-                     data-checked-in="{{ apt.checked_in_label }}"
-                     data-notes="{{ apt.notes }}"
+                     data-checkin-code="{{ apt.checkin_code or '' }}"
+                     data-checked-in="{{ apt.checked_in_label or '' }}"
+                     data-notes="{{ apt.notes or '' }}"
                      aria-label="Cita de {{ apt.patient_name }}">
               <div class="card-item-top">
                 <span class="card-time-highlight">
@@ -278,7 +285,7 @@
             <!-- Estado vacío informativo -->
             <div class="room-empty-state">
               <p class="empty-state-title">Sin citas en {{ room }}</p>
-              <p class="empty-state-sub">No hay pacientes programados para hoy en este consultorio.</p>
+              <p class="empty-state-sub">No hay pacientes programados para este día en este consultorio.</p>
             </div>
           {% endif %}
         </div>
@@ -332,7 +339,7 @@
                      data-apt-id="{{ apt.id }}"
                      data-patient-id="{{ apt.patient_id }}"
                      data-patient-name="{{ apt.patient_name }}"
-                     data-patient-curp="{{ apt.patient_curp }}"
+                     data-patient-curp="{{ apt.patient_curp or '' }}"
                      data-doctor-id="{{ apt.doctor_id }}"
                      data-doctor-name="{{ apt.doctor_name }}"
                      data-specialty="{{ apt.specialty }}"
@@ -341,9 +348,9 @@
                      data-time="{{ apt.time_str }}"
                      data-status="{{ apt.status }}"
                      data-status-label="{{ apt.status_label }}"
-                     data-checkin-code="{{ apt.checkin_code }}"
-                     data-checked-in="{{ apt.checked_in_label }}"
-                     data-notes="{{ apt.notes }}"
+                     data-checkin-code="{{ apt.checkin_code or '' }}"
+                     data-checked-in="{{ apt.checked_in_label or '' }}"
+                     data-notes="{{ apt.notes or '' }}"
                      tabindex="0"
                      role="button">
                   <div class="grid-card-top">
@@ -413,7 +420,7 @@
                      data-apt-id="{{ apt.id }}"
                      data-patient-id="{{ apt.patient_id }}"
                      data-patient-name="{{ apt.patient_name }}"
-                     data-patient-curp="{{ apt.patient_curp }}"
+                     data-patient-curp="{{ apt.patient_curp or '' }}"
                      data-doctor-id="{{ apt.doctor_id }}"
                      data-doctor-name="{{ apt.doctor_name }}"
                      data-specialty="{{ apt.specialty }}"
@@ -422,9 +429,9 @@
                      data-time="{{ apt.time_str }}"
                      data-status="{{ apt.status }}"
                      data-status-label="{{ apt.status_label }}"
-                     data-checkin-code="{{ apt.checkin_code }}"
-                     data-checked-in="{{ apt.checked_in_label }}"
-                     data-notes="{{ apt.notes }}"
+                     data-checkin-code="{{ apt.checkin_code or '' }}"
+                     data-checked-in="{{ apt.checked_in_label or '' }}"
+                     data-notes="{{ apt.notes or '' }}"
                      tabindex="0"
                      role="button">
                   <div class="grid-card-top">

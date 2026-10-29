@@ -84,6 +84,23 @@ BLOOD_TYPES = ("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")
 
 ROOMS = ("Consultorio 1", "Consultorio 2", "Consultorio 3", "Consultorio 4")
 
+
+def agenda_room_name(raw: str | None) -> str:
+    """Normaliza la ubicación de una cita sin perder consultorios fuera de 1–4."""
+    if not raw or not raw.strip():
+        return "Sin consultorio"
+    text = raw.strip()
+    for room in ROOMS:
+        if text.lower() == room.lower():
+            return room
+    match = re.search(r"consultorio\s*(\d+)", text, re.IGNORECASE)
+    if match:
+        return f"Consultorio {int(match.group(1))}"
+    if "hospital" in text.lower():
+        return "Sin consultorio"
+    return text[:40]
+
+
 STUDY_STATUS_LABELS = {
     StudyOrderStatus.REQUESTED: "Solicitado",
     StudyOrderStatus.IN_PROGRESS: "En proceso",
@@ -1257,6 +1274,7 @@ async def agenda_page(
     }
 
     day_counts: dict[str, int] = {d["date_str"]: 0 for d in week_days}
+    room_names = list(ROOMS)
 
     for appointment, patient, doctor_row in rows:
         local_dt = deps._local(appointment.scheduled_at)
@@ -1266,12 +1284,9 @@ async def agenda_page(
         slot_key = f"{local_dt.hour:02d}:{slot_minute:02d}"
 
         raw_room = appointment.room or appointment.location
-        room_name = ROOMS[0]
-        if raw_room:
-            for r in ROOMS:
-                if r.lower() in raw_room.lower():
-                    room_name = r
-                    break
+        room_name = agenda_room_name(raw_room)
+        if room_name not in room_names:
+            room_names.append(room_name)
 
         words = patient.full_name.split()
         initials = "".join(w[0] for w in words[:2]).upper() if words else "P"
@@ -1311,8 +1326,16 @@ async def agenda_page(
     for d in week_days:
         d["appointment_count"] = day_counts.get(d["date_str"], 0)
 
+    preferred_rooms = [room for room in ROOMS if room in room_names]
+    extra_rooms = sorted(
+        room for room in room_names if room not in ROOMS and room != "Sin consultorio"
+    )
+    room_names = preferred_rooms + extra_rooms
+    if "Sin consultorio" in room_names:
+        room_names.append("Sin consultorio")
+
     # Citas del día seleccionado organizadas por consultorio (para la vista de Tablero)
-    room_appointments = {room: [] for room in ROOMS}
+    room_appointments = {room: [] for room in room_names}
     today_appointments = []
     for apt in appointments_list:
         if apt["date_str"] == current_date.isoformat():
@@ -1321,12 +1344,12 @@ async def agenda_page(
             if room in room_appointments:
                 room_appointments[room].append(apt)
 
-    for r in ROOMS:
+    for r in room_names:
         room_appointments[r].sort(key=lambda a: a["time_str"])
     today_appointments.sort(key=lambda a: a["time_str"])
 
     # Grilla por consultorios (matriz de horarios)
-    grid_consultorios = {slot: {room: [] for room in ROOMS} for slot in AGENDA_TIME_SLOTS}
+    grid_consultorios = {slot: {room: [] for room in room_names} for slot in AGENDA_TIME_SLOTS}
     for apt in appointments_list:
         if apt["date_str"] == current_date.isoformat():
             slot = apt["slot_key"]
@@ -1369,7 +1392,7 @@ async def agenda_page(
             "prev_date_str": prev_date_str,
             "next_date_str": next_date_str,
             "time_slots": AGENDA_TIME_SLOTS,
-            "rooms": ROOMS,
+            "rooms": room_names,
             "room_appointments": room_appointments,
             "today_appointments": today_appointments,
             "grid_consultorios": grid_consultorios,
@@ -1413,16 +1436,46 @@ async def agenda_update_status(
 
     try:
         status_enum = AppointmentStatus(nuevo_estado)
-        appointment.status = status_enum
     except ValueError:
         return RedirectResponse(
             f"/portal/agenda?fecha={fecha}&vista={vista}&error=Estado+no+válido",
             status_code=status.HTTP_303_SEE_OTHER,
         )
 
-    if nuevo_consultorio and nuevo_consultorio.strip() in ROOMS:
-        appointment.room = nuevo_consultorio.strip()
-        appointment.location = nuevo_consultorio.strip()
+    room_value = nuevo_consultorio.strip()
+    if room_value:
+        if len(room_value) > 40:
+            return RedirectResponse(
+                f"/portal/agenda?fecha={fecha}&vista={vista}&error=Consultorio+demasiado+largo",
+                status_code=status.HTTP_303_SEE_OTHER,
+            )
+        valid_rooms = {agenda_room_name(room) for room in ROOMS}
+        valid_rooms.add(agenda_room_name(appointment.room))
+        valid_rooms.add(agenda_room_name(appointment.location))
+        db_rooms = (
+            await db.scalars(
+                select(Appointment.room).where(Appointment.room.is_not(None)).distinct()
+            )
+        ).all()
+        db_locations = (
+            await db.scalars(
+                select(Appointment.location).where(Appointment.location.is_not(None)).distinct()
+            )
+        ).all()
+        for raw in list(db_rooms) + list(db_locations):
+            if raw and raw.strip():
+                valid_rooms.add(raw.strip()[:40])
+                valid_rooms.add(agenda_room_name(raw))
+        if room_value not in valid_rooms:
+            return RedirectResponse(
+                f"/portal/agenda?fecha={fecha}&vista={vista}&error=Consultorio+no+válido",
+                status_code=status.HTTP_303_SEE_OTHER,
+            )
+
+    appointment.status = status_enum
+    if room_value:
+        appointment.room = room_value
+        appointment.location = room_value
 
     if status_enum == AppointmentStatus.ATTENDED and appointment.checked_in_at is None:
         appointment.checked_in_at = datetime.now(timezone.utc)

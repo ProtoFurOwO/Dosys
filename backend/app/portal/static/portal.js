@@ -39,8 +39,12 @@ document.addEventListener("click", (event) => {
 // Agenda: abrir los detalles de la cita desde el botón de cada tarjeta.
 const appointmentModal = document.getElementById("modal-detalle");
 if (appointmentModal) {
+  const cleanValue = (raw) => {
+    const text = (raw || "").trim();
+    return text.toLowerCase() === "none" ? "" : text;
+  };
   const openAppointmentModal = (card) => {
-    const value = (name) => card.getAttribute("data-" + name) || "";
+    const value = (name) => cleanValue(card.getAttribute("data-" + name));
     const patientName = value("patient-name");
     const setText = (id, text) => {
       const element = document.getElementById(id);
@@ -49,23 +53,24 @@ if (appointmentModal) {
     };
 
     setText("detalle-avatar", patientName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join("") || "P");
-    setText("detalle-paciente", patientName);
+    setText("detalle-paciente", patientName || "Paciente sin nombre");
     setText("detalle-curp", "CURP: " + (value("patient-curp") || "No registrada"));
-    setText("detalle-medico", value("doctor-name"));
-    setText("detalle-especialidad", value("specialty"));
+    setText("detalle-medico", value("doctor-name") || "Sin médico asignado");
+    setText("detalle-especialidad", value("specialty") || "Sin especialidad");
     setText("detalle-horario", value("time") + " h");
     setText("detalle-fecha", value("date"));
-    setText("detalle-consultorio", value("room"));
+    setText("detalle-consultorio", value("room") || "Sin consultorio");
     setText("detalle-checkin-code", value("checkin-code") || "N/A");
     setText("detalle-notas", value("notes") || "Sin notas adicionales registradas.");
 
     const badge = setText("detalle-status-badge", value("status-label"));
     if (badge) badge.className = "modern-status-pill status-pill-" + value("status");
 
-    const arrival = setText("detalle-llegada-aviso", value("checked-in") ? "Llegó " + value("checked-in") : "Pendiente de escaneo QR");
+    const checkedIn = value("checked-in");
+    const arrival = setText("detalle-llegada-aviso", checkedIn ? "Llegó " + checkedIn : "Pendiente de escaneo QR");
     if (arrival) {
-      arrival.style.color = value("checked-in") ? "#047857" : "var(--ink-muted)";
-      arrival.style.fontWeight = value("checked-in") ? "600" : "normal";
+      arrival.style.color = checkedIn ? "#047857" : "var(--ink-muted)";
+      arrival.style.fontWeight = checkedIn ? "600" : "normal";
     }
 
     const qrLink = document.getElementById("btn-ver-qr");
@@ -100,6 +105,21 @@ if (appointmentModal) {
     });
   });
 
+  // Las tarjetas de la matriz horaria y de la vista semanal también abren el detalle.
+  document.querySelectorAll(".grid-apt-card").forEach((card) => {
+    const open = (event) => {
+      if (event) event.preventDefault();
+      openAppointmentModal(card);
+    };
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        open(event);
+      }
+    });
+  });
+
   appointmentModal.querySelectorAll("[data-close-modal]").forEach((button) => {
     button.addEventListener("click", closeAppointmentModal);
   });
@@ -111,6 +131,22 @@ if (appointmentModal) {
       closeAppointmentModal();
     }
   });
+}
+
+// Agenda: los filtros y el selector de fecha envían el formulario sin depender
+// de handlers inline, que el CSP del portal bloquea.
+const agendaFilters = document.getElementById("agenda-filters");
+if (agendaFilters) {
+  agendaFilters.querySelectorAll("select").forEach((select) => {
+    select.addEventListener("change", () => agendaFilters.submit());
+  });
+}
+const agendaDateForm = document.getElementById("agenda-date-form");
+if (agendaDateForm) {
+  const agendaDateInput = document.getElementById("agenda-date-input");
+  if (agendaDateInput) {
+    agendaDateInput.addEventListener("change", () => agendaDateForm.submit());
+  }
 }
 
 // Check-in en vivo: la pantalla del QR se actualiza sola cuando el paciente
