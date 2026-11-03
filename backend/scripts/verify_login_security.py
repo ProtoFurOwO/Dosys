@@ -104,7 +104,7 @@ def main() -> None:
         status, _ = api("/api/v1/auth/login", method="POST", body={"username": username, "password": WRONG_PASSWORD})
         assert status == 401, "Cada intento fallido debe responder 401"
     status, body = api("/api/v1/auth/login", method="POST", body={"username": username, "password": password})
-    assert status == 423, f"La cuenta bloqueada debe responder 423 (fue {status})"
+    assert status == 429, f"La cuenta bloqueada debe responder 429 (fue {status})"
     assert "bloqueada" in body["detail"].lower()
 
     # 3. Desbloqueo desde el expediente del paciente (lo hace el médico).
@@ -194,7 +194,7 @@ def main() -> None:
     print(
         json.dumps(
             {
-                "lockout": "5 intentos -> 423",
+                "lockout": "5 intentos -> 429",
                 "unlock_por_portal": True,
                 "access_token_rechazado_como_desafio": True,
                 "2fa_activado": True,

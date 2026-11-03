@@ -247,7 +247,7 @@ async def login_submit(
                 f"Intenta de nuevo en {login_security.lock_minutes_left(user)} minutos."
             ),
             username=username.strip(),
-            code=status.HTTP_423_LOCKED,
+            code=status.HTTP_429_TOO_MANY_REQUESTS,
         )
 
     if user is None or not user.is_active or not verify_password(password, user.password_hash):

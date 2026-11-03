@@ -71,11 +71,12 @@ async def login(
         )
         await db.commit()
         raise HTTPException(
-            status_code=status.HTTP_423_LOCKED,
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=(
                 "Cuenta bloqueada temporalmente por intentos fallidos. "
                 f"Intenta de nuevo en {login_security.lock_minutes_left(user)} minutos."
             ),
+            headers={"Retry-After": str(login_security.lock_minutes_left(user) * 60)},
         )
 
     if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):

@@ -104,7 +104,7 @@ class RemoteAuthRepository(
     } catch (error: HttpException) {
         when (error.code()) {
             401 -> AuthResult.Error(error.serverDetail() ?: "Usuario o contraseña incorrectos")
-            423 -> AuthResult.Error(error.serverDetail() ?: "Cuenta bloqueada temporalmente")
+            429 -> AuthResult.Error(error.serverDetail() ?: "Cuenta bloqueada temporalmente")
             else -> AuthResult.Error("No se pudo iniciar sesión. Intenta más tarde")
         }
     } catch (error: IOException) {
