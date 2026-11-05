@@ -61,16 +61,16 @@ class CheckInViewModel : ViewModel() {
             _state.update { it.copy(error = "El código del QR no es válido") }
             return
         }
-        submit(code)
+        submit(code, CheckInCode.appointmentId(raw))
     }
 
     fun submitManualCode() {
         val code = _state.value.codeInput.trim()
         if (code.isEmpty()) return
-        submit(code)
+        submit(code, null)
     }
 
-    private fun submit(raw: String) {
+    private fun submit(raw: String, appointmentId: Int?) {
         if (_state.value.isSubmitting) return
         val code = CheckInCode.extract(raw)
         if (code == null) {
@@ -80,7 +80,12 @@ class CheckInViewModel : ViewModel() {
 
         _state.update { it.copy(isSubmitting = true, error = null) }
         viewModelScope.launch {
-            when (val result = repository.checkInWithCode(code)) {
+            val result = if (appointmentId != null) {
+                repository.checkIn(appointmentId, code)
+            } else {
+                repository.checkInWithCode(code)
+            }
+            when (result) {
                 is ClinicalResult.Success -> _state.update { current ->
                     current.copy(
                         isSubmitting = false,

@@ -22,6 +22,13 @@ object CheckInCode {
         val candidate = clean.uppercase().filter { it.isLetterOrDigit() }
         return candidate.takeIf { it.length in 4..32 }
     }
+
+    /** Identificador de cita incluido en el QR, si lo trae. */
+    fun appointmentId(raw: String): Int? {
+        val clean = raw.trim()
+        if (!clean.startsWith(PREFIX)) return null
+        return clean.split("|").getOrNull(1)?.trim()?.toIntOrNull()
+    }
 }
 
 /** Citas que la pantalla de check-in debe mostrar. */

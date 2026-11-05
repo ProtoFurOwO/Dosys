@@ -33,6 +33,13 @@ class CheckInCodeTest {
     }
 
     @Test
+    fun `extrae la cita del QR para compatibilidad`() {
+        assertEquals(12, CheckInCode.appointmentId("DOSYS-CHECKIN|12|A7K9M2"))
+        assertNull(CheckInCode.appointmentId("A7K9M2"))
+        assertNull(CheckInCode.appointmentId("DOSYS-CHECKIN|x|A7K9M2"))
+    }
+
+    @Test
     fun `acepta el codigo escrito a mano`() {
         assertEquals("A7K9M2", CheckInCode.extract("a7k9m2"))
         assertEquals("A7K9M2", CheckInCode.extract(" A7K9-M2 "))
