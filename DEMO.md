@@ -219,9 +219,10 @@ en A; si no, la app también detecta la solicitud al estar abierta (sondeo cada 
 5. Vuelve a **A** y toca cualquier opción: la sesión ya no sirve (el servidor responde 401
    de inmediato, no a los 30 minutos del JWT).
 
-> El servidor nunca genera, compara ni guarda el código; solo enruta la propuesta entre los
-> dos teléfonos. El código vive 60 segundos en la memoria de A y se destruye al expirar,
-> al aprobar o si la app pasa a segundo plano.
+> El servidor nunca genera ni compara el código: guarda solo el hash SHA-256 de la
+> propuesta y lo enruta entre los dos teléfonos. El código vive 60 segundos en la
+> memoria de A y se destruye al expirar, al aprobar o si la app pasa a segundo plano.
+> Sin huella/PIN configurado, A no puede autorizar la transferencia.
 
 ### Para repetir la demo
 
