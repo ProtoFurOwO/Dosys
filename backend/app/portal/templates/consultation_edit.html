@@ -1,0 +1,56 @@
+{% extends "panel.html" %}
+{% block title %}Corregir consulta · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <a class="back-link" href="/portal/pacientes/{{ patient.id }}">Volver al expediente</a>
+    <h1>Corregir consulta</h1>
+    <p class="meta-row">
+      <span><b>Paciente</b> {{ patient.full_name }}</span>
+      <span><b>CURP</b> {{ patient.curp }}</span>
+      <span><b>Registrada</b> {{ consultation.created_at | fecha_hora }}</span>
+      <span><b>Médico original</b> {{ author_name }}</span>
+    </p>
+  </div>
+</header>
+
+<div class="note note-info" role="status">
+  <p>Estás corrigiendo una consulta ya firmada. El cambio se guarda con fecha, hora y usuario en la bitácora; no se borra el registro anterior.</p>
+</div>
+
+{% if errors %}
+<div class="note note-error" role="alert" id="resumen-errores">
+  <p><b>No se pudo guardar la corrección.</b> Corrige lo siguiente:</p>
+  <ul class="error-list">
+    {% for field, message in errors.items() %}
+    <li>{{ message }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<form class="form" method="post" action="/portal/pacientes/{{ patient.id }}/consulta/{{ consultation.id }}/editar" novalidate>
+  <div class="field {% if errors.reason %}has-error{% endif %}">
+    <label for="reason">Motivo de la consulta</label>
+    <input id="reason" name="reason" maxlength="300" value="{{ values.reason }}" required>
+    {% if errors.reason %}<p class="error">{{ errors.reason }}</p>{% endif %}
+  </div>
+
+  <div class="field {% if errors.diagnosis %}has-error{% endif %}">
+    <label for="diagnosis">Diagnóstico</label>
+    <textarea id="diagnosis" name="diagnosis" rows="3" maxlength="500" required>{{ values.diagnosis }}</textarea>
+    {% if errors.diagnosis %}<p class="error">{{ errors.diagnosis }}</p>{% endif %}
+  </div>
+
+  <div class="field {% if errors.notes %}has-error{% endif %}">
+    <label for="notes">Notas para el seguimiento</label>
+    <textarea id="notes" name="notes" rows="3" maxlength="4000">{{ values.notes }}</textarea>
+    {% if errors.notes %}<p class="error">{{ errors.notes }}</p>{% endif %}
+  </div>
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">Guardar corrección</button>
+    <a class="btn btn-quiet" href="/portal/pacientes/{{ patient.id }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

@@ -15,14 +15,16 @@ Demostración de 7 a 10 minutos con dos dispositivos: **laptop** (portal clínic
 
 2. **Laptop**: abre `https://medicos.stolasimp.dev/portal` e inicia sesión con
    `medico` / `Medico123!`. Deja la ventana maximizada.
+   Cuentas de apoyo: `laboratorio` / `Lab12345!` y `recepcion` / `Recepcion123!`.
 
-3. **Celular**: instala `dosys-demo-vps.apk` (ya apunta al VPS), inicia sesión con
+3. **Celular**: instala `dosys-clinico-vps.apk` (ya apunta al VPS), inicia sesión con
    `paciente` / `Paciente123!` **una vez** para comprobar que todo carga, y sal de la
    sesión. Deja el celular en la pantalla de acceso con datos móviles o wifi.
    Concede el permiso de ubicación y ten la huella configurada.
 
-4. **Citas de reserva**: en el portal, agenda 2 citas (por si el primer escaneo no lee).
-   Cada cita genera su propio QR y código.
+4. **Citas de reserva**: en el portal, agenda 2 citas **para dentro de los próximos
+   30 minutos** (el check-in abre 2 horas antes). Cada cita genera su propio QR y código.
+   Una cita de días pasados ya no aparece como próxima.
 
 ## Guion sugerido
 
@@ -35,8 +37,9 @@ Demostración de 7 a 10 minutos con dos dispositivos: **laptop** (portal clínic
 ### 2. El portal y el expediente (1 min)
 
 - Muestra **Pacientes**: buscador real, métricas (pacientes, consultas, consultas de hoy).
-- Entra al expediente de José Antonio Matuz: datos, historial de consultas en orden
-  cronológico, correo y contacto de emergencia.
+- Entra al expediente de José Antonio Matuz: datos, **alergias**, antecedentes,
+  diagnósticos crónicos, historial de consultas en orden cronológico, correo y contacto de
+  emergencia.
 
 > "Cada consulta que se registra aquí aparece automáticamente en la app del paciente."
 
@@ -54,14 +57,18 @@ Demostración de 7 a 10 minutos con dos dispositivos: **laptop** (portal clínic
 
 ### 4. Agendar la cita con QR (30 s)
 
-- En el expediente o en **Citas**: **Agendar cita** (Cardiología, mañana 11:30).
+- En el expediente o en **Citas**: **Agendar cita** (Cardiología, **dentro de los próximos
+  30 minutos**).
 - Vuelve a **Citas**, busca al paciente y pulsa **Ver QR**: se abre el código a pantalla
-  grande con su código de respaldo.
+  grande con su código de respaldo y la **ventana de check-in** (2 h antes a 4 h después).
+- Si el paciente ya tiene otra cita en ese horario, el portal lo rechaza con un mensaje
+  claro: el sistema no permite empalmes.
 
 ### 5. La app con la cuenta recién creada (1 min)
 
 - En el celular, inicia sesión con **el paciente que acabas de registrar**.
-- La app saluda con su nombre, le muestra "No tienes citas próximas" y el check-in listo.
+- La app saluda con su nombre, le muestra su **próxima cita real** (o “No tienes citas
+  próximas” si no hay ninguna) y las recetas reales.
 
 > "La cuenta nació hace un minuto en el portal y ya funciona en la app: es la misma base
 > de datos y el mismo servidor."
@@ -72,12 +79,14 @@ Demostración de 7 a 10 minutos con dos dispositivos: **laptop** (portal clínic
 - La app confirma: "Llegada confirmada".
 - Recarga **Citas** en la laptop: aparece la etiqueta **"Llegó (hora)"**.
 
-> "La cámara del celular del paciente es el módulo del dispositivo; el hospital solo
-> muestra el código, no necesita cámara ni permisos del navegador."
+> "El servidor solo acepta el check-in dentro de la ventana de la cita. El código es de un
+> solo uso: si alguien lo fotografía después, ya no sirve."
 
 ### 7. Huella y GPS (1 min)
 
 - Abre **Mi expediente**: pide **huella** antes de mostrar información clínica.
+- Muestra **alergias, antecedentes y diagnósticos crónicos** reales del expediente, además
+  del historial de consultas. Si un dato no está capturado, dice “Sin registrar”.
 - En el check-in, la tarjeta **Cómo llegar al hospital** muestra el **mapa real**
   (OpenStreetMap, sin API key), el pin del sanatorio, tu ubicación y la distancia.
 
@@ -89,10 +98,24 @@ Demostración de 7 a 10 minutos con dos dispositivos: **laptop** (portal clínic
 
 > "Desactivar bloquea el acceso al instante porque la validación es en el servidor."
 
-- Abre **Actividad**: ahí está todo lo que acabas de hacer (registro, desactivación,
-  contraseña restablecida, llegada con QR, accesos).
+- Abre **Actividad**: ahí está todo lo que acabas de hacer (registro, edición de alergias,
+  consulta con estudio, corrección de diagnóstico, desactivación, contraseña restablecida,
+  llegada con QR, accesos). Filtra por **entidad** o **texto** y descarga el **CSV**.
 
-### 9. Cierre (30 s)
+### 9. Laboratorio y estudios (1 min)
+
+- En el expediente del paciente, abre **Solicitar estudio de laboratorio (DEMO)** y elige
+  un estudio. Se crea una **orden real y auditada**.
+- Entra con la cuenta de **Laboratorio** (`laboratorio` / `Lab12345!`): aparece la
+  orden, se puede **Iniciar**, capturar el resultado y descargar el **PDF con huella
+  SHA-256**.
+- En la app del paciente, **Estudios** muestra el estado y el resultado real.
+
+> "El botón de demo no inventa datos: crea una orden en la misma tabla que usa el
+> laboratorio, con su evento de auditoría. Así se puede mostrar la cola sin depender de
+> una consulta previa."
+
+### 10. Cierre (30 s)
 
 - Arquitectura: app nativa ↔ API REST ↔ PostgreSQL, portal con el mismo backend, HTTPS y
   bitácora de todo.

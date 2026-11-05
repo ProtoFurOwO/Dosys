@@ -1,11 +1,14 @@
 """Administración del portal: personal del hospital, credenciales y bitácora."""
 
+import csv
+import io
 import re
 import unicodedata
+from datetime import datetime, time, timezone
 
 from fastapi import APIRouter, Depends, Form, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import desc, func, select
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -17,7 +20,7 @@ from app.models.permission import Permission
 from app.models.role import Role
 from app.models.user import User
 from app.portal import deps
-from app.portal.labels import ROLE_LABELS, action_label
+from app.portal.labels import ACTION_LABELS, ENTITY_LABELS, ROLE_LABELS, action_label
 from app.portal.routes import forbidden, portal_staff
 from app.portal.templating import credential_context, templates
 from app.services import devices, login_security, two_factor
@@ -907,11 +910,90 @@ async def send_credentials_email(
 # ── Bitácora ──────────────────────────────────────────────────────────────────
 
 
+ACTIVITY_PAGE_SIZE = 50
+
+
+def _activity_filters(
+    *,
+    accion: str,
+    usuario: str,
+    entidad: str,
+    texto: str,
+    desde: str,
+    hasta: str,
+):
+    """Condiciones compartidas por la vista HTML y la exportación CSV."""
+    conditions = []
+
+    search = accion.strip()
+    if search:
+        matching_codes = [
+            code
+            for code, label in ACTION_LABELS.items()
+            if normalize(search) in normalize(label) or normalize(search) in normalize(code)
+        ]
+        conditions.append(
+            or_(AuditLog.action.ilike(f"%{search}%"), AuditLog.action.in_(matching_codes))
+        )
+
+    if usuario.strip():
+        conditions.append(
+            AuditLog.user_id.in_(
+                select(User.id).where(User.username.ilike(f"%{usuario.strip()}%"))
+            )
+        )
+
+    if entidad.strip() in ENTITY_LABELS:
+        conditions.append(AuditLog.entity_type == entidad.strip())
+
+    if texto.strip():
+        pattern = f"%{texto.strip()}%"
+        conditions.append(
+            or_(
+                AuditLog.detail.ilike(pattern),
+                AuditLog.entity_id.ilike(pattern),
+                AuditLog.ip_address.ilike(pattern),
+            )
+        )
+
+    for raw, is_end in ((desde, False), (hasta, True)):
+        clean = raw.strip()
+        if not clean:
+            continue
+        try:
+            day = datetime.strptime(clean, "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        moment = datetime.combine(day, time.max if is_end else time.min, tzinfo=deps.CLINIC_TIMEZONE)
+        if is_end:
+            conditions.append(AuditLog.created_at <= moment.astimezone(timezone.utc))
+        else:
+            conditions.append(AuditLog.created_at >= moment.astimezone(timezone.utc))
+
+    return conditions
+
+
+def _activity_query(conditions):
+    query = (
+        select(AuditLog, User)
+        .outerjoin(User, AuditLog.user_id == User.id)
+        .order_by(desc(AuditLog.created_at))
+    )
+    if conditions:
+        query = query.where(*conditions)
+    return query
+
+
 @router.get("/actividad", response_class=HTMLResponse)
 async def activity_page(
     request: Request,
     accion: str = "",
     usuario: str = "",
+    entidad: str = "",
+    texto: str = "",
+    desde: str = "",
+    hasta: str = "",
+    pagina: int = 1,
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     session = await require_staff(request, db)
@@ -921,37 +1003,50 @@ async def activity_page(
     if not has_permission(current_user, "audit:read"):
         return forbidden(request, doctor.full_name, "Tu rol no puede consultar la bitácora.")
 
-    query = (
-        select(AuditLog, User)
-        .outerjoin(User, AuditLog.user_id == User.id)
-        .order_by(desc(AuditLog.created_at))
-        .limit(300)
+    conditions = _activity_filters(
+        accion=accion,
+        usuario=usuario,
+        entidad=entidad,
+        texto=texto,
+        desde=desde,
+        hasta=hasta,
     )
-    if usuario.strip():
-        query = query.where(User.username.ilike(f"%{usuario.strip()}%"))
+    total = await db.scalar(select(func.count(AuditLog.id)).where(*conditions)) if conditions else await db.scalar(select(func.count(AuditLog.id)))
+    total = int(total or 0)
+    pages = max(1, (total + ACTIVITY_PAGE_SIZE - 1) // ACTIVITY_PAGE_SIZE)
+    current_page = min(max(pagina, 1), pages)
+    rows = (
+        await db.execute(
+            _activity_query(conditions)
+            .offset((current_page - 1) * ACTIVITY_PAGE_SIZE)
+            .limit(ACTIVITY_PAGE_SIZE)
+        )
+    ).all()
 
-    rows = (await db.execute(query)).all()
-    search = normalize(accion.strip())
     entries = [
         {
             "created_at": log.created_at,
-            "username": account.username if account else "—",
+            "username": account.username if account else "-",
             "action": log.action,
             "label": action_label(log.action),
             "entity_type": log.entity_type,
             "entity_id": log.entity_id,
-            "ip": log.ip_address or "—",
+            "ip": log.ip_address or "-",
             "detail": log.detail,
         }
         for log, account in rows
     ]
-    if search:
-        entries = [
-            entry
-            for entry in entries
-            if search in normalize(entry["label"]) or search in normalize(entry["action"])
-        ]
-    entries = entries[:100]
+
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="portal_read_activity",
+        entity_type="audit",
+        entity_id=None,
+        request=request,
+        detail=f"filas={len(entries)}",
+    )
+    await db.commit()
 
     return templates.TemplateResponse(
         request,
@@ -962,5 +1057,78 @@ async def activity_page(
             "entries": entries,
             "accion": accion,
             "usuario": usuario,
+            "entidad": entidad,
+            "texto": texto,
+            "desde": desde,
+            "hasta": hasta,
+            "page": current_page,
+            "pages": pages,
+            "total": total,
+            "page_size": ACTIVITY_PAGE_SIZE,
+            "entity_options": sorted(ENTITY_LABELS.items(), key=lambda item: item[1]),
+            "action_options": sorted(ACTION_LABELS.items(), key=lambda item: item[1]),
         },
+    )
+
+
+@router.get("/actividad.csv")
+async def activity_export(
+    request: Request,
+    accion: str = "",
+    usuario: str = "",
+    entidad: str = "",
+    texto: str = "",
+    desde: str = "",
+    hasta: str = "",
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    session = await require_staff(request, db)
+    if session is None:
+        return login_redirect()
+    current_user, doctor = session
+    if not has_permission(current_user, "audit:read"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede exportar la bitácora.")
+
+    conditions = _activity_filters(
+        accion=accion,
+        usuario=usuario,
+        entidad=entidad,
+        texto=texto,
+        desde=desde,
+        hasta=hasta,
+    )
+    rows = (await db.execute(_activity_query(conditions).limit(5000))).all()
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["Fecha", "Usuario", "Acción", "Entidad", "ID", "IP", "Detalle"])
+    for log, account in rows:
+        writer.writerow(
+            [
+                deps.format_datetime(log.created_at),
+                account.username if account else "-",
+                action_label(log.action),
+                ENTITY_LABELS.get(log.entity_type, log.entity_type),
+                log.entity_id or "",
+                log.ip_address or "",
+                log.detail or "",
+            ]
+        )
+
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="portal_export_activity",
+        entity_type="audit",
+        entity_id=None,
+        request=request,
+        detail=f"filas={len(rows)}",
+    )
+    await db.commit()
+
+    filename = f"actividad-dosys-{deps.clinic_now():%Y%m%d-%H%M}.csv"
+    return Response(
+        content="\ufeff" + buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

@@ -17,8 +17,15 @@
   </div>
 </header>
 
-{% if errors.general %}
-<div class="note note-error" role="alert">{{ errors.general }}</div>
+{% if errors %}
+<div class="note note-error" role="alert" id="resumen-errores">
+  <p><b>No se pudo guardar el paciente.</b> Corrige lo siguiente:</p>
+  <ul class="error-list">
+    {% for field, message in errors.items() %}
+    <li>{{ message }}</li>
+    {% endfor %}
+  </ul>
+</div>
 {% endif %}
 
 <form class="form" method="post"
@@ -74,6 +81,33 @@
     <p class="help">Se usa para enviarle su credencial de acceso.</p>
     {% if errors.email %}<p class="error">{{ errors.email }}</p>{% endif %}
   </div>
+
+  <section class="block">
+    <h2 class="section-title">Datos clínicos de alerta</h2>
+    <p class="page-note">Se muestran en el expediente y en la app del paciente. Un dato vacío significa “sin registrar”, no “sin alergias”.</p>
+
+    <div class="field {% if errors.allergies %}has-error{% endif %}">
+      <label for="allergies">Alergias</label>
+      <textarea id="allergies" name="allergies" rows="2" maxlength="2000"
+                placeholder="Ej. Penicilina (urticaria), polen">{{ values.allergies }}</textarea>
+      <p class="help">Medicamentos, alimentos o materiales. Indica la reacción si la conoces.</p>
+      {% if errors.allergies %}<p class="error">{{ errors.allergies }}</p>{% endif %}
+    </div>
+
+    <div class="field {% if errors.medical_history %}has-error{% endif %}">
+      <label for="medical_history">Antecedentes personales y familiares</label>
+      <textarea id="medical_history" name="medical_history" rows="3" maxlength="2000"
+                placeholder="Ej. Apendicectomía (2018). Padre con diabetes tipo 2.">{{ values.medical_history }}</textarea>
+      {% if errors.medical_history %}<p class="error">{{ errors.medical_history }}</p>{% endif %}
+    </div>
+
+    <div class="field {% if errors.chronic_conditions %}has-error{% endif %}">
+      <label for="chronic_conditions">Diagnósticos crónicos</label>
+      <textarea id="chronic_conditions" name="chronic_conditions" rows="2" maxlength="2000"
+                placeholder="Ej. Hipertensión arterial en control">{{ values.chronic_conditions }}</textarea>
+      {% if errors.chronic_conditions %}<p class="error">{{ errors.chronic_conditions }}</p>{% endif %}
+    </div>
+  </section>
 
   {% if mode == 'create' %}
   <div class="field {% if errors.username %}has-error{% endif %}">

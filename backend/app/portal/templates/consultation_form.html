@@ -15,8 +15,15 @@
   </div>
 </header>
 
-{% if errors.general %}
-<div class="note note-error" role="alert">{{ errors.general }}</div>
+{% if errors %}
+<div class="note note-error" role="alert" id="resumen-errores">
+  <p><b>No se pudo guardar la consulta.</b> Corrige lo siguiente:</p>
+  <ul class="error-list">
+    {% for field, message in errors.items() %}
+    <li>{{ message }}</li>
+    {% endfor %}
+  </ul>
+</div>
 {% endif %}
 
 <form class="form" method="post" action="/portal/pacientes/{{ patient.id }}/consulta" novalidate>

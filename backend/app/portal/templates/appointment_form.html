@@ -12,6 +12,10 @@
   </div>
 </header>
 
+{% if errors.general %}
+<div class="note note-error" role="alert">{{ errors.general }}</div>
+{% endif %}
+
 <form class="form" method="post" action="/portal/pacientes/{{ patient.id }}/cita" novalidate>
   <div class="field {% if errors.specialty %}has-error{% endif %}">
     <label for="specialty">Especialidad o servicio</label>

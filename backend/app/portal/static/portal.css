@@ -2823,3 +2823,143 @@ body.login {
   }
 }
 
+
+/* ── Expediente clínico y nuevas herramientas ─────────────────────────────── */
+
+.error-list {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.error-list li {
+  margin: 2px 0;
+}
+
+.clinical-alerts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.clinical-alert {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  background: #fbfcfb;
+}
+
+.clinical-alert.is-warning {
+  border-color: #e4c98f;
+  background: #fffaf0;
+}
+
+.clinical-alert-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 4px;
+}
+
+.clinical-alert p {
+  margin: 0;
+  white-space: pre-line;
+}
+
+.demo-study {
+  margin-top: 14px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px 14px;
+  background: #fbfcfb;
+}
+
+.demo-study > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent-deep);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.demo-study > summary::marker {
+  color: var(--accent);
+}
+
+.demo-study .form {
+  margin-top: 12px;
+}
+
+.lab-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.lab-stat {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  background: #fbfcfb;
+}
+
+.lab-stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.lab-stat-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  margin-top: 2px;
+}
+
+.result-details > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.result-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.result-form {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  min-width: 280px;
+}
+
+.checkin-window {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+  .clinical-alerts {
+    grid-template-columns: 1fr;
+  }
+  .lab-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -62,6 +62,7 @@ import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import mx.unach.dosys.R
+import mx.unach.dosys.data.model.PatientAppointment
 import mx.unach.dosys.ui.components.ScreenScaffold
 import mx.unach.dosys.ui.components.StatusChip
 import mx.unach.dosys.ui.components.appointmentStatusColor
@@ -108,7 +109,7 @@ fun CheckInScreen(
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            text = "Escanea el código QR que recepción muestra en pantalla. Si no puedes escanear, escribe el código de respaldo.",
+                            text = "Escanea el código QR que recepción muestra en pantalla. Si no puedes escanear, escribe el código de respaldo. Solo funciona dentro de la ventana de tu cita.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -192,11 +193,21 @@ fun CheckInScreen(
 
             item {
                 Text(
-                    text = "Mis citas",
+                    text = "Próximas citas",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(top = 8.dp),
                 )
+            }
+
+            if (!state.isLoading && state.appointments.isEmpty()) {
+                item {
+                    Text(
+                        text = "No tienes citas próximas para confirmar. Revisa Mis citas para ver tu historial.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             items(state.appointments, key = { it.id }) { appointment ->
@@ -218,12 +229,26 @@ fun CheckInScreen(
                                 text = appointmentStatusLabel(appointment.status),
                                 color = appointmentStatusColor(appointment.status),
                             )
+                            if (appointment.checkinAvailable && appointment.checkedInAt == null) {
+                                StatusChip(
+                                    text = "Check-in abierto",
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
                             appointment.checkedInAt?.let { checkedIn ->
                                 StatusChip(
                                     text = "Llegaste ${formatClinicalDateTime(checkedIn)}",
                                     color = MaterialTheme.colorScheme.primary,
                                 )
                             }
+                        }
+                        if (appointment.checkedInAt == null && !appointment.checkinAvailable) {
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = checkinHint(appointment),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                 }
@@ -436,6 +461,15 @@ private fun distanceToHospital(location: Location): Float {
 
 private fun formatDistance(meters: Float): String =
     if (meters < 1000f) "${meters.toInt()} m" else String.format("%.1f km", meters / 1000f)
+
+private fun checkinHint(appointment: PatientAppointment): String = when (appointment.checkinReason) {
+    "too_early" -> "El check-in abre 2 horas antes de la cita."
+    "closed" -> "El check-in de esta cita ya cerró. Pide apoyo en recepción."
+    "already_checked_in" -> "Tu llegada ya estaba confirmada."
+    "attended" -> "Esta cita ya fue atendida."
+    "cancelled" -> "Esta cita fue cancelada."
+    else -> "Check-in disponible cerca de la hora de la cita."
+}
 
 private suspend fun readCurrentLocation(context: Context): Location? {
     val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null

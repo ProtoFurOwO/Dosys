@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     documents_max_mb: int = Field(default=10, ge=1, le=50)
     documents_signing_key: str = ""
 
+    # Check-in: la llegada solo se confirma cerca de la cita.
+    checkin_window_before_minutes: int = Field(default=120, ge=0, le=1440)
+    checkin_window_after_minutes: int = Field(default=240, ge=0, le=1440)
+
     # Cuentas: sesión renovable, recuperación y límite de peticiones.
     refresh_token_expire_days: int = Field(default=7, ge=1, le=30)
     password_reset_expire_minutes: int = Field(default=15, ge=5, le=60)

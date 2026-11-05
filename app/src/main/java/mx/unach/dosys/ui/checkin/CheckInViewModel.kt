@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mx.unach.dosys.core.di.ServiceLocator
-import mx.unach.dosys.data.model.AppointmentStatus
 import mx.unach.dosys.data.model.PatientAppointment
 import mx.unach.dosys.data.repository.ClinicalResult
 
@@ -37,8 +36,14 @@ class CheckInViewModel : ViewModel() {
         _state.update { it.copy(isLoading = true) }
         viewModelScope.launch {
             when (val result = repository.appointments()) {
-                is ClinicalResult.Success -> _state.update {
-                    it.copy(appointments = result.value, isLoading = false, error = null)
+                is ClinicalResult.Success -> {
+                    _state.update {
+                        it.copy(
+                            appointments = CheckInAppointments.eligible(result.value),
+                            isLoading = false,
+                            error = null,
+                        )
+                    }
                 }
                 is ClinicalResult.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
             }
@@ -46,11 +51,17 @@ class CheckInViewModel : ViewModel() {
     }
 
     fun onCodeChange(value: String) {
-        _state.update { it.copy(codeInput = value.uppercase(), error = null) }
+        val clean = value.uppercase().filter { it.isLetterOrDigit() }.take(32)
+        _state.update { it.copy(codeInput = clean, error = null) }
     }
 
     fun onCodeScanned(raw: String) {
-        submit(raw)
+        val code = CheckInCode.extract(raw)
+        if (code == null) {
+            _state.update { it.copy(error = "El código del QR no es válido") }
+            return
+        }
+        submit(code)
     }
 
     fun submitManualCode() {
@@ -61,31 +72,25 @@ class CheckInViewModel : ViewModel() {
 
     private fun submit(raw: String) {
         if (_state.value.isSubmitting) return
-        val text = raw.trim()
-        val target = if (text.startsWith(CHECKIN_PREFIX)) parseQr(text) else pendingTarget(text)
-        if (target == null) {
-            _state.update {
-                it.copy(
-                    error = if (text.startsWith(CHECKIN_PREFIX)) {
-                        "El código del QR no es válido"
-                    } else {
-                        "No tienes citas pendientes para confirmar"
-                    }
-                )
-            }
+        val code = CheckInCode.extract(raw)
+        if (code == null) {
+            _state.update { it.copy(error = "El código del QR no es válido") }
             return
         }
+
         _state.update { it.copy(isSubmitting = true, error = null) }
         viewModelScope.launch {
-            when (val result = repository.checkIn(target.first, target.second)) {
+            when (val result = repository.checkInWithCode(code)) {
                 is ClinicalResult.Success -> _state.update { current ->
                     current.copy(
                         isSubmitting = false,
                         confirmed = result.value,
                         codeInput = "",
-                        appointments = current.appointments.map { appointment ->
-                            if (appointment.id == result.value.id) result.value else appointment
-                        },
+                        appointments = current.appointments
+                            .map { appointment ->
+                                if (appointment.id == result.value.id) result.value else appointment
+                            }
+                            .filter { it.id != result.value.id } + result.value,
                     )
                 }
                 is ClinicalResult.Error -> _state.update { it.copy(isSubmitting = false, error = result.message) }
@@ -93,25 +98,7 @@ class CheckInViewModel : ViewModel() {
         }
     }
 
-    /** Contenido del QR del hospital: DOSYS-CHECKIN|<cita>|<código>. */
-    private fun parseQr(text: String): Pair<Int, String>? {
-        val parts = text.split("|")
-        val id = parts.getOrNull(1)?.toIntOrNull()
-        val code = parts.getOrNull(2)?.takeIf { it.isNotBlank() }
-        return if (id != null && code != null) id to code else null
-    }
-
-    /** Código escrito a mano: se prueba con la próxima cita sin confirmar. */
-    private fun pendingTarget(code: String): Pair<Int, String>? {
-        val next = _state.value.appointments.firstOrNull { appointment ->
-            appointment.checkedInAt == null &&
-                appointment.status != AppointmentStatus.CANCELLED &&
-                appointment.status != AppointmentStatus.ATTENDED
-        } ?: return null
-        return next.id to code
-    }
-
     companion object {
-        const val CHECKIN_PREFIX = "DOSYS-CHECKIN|"
+        const val CHECKIN_PREFIX = CheckInCode.PREFIX
     }
 }

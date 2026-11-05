@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Medication
-import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Shield
@@ -32,7 +31,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -57,8 +55,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import mx.unach.dosys.core.di.ServiceLocator
-import mx.unach.dosys.data.mock.MockData
 import mx.unach.dosys.data.model.PatientAppointment
+import mx.unach.dosys.data.model.PatientPrescription
 import mx.unach.dosys.ui.format.formatClinicalDateTime
 
 /**
@@ -72,7 +70,6 @@ fun HomeScreen(
     onOpenRecord: () -> Unit,
     onOpenStudies: () -> Unit,
     onOpenPrescriptions: () -> Unit,
-    onOpenQr: () -> Unit,
     onOpenAppointments: () -> Unit,
     onOpenCheckIn: () -> Unit,
     onOpenSecurity: () -> Unit,
@@ -141,7 +138,7 @@ fun HomeScreen(
                     )
                 }
             }
-            item { ActiveTreatmentCard(onClick = onOpenPrescriptions) }
+            item { ActiveTreatmentCard(state.prescriptions, state.isLoading, onOpenPrescriptions) }
             item {
                 Text(
                     text = "Mi información",
@@ -159,7 +156,7 @@ fun HomeScreen(
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     QuickAccess(Icons.Filled.Medication, "Recetas", Modifier.weight(1f), onOpenPrescriptions)
-                    QuickAccess(Icons.Filled.QrCode, "Mi QR", Modifier.weight(1f), onOpenQr)
+                    QuickAccess(Icons.Filled.FolderOpen, "Documentos", Modifier.weight(1f), onOpenDocuments)
                 }
             }
             item {
@@ -167,9 +164,6 @@ fun HomeScreen(
                     QuickAccess(Icons.Filled.QrCodeScanner, "Check-in con QR", Modifier.weight(1f), onOpenCheckIn)
                     QuickAccess(Icons.Filled.Shield, "Mi seguridad", Modifier.weight(1f), onOpenSecurity)
                 }
-            }
-            item {
-                QuickAccess(Icons.Filled.FolderOpen, "Mis documentos", Modifier.fillMaxWidth(), onOpenDocuments)
             }
             item {
                 Text(
@@ -276,7 +270,7 @@ private fun NextAppointmentCard(
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 appointment == null -> Text(
-                    text = "No tienes citas próximas.",
+                    text = "No tienes citas próximas. Puedes revisar tu historial en Mis citas.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 else -> {
@@ -287,6 +281,25 @@ private fun NextAppointmentCard(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Text(
+                        text = appointment.location,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    when {
+                        appointment.checkedInAt != null -> Text(
+                            text = "Llegada confirmada",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                        appointment.checkinAvailable -> Text(
+                            text = "Check-in abierto: confirma tu llegada desde la app",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
                 }
             }
             Text(
@@ -300,36 +313,50 @@ private fun NextAppointmentCard(
 }
 
 @Composable
-private fun ActiveTreatmentCard(onClick: () -> Unit) {
+private fun ActiveTreatmentCard(
+    prescriptions: List<PatientPrescription>,
+    isLoading: Boolean,
+    onClick: () -> Unit,
+) {
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Text(
-                text = "Tratamiento activo",
+                text = "Tratamiento y recetas",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
             Spacer(Modifier.height(8.dp))
-            MockData.prescriptions.take(2).forEach { prescription ->
-                Text(prescription.medication, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Text(
-                    text = prescription.dose,
-                    style = MaterialTheme.typography.bodySmall,
+            when {
+                isLoading -> Text(
+                    text = "Cargando tus recetas…",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                prescriptions.isEmpty() -> Text(
+                    text = "No tienes recetas activas. Cuando tu médico emita una, aparecerá aquí.",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(6.dp))
-                LinearProgressIndicator(
-                    progress = { prescription.taken.toFloat() / prescription.total.toFloat() },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    text = "${prescription.taken} de ${prescription.total} tomas",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(12.dp))
+                else -> prescriptions.take(2).forEach { prescription ->
+                    val names = prescription.items.joinToString { it.medication }.ifBlank { "Receta médica" }
+                    Text(names, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    val first = prescription.items.firstOrNull()
+                    Text(
+                        text = listOfNotNull(first?.dose, first?.frequency).joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    prescription.notes?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                }
             }
             Text(
-                text = "Toca para marcar tomas",
+                text = "Toca para ver todas tus recetas",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )

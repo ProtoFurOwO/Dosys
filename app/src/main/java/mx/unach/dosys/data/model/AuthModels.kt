@@ -47,6 +47,9 @@ data class PatientProfile(
     @SerialName("blood_type") val bloodType: String? = null,
     @SerialName("birth_date") val birthDate: String? = null,
     @SerialName("emergency_contact") val emergencyContact: String? = null,
+    val allergies: String? = null,
+    @SerialName("medical_history") val medicalHistory: String? = null,
+    @SerialName("chronic_conditions") val chronicConditions: String? = null,
 )
 
 // ── Segundo factor (Mi seguridad) ─────────────────────────────────────────────

@@ -1,6 +1,6 @@
 """Datos iniciales: catálogo de permisos, roles base y cuentas de demostración."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +17,7 @@ from app.models.patient import Patient
 from app.models.permission import Permission
 from app.models.role import Role
 from app.models.user import User
+from app.services.appointments import AppointmentError, create_appointment
 from app.services.permissions import BASE_ROLES, DEFAULT_ROLE_PERMISSIONS, PERMISSIONS
 
 
@@ -140,6 +141,9 @@ async def seed_demo_data() -> None:
                     curp="MAAJ010415HCSRRN09",
                     blood_type="O+",
                     emergency_contact="María Argueta · 961 123 4567",
+                    allergies="Penicilina (urticaria), polen",
+                    medical_history="Apendicectomía (2018). Padre con diabetes tipo 2.",
+                    chronic_conditions="Hipertensión arterial en control",
                 )
             )
 
@@ -170,11 +174,40 @@ async def seed_demo_data() -> None:
                 )
             )
 
+        lab_user = await db.scalar(select(User).where(User.username == "laboratorio"))
+        if lab_user is None:
+            db.add(
+                User(
+                    username="laboratorio",
+                    full_name="Laboratorio Central",
+                    password_hash=hash_password("Lab12345!"),
+                    role_id=roles["laboratory"].id,
+                )
+            )
+
+        reception_user = await db.scalar(select(User).where(User.username == "recepcion"))
+        if reception_user is None:
+            db.add(
+                User(
+                    username="recepcion",
+                    full_name="Recepción",
+                    password_hash=hash_password("Recepcion123!"),
+                    role_id=roles["reception"].id,
+                )
+            )
+
         await db.flush()
         patient = await db.scalar(select(Patient).where(Patient.user_id == patient_user.id))
         doctor = await db.scalar(select(Doctor).where(Doctor.user_id == doctor_user.id))
         if patient is None or doctor is None:
             raise RuntimeError("No se pudieron preparar los datos demo")
+
+        # Completar la demo sin pisar datos que ya haya capturado el hospital.
+        if not patient.allergies and not patient.medical_history and not patient.chronic_conditions:
+            patient.allergies = "Penicilina (urticaria), polen"
+            patient.medical_history = "Apendicectomía (2018). Padre con diabetes tipo 2."
+            patient.chronic_conditions = "Hipertensión arterial en control"
+            await db.flush()
 
         existing_consultation = await db.scalar(
             select(Consultation).where(Consultation.patient_id == patient.id).limit(1)
@@ -208,5 +241,31 @@ async def seed_demo_data() -> None:
             )
         elif not existing_appointment.checkin_code:
             existing_appointment.checkin_code = "A7K9M2"
+
+        # Mantén al menos una cita futura para que la app nunca arranque vacía.
+        now = datetime.now(timezone.utc)
+        upcoming = await db.scalar(
+            select(Appointment.id).where(
+                Appointment.patient_id == patient.id,
+                Appointment.scheduled_at >= now,
+                Appointment.status != AppointmentStatus.CANCELLED,
+            ).limit(1)
+        )
+        if upcoming is None:
+            try:
+                await create_appointment(
+                    db,
+                    patient=patient,
+                    doctor=doctor,
+                    specialty="Medicina General",
+                    scheduled_at=now + timedelta(days=3, hours=1),
+                    location="Consultorio 3",
+                    room="Consultorio 3",
+                    notes="Cita de demostración",
+                )
+            except AppointmentError:
+                # Si el horario ya está ocupado, la demo sigue funcionando con
+                # las citas que ya existan.
+                pass
 
         await db.commit()

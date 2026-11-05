@@ -5,7 +5,7 @@
 <header class="page-head">
   <div>
     <h1>Citas</h1>
-    <p class="page-note">Consulta las citas pendientes y los datos de check-in de cada paciente.</p>
+    <p class="page-note">Solo se muestran como próximas las citas que todavía no ocurren. Las pasadas quedan en el historial del paciente.</p>
   </div>
   <div class="page-actions" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
     <a class="btn btn-line" href="/portal/agenda">Ver agenda</a>
@@ -33,12 +33,14 @@
         <th scope="col">Paciente</th>
         <th scope="col" class="hide-sm">CURP</th>
         <th scope="col">Próxima cita</th>
+        <th scope="col" class="hide-sm">Última cita</th>
         <th scope="col" class="col-action"><span class="visually-hidden">Acciones</span></th>
       </tr>
     </thead>
     <tbody>
       {% for patient in patients %}
       {% set appointment = pending.get(patient.id) %}
+      {% set last = past.get(patient.id) %}
       <tr>
         <td><a class="link" href="/portal/pacientes/{{ patient.id }}">{{ patient.full_name }}</a></td>
         <td class="hide-sm code">{{ patient.curp }}</td>
@@ -51,6 +53,14 @@
           </span>
           {% else %}
           <span class="row-sub">Sin cita pendiente</span>
+          {% endif %}
+        </td>
+        <td class="hide-sm">
+          {% if last %}
+          {{ last.scheduled_at | fecha_hora }}
+          <span class="row-sub">{{ last.specialty }} · {{ last.status_label }}</span>
+          {% else %}
+          <span class="row-sub">Sin historial</span>
           {% endif %}
         </td>
         <td class="col-action">

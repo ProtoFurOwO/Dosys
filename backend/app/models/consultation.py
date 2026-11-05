@@ -26,6 +26,9 @@ class Consultation(Base):
     diagnosis: Mapped[str] = mapped_column(String(500), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # Se actualiza solo cuando un médico corrige una consulta ya firmada. La
+    # bitácora guarda quién lo hizo y qué campos cambió (nunca el contenido).
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     patient: Mapped[Patient] = relationship(back_populates="consultations")
     doctor: Mapped[Doctor] = relationship(back_populates="consultations")

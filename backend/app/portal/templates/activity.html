@@ -4,24 +4,57 @@
 <header class="page-head">
   <div>
     <h1>Actividad</h1>
-    <p class="page-note">Bitácora del sistema: quién accedió a qué y cuándo. Solo lectura.</p>
+    <p class="page-note">Bitácora del sistema: quién accedió a qué, cuándo y desde dónde. Solo lectura; las exportaciones también se auditan.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-line" href="{{ request.url.replace(path='/portal/actividad.csv') }}">Exportar CSV</a>
   </div>
 </header>
 
 <form class="filters" method="get" action="/portal/actividad">
   <div class="field">
     <label for="accion">Acción</label>
-    <input id="accion" name="accion" value="{{ accion }}" placeholder="Ej. Paciente registrado">
+    <input id="accion" name="accion" value="{{ accion }}" list="acciones" placeholder="Ej. Consulta corregida">
+    <datalist id="acciones">
+      {% for code, label in action_options %}
+      <option value="{{ label }}"></option>
+      {% endfor %}
+    </datalist>
   </div>
   <div class="field">
     <label for="usuario">Usuario</label>
     <input id="usuario" name="usuario" value="{{ usuario }}" placeholder="Ej. medico">
+  </div>
+  <div class="field">
+    <label for="entidad">Entidad</label>
+    <select id="entidad" name="entidad">
+      <option value="">Todas</option>
+      {% for code, label in entity_options %}
+      <option value="{{ code }}" {% if entidad == code %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="texto">Texto libre</label>
+    <input id="texto" name="texto" value="{{ texto }}" placeholder="Detalle, ID o IP">
+  </div>
+  <div class="field">
+    <label for="desde">Desde</label>
+    <input id="desde" name="desde" type="date" value="{{ desde }}">
+  </div>
+  <div class="field">
+    <label for="hasta">Hasta</label>
+    <input id="hasta" name="hasta" type="date" value="{{ hasta }}">
   </div>
   <div class="filters-actions">
     <button class="btn btn-line" type="submit">Filtrar</button>
     <a class="btn btn-quiet" href="/portal/actividad">Limpiar</a>
   </div>
 </form>
+
+<p class="page-note">
+  {{ total }} movimiento{% if total != 1 %}s{% endif %} · página {{ page }} de {{ pages }} · {{ page_size }} por página
+</p>
 
 {% if entries %}
 <div class="table-wrap">
@@ -58,10 +91,22 @@
     </tbody>
   </table>
 </div>
+
+{% if pages > 1 %}
+<nav class="pagination" aria-label="Paginación de la bitácora">
+  {% if page > 1 %}
+  <a class="btn btn-quiet" href="{{ request.url.include_query_params(pagina=page - 1) }}">Anterior</a>
+  {% endif %}
+  <span class="page-note">Página {{ page }} de {{ pages }}</span>
+  {% if page < pages %}
+  <a class="btn btn-quiet" href="{{ request.url.include_query_params(pagina=page + 1) }}">Siguiente</a>
+  {% endif %}
+</nav>
+{% endif %}
 {% else %}
 <div class="empty">
   <p class="empty-title">Sin actividad para ese filtro</p>
-  <p>Prueba con otra palabra o limpia el filtro para ver los últimos movimientos.</p>
+  <p>Prueba con otra palabra, amplía el rango de fechas o limpia los filtros.</p>
   <a class="btn btn-line" href="/portal/actividad">Limpiar filtros</a>
 </div>
 {% endif %}

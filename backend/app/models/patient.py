@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, ForeignKey, Integer, String
+from sqlalchemy import Date, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -25,6 +25,13 @@ class Patient(Base):
     birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     emergency_contact: Mapped[str | None] = mapped_column(String(160), nullable=True)
     email: Mapped[str | None] = mapped_column(String(160), nullable=True)
+
+    # Datos clínicos de alerta: se muestran en el expediente y en la app del
+    # paciente. Se guardan como texto libre porque el catálogo de alergias y
+    # antecedentes cambia entre instituciones.
+    allergies: Mapped[str | None] = mapped_column(Text, nullable=True)
+    medical_history: Mapped[str | None] = mapped_column(Text, nullable=True)
+    chronic_conditions: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="patient")
     consultations: Mapped[list[Consultation]] = relationship(back_populates="patient")

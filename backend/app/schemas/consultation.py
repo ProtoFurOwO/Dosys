@@ -19,3 +19,4 @@ class ConsultationResponse(BaseModel):
     diagnosis: str
     notes: str | None
     created_at: datetime
+    updated_at: datetime | None = None

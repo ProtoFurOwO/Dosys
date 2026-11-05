@@ -176,6 +176,13 @@ interface ApiService {
         @Body request: CheckInRequest,
     ): PatientAppointment
 
+    /** Check-in con solo el código: el servidor busca la cita vigente. */
+    @POST("patients/me/check-in")
+    suspend fun checkInWithCode(
+        @Header("Authorization") authorization: String,
+        @Body request: CheckInRequest,
+    ): PatientAppointment
+
     // Próximos endpoints:
     // @GET("study-orders")         estudios y resultados
     // @GET("prescriptions")        recetas + tomas

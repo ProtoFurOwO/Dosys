@@ -56,16 +56,21 @@ Abre `http://127.0.0.1:8000/portal` e inicia sesión con `medico` / `Medico123!`
 
 1. **Pacientes**: buscador por nombre o CURP, métricas reales, alta de pacientes con
    credencial de acceso (mostrar una vez, imprimir y envío simulado por correo) y edición
-   de sus datos.
-2. **Expediente**: datos del paciente e historial de consultas en orden cronológico.
-3. **Nueva consulta**: motivo, diagnóstico y notas; al guardar aparece en el expediente y
-   en la app del paciente.
+   de sus datos, incluidas **alergias, antecedentes y diagnósticos crónicos**.
+2. **Expediente**: datos del paciente, alertas clínicas e historial de consultas en orden
+   cronológico. Una consulta ya firmada se puede **corregir** con auditoría.
+3. **Nueva consulta**: motivo, diagnóstico, notas, estudios de laboratorio/imagen, receta
+   y próxima cita. Los errores se muestran en un resumen al inicio del formulario.
 4. **Agendar cita**: fecha, hora, especialidad y consultorio; el sistema genera un código
-   de check-in único por cita.
-5. **Citas**: agenda con el QR de check-in y su código de respaldo.
-6. **Usuarios**: alta y edición de médicos, activar/desactivar cuentas y restablecer
+   de check-in único por cita y rechaza empalmes de paciente, médico o consultorio.
+5. **Citas**: solo las citas futuras aparecen como próximas; las pasadas quedan en el
+   historial. El QR muestra su ventana de validez (2 h antes a 4 h después).
+6. **En espera y laboratorio**: cola de estudios con filtros, inicio, captura de resultado
+   y PDF con huella SHA-256.
+7. **Usuarios**: alta y edición de médicos, activar/desactivar cuentas y restablecer
    contraseñas (siempre mostrando la credencial una vez).
-7. **Actividad**: bitácora en solo lectura con filtros por acción y usuario.
+8. **Actividad**: bitácora con filtros por acción, usuario, entidad, texto y fechas,
+   paginación y exportación CSV auditada.
 
 Cada cita agendada desde el portal aparece también en la app del paciente, y cada paciente
 registrado puede iniciar sesión de inmediato en la app con la credencial que se genera.
@@ -76,6 +81,62 @@ Credenciales exclusivamente locales/de demostración:
 |---|---|---|
 | Paciente (app) | `paciente` | `Paciente123!` |
 | Médico (portal) | `medico` | `Medico123!` |
+| Administrador | `admin` | `Admin123!` |
+| Laboratorio | `laboratorio` | `Lab12345!` |
+| Recepción | `recepcion` | `Recepcion123!` |
+
+## Expediente clínico, check-in y laboratorio
+
+### Datos clínicos del paciente
+
+La migración `20261105_0012_clinical_record.py` agrega a `patients`:
+
+- `allergies` (texto libre)
+- `medical_history` (antecedentes)
+- `chronic_conditions` (diagnósticos crónicos)
+
+Se capturan al crear o editar al paciente y se muestran en el expediente y en la app. El
+endpoint `GET /api/v1/patients/me` los devuelve. La edición requiere `patients:write` y
+registra en la bitácora **solo los nombres de los campos modificados**, nunca el contenido
+clínico.
+
+### Corrección de consultas
+
+`GET/POST /portal/pacientes/{id}/consulta/{consulta_id}/editar` permite a un médico con
+ficha corregir motivo, diagnóstico y notas. La consulta conserva `created_at`, se marca
+`updated_at` y la bitácora registra `portal_update_consultation` con
+`campos=reason,diagnosis,...`. No se borra ni se sobrescribe el registro original sin
+dejar rastro.
+
+### Check-in con ventana y un solo uso
+
+- El check-in abre **2 horas antes** y cierra **4 horas después** de la cita
+  (`CHECKIN_WINDOW_BEFORE_MINUTES` y `CHECKIN_WINDOW_AFTER_MINUTES`).
+- `GET /api/v1/patients/me/appointments` incluye `is_upcoming`, `checkin_available`,
+  `checkin_opens_at`, `checkin_closes_at` y `checkin_reason`.
+- `POST /api/v1/patients/me/check-in` acepta solo el código y busca la cita vigente del
+  paciente. El endpoint anterior con `appointment_id` se conserva.
+- Un código incorrecto responde **400**; una cita cancelada, atendida o fuera de ventana
+  responde **409** con el motivo. La operación es idempotente.
+- Límite de **10 intentos por minuto por IP** (`429`).
+- Portal: el QR muestra la ventana, se actualiza solo y permite **reabrir el check-in** si
+  recepción se equivocó (auditado).
+
+### Laboratorio
+
+- `POST /portal/pacientes/{id}/estudio-demo` crea una **orden real** sin consulta previa,
+  pensada para demostrar la cola en clase. Requiere ficha de médico y `studies:request`.
+- La cola tiene filtros por paciente/CURP/estudio y por estado; `Iniciar` pasa a
+  `in_progress`; `Capturar resultado` genera el PDF con SHA-256.
+- Todo queda auditado: `portal_create_demo_study_order`, `portal_start_study_order`,
+  `portal_complete_study_order` y `portal_cancel_study_order`.
+
+### Bitácora
+
+`/portal/actividad` filtra por acción, usuario, entidad, texto libre y rango de fechas,
+pagina de 50 en 50 y exporta CSV. La exportación también se audita
+(`portal_export_activity`). Los identificadores y detalles se muestran con etiquetas
+legibles; las contraseñas, tokens y contenido clínico nunca se guardan.
 
 ## Transferencia de sesión entre dispositivos (app del paciente)
 
@@ -168,12 +229,13 @@ Cada evento queda en la bitácora con etiqueta en español: `device_registered`,
 
 ## Pruebas de aceptación repetibles
 
-Con los contenedores levantados:
+Con los contenedores levantados (instala una vez `py -3.12 -m pip install -r requirements-dev.txt`):
 
 ```powershell
 py -3.12 scripts\verify_vertical_slice.py   # API: médico crea, paciente lee, RBAC 401/403
 py -3.12 scripts\verify_portal.py           # Portal: pacientes, consultas, citas, usuarios, credenciales y bitácora
-py -3.12 scripts\verify_checkin.py          # Check-in: código incorrecto 400, correcto 200 e idempotente
+py -3.12 scripts\verify_checkin.py          # Check-in: ventana, código incorrecto 400, correcto 200 e idempotente
+py -3.12 scripts\verify_clinical_flow.py     # Expediente: alergias, edición, consulta con estudio, corrección, laboratorio y CSV
 py -3.12 scripts\verify_agenda.py           # Agenda: vistas, filtros por URL, modal, estado y consultorio dinámico
 py -3.12 scripts\verify_login_security.py   # Login: bloqueo 429, desbloqueo, 2FA y códigos de recuperación
 py -3.12 scripts\verify_account_security.py # Cuentas: cambio y recuperación de contraseña, refresh con rotación, rate limit y API admin
