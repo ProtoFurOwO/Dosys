@@ -93,22 +93,55 @@ a {
   min-height: 100dvh;
 }
 
+/* Menú lateral fijo: usuario y engranaje siempre a la altura de la ventana. */
 .rail {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  height: 100dvh;
+  box-sizing: border-box;
+  z-index: 20;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 24px;
   padding: 22px 18px;
   background: var(--surface);
-  border-right: 1px solid var(--line);
+  border-right: 0;
+}
+
+/* Si la ventana es baja, solo se desplaza la navegación; el pie del menú no se mueve. */
+.rail-top {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: -6px;
+  padding: 6px;
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  max-width: 100%;
+  border-radius: var(--radius-sm);
   text-decoration: none;
   color: inherit;
+}
+
+.brand-logo {
+  display: block;
+  height: 56px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.brand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
 }
 
 .brand-text strong {
@@ -202,8 +235,14 @@ a {
 }
 
 .rail-bottom {
-  display: grid;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+  background: var(--surface);
 }
 
 .who {
@@ -217,13 +256,127 @@ a {
   font-weight: 500;
 }
 
+/* ── Engranaje de cuenta ───────────────────────────────────────────────────── */
+
+.gear {
+  position: relative;
+}
+
+.gear-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  cursor: pointer;
+  list-style: none;
+}
+
+.gear-button::-webkit-details-marker {
+  display: none;
+}
+
+.gear-button:hover {
+  background: var(--line-soft);
+  color: var(--ink);
+}
+
+.gear-button.is-active,
+.gear[open] .gear-button {
+  background: var(--accent-tint);
+  color: var(--accent-deep);
+}
+
+.gear-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.gear-menu {
+  position: absolute;
+  left: calc(100% + 12px);
+  bottom: 0;
+  width: 232px;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(23, 33, 27, 0.12);
+}
+
+.gear-title {
+  margin: 8px 10px 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.gear-title:first-child {
+  margin-top: 4px;
+}
+
+.gear-item {
+  display: block;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: 0.9375rem;
+  text-align: left;
+  text-decoration: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.gear-item:hover {
+  background: var(--line-soft);
+  color: var(--ink);
+}
+
+.gear-item.is-active {
+  background: var(--accent-tint);
+  color: var(--accent-deep);
+  font-weight: 500;
+}
+
+.gear-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.gear-logout {
+  margin: 6px 0 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.gear-item-danger {
+  color: var(--error-ink);
+}
+
+.gear-item-danger:hover {
+  background: var(--error-bg);
+  color: var(--error-ink);
+}
+
 .main {
   min-width: 0;
+  border-left: 1px solid var(--line);
 }
 
 .content {
   max-width: 1080px;
   padding: 36px 40px 72px;
+}
+
+.content-wide {
+  max-width: 1400px;
 }
 
 /* ── Encabezado de página ──────────────────────────────────────────────────── */
@@ -595,6 +748,37 @@ a {
   display: inline;
 }
 
+.table-users .col-name { min-width: 200px; }
+.table-users .col-role { min-width: 250px; width: auto; }
+.table-users .role-form { flex-wrap: nowrap; white-space: nowrap; }
+.table-users .col-action { width: 1%; white-space: nowrap; }
+.table-users .row-actions { flex-wrap: nowrap; }
+
+/* El menú emergente no puede quedar dentro de un contenedor con scroll */
+.table-wrap-open { overflow: visible; }
+
+.more { position: relative; }
+.more-button { display: inline-flex; align-items: center; gap: 4px; list-style: none; cursor: pointer; }
+.more-button::-webkit-details-marker { display: none; }
+.more[open] .more-button { background: var(--accent-tint); color: var(--accent-deep); }
+.more-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.more-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 15;
+  min-width: 220px;
+  padding: 6px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(23, 33, 27, 0.12);
+}
+.more-menu form { display: block; margin: 0; }
+.more-menu .more-sep { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line-soft); }
+
 .filters {
   display: flex;
   align-items: flex-end;
@@ -902,12 +1086,45 @@ body.login {
 }
 
 .login-intro {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: center;
   padding: 48px clamp(28px, 6vw, 72px);
   background: var(--canvas);
   border-right: 1px solid var(--line);
+}
+
+/* Imagen de fondo en capa propia: la opacidad no afecta al logo ni al texto. */
+.login-intro::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url("img/FondoLogin.jpg") center / cover no-repeat;
+  opacity: 0.75;
+}
+
+/* Velo de legibilidad: la foto tiene sillones oscuros justo detrás del texto. */
+.login-intro::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(243, 245, 243, 0.84) 0%,
+    rgba(243, 245, 243, 0.8) 70%,
+    rgba(243, 245, 243, 0.45) 100%
+  );
+}
+
+/* La nota inferior necesita algo más de peso para pasar 4.5:1 sobre la foto. */
+.login-intro .login-caption {
+  color: var(--ink-soft) !important;
 }
 
 .login-intro h1 {
@@ -939,6 +1156,17 @@ body.login {
   align-items: center;
   justify-content: center;
   padding: 48px clamp(28px, 6vw, 80px);
+}
+
+/* En el acceso el logo sustituye al antiguo bloque de texto y se muestra grande. */
+.login-brand .brand-logo {
+  height: 104px;
+}
+
+@media (max-width: 920px) {
+  .login-brand .brand-logo {
+    height: 84px;
+  }
 }
 
 .login-form {
@@ -1263,6 +1491,9 @@ body.login {
   }
 
   .rail {
+    position: static;
+    height: auto;
+    align-self: stretch;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
@@ -1273,12 +1504,27 @@ body.login {
     padding: 14px 18px;
   }
 
+  .rail-top {
+    overflow: visible;
+    margin: 0;
+    padding: 0;
+  }
+
+  .main {
+    border-left: 0;
+  }
+
   .brand {
     margin-right: auto;
   }
 
+  .brand-logo {
+    height: 44px;
+  }
+
   .nav {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
     margin-top: 0;
   }
@@ -1287,11 +1533,30 @@ body.login {
     display: flex;
     align-items: center;
     gap: 12px;
+    border-top: 0;
+    padding-top: 0;
   }
 
   .who {
     display: none;
   }
+
+  .gear {
+    position: static;
+  }
+
+  .gear-menu {
+    left: 18px;
+    right: 18px;
+    bottom: auto;
+    top: calc(100% + 8px);
+    width: auto;
+    max-width: none;
+  }
+
+  .table-wrap-open { overflow-x: auto; }
+  .more-menu { position: static; margin-top: 6px; min-width: 0; box-shadow: none; }
+  .table-users .row-actions { flex-wrap: wrap; }
 
   .content {
     padding: 26px 20px 60px;
@@ -1336,6 +1601,11 @@ body.login {
     padding: 36px 24px;
   }
 
+  /* En una columna el texto ocupa casi todo el panel: el velo ya no se aclara. */
+  .login-intro::after {
+    background: linear-gradient(180deg, rgba(243, 245, 243, 0.88), rgba(243, 245, 243, 0.84));
+  }
+
   .login-panel {
     padding: 36px 24px 64px;
   }
@@ -1373,6 +1643,10 @@ body.login {
 
   .login-intro h1 {
     font-size: 1.625rem;
+  }
+
+  .login-brand .brand-logo {
+    height: 72px;
   }
 
   .field-row {

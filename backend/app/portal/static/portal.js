@@ -222,3 +222,23 @@ if (waitingWatch) {
     }
   }, 5000);
 }
+
+// Menús emergentes (engranaje de cuenta y «Más» de Usuarios): se cierran al
+// hacer clic fuera o con Escape. Solo hay uno abierto a la vez.
+const popovers = document.querySelectorAll("details[data-gear], details[data-more]");
+if (popovers.length) {
+  document.addEventListener("click", (event) => {
+    popovers.forEach((item) => {
+      if (item.open && !item.contains(event.target)) item.open = false;
+    });
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    popovers.forEach((item) => {
+      if (item.open) {
+        item.open = false;
+        item.querySelector("summary").focus();
+      }
+    });
+  });
+}

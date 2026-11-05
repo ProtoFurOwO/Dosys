@@ -56,6 +56,15 @@ def get(opener, path: str) -> tuple[int, str]:
         return error.code, error.read().decode("utf-8")
 
 
+def get_bytes(opener, path: str) -> tuple[int, str, bytes]:
+    request = Request(f"{BASE_URL}{path}", headers={"User-Agent": USER_AGENT}, method="GET")
+    try:
+        with opener.open(request, timeout=15) as response:
+            return response.status, response.headers.get_content_type(), response.read()
+    except HTTPError as error:
+        return error.code, error.headers.get_content_type(), error.read()
+
+
 def upload_request(
     opener,
     path: str,
@@ -96,6 +105,18 @@ def new_session():
 
 def main() -> None:
     opener = new_session()
+
+    # 0. La pantalla de acceso muestra el logo real del portal.
+    status, html = get(new_session(), "/portal/login")
+    assert status == 200, "La pantalla de acceso debe responder"
+    assert "/portal/static/img/LogoDOSYS.png" in html, "El acceso debe mostrar el logo del portal"
+    assert "brand-mark" not in html, "El acceso ya no debe usar el logo dibujado en CSS"
+
+    # 0.b El fondo del panel de acceso se sirve como imagen propia.
+    status, content_type, fondo = get_bytes(new_session(), "/portal/static/img/FondoLogin.jpg")
+    assert status == 200 and content_type == "image/jpeg" and fondo.startswith(b"\xff\xd8\xff"), (
+        "El fondo del acceso debe servirse como JPEG"
+    )
 
     # 1. Credenciales incorrectas → 401 con mensaje.
     status, html = form_request(opener, "/portal/login", {**DOCTOR, "password": "incorrecta"})
@@ -239,6 +260,40 @@ def main() -> None:
     status, html = form_request(admin, "/portal/login", ADMIN)
     assert status == 200, "El administrador debe entrar al portal"
 
+    # Menú del administrador: logo y engranaje con cuenta y administración.
+    status, html = get(admin, "/portal")
+    assert status == 200
+    assert "/portal/static/img/LogoDOSYS.png" in html, "El menú debe mostrar el logo del portal"
+    assert 'class="rail-top"' in html, "El menú lateral debe separar navegación y pie fijo"
+    assert "data-gear" in html, "El menú debe traer el engranaje de cuenta"
+    assert 'action="/portal/salir"' in html, "Cerrar sesión debe vivir dentro del engranaje"
+    assert 'class="nav"' in html, "El menú principal debe seguir existiendo"
+    nav_html = html.split('class="nav"', 1)[1].split("</nav>", 1)[0]
+    for path in ("/portal/roles", "/portal/actividad", "/portal/seguridad"):
+        assert path in html, f"El engranaje del admin debe incluir {path}"
+        assert path not in nav_html, f"El menú principal ya no debe incluir {path}"
+    assert "/portal/usuarios" in nav_html, "Usuarios sigue en el menú principal del admin"
+
+    status, content_type, logo = get_bytes(admin, "/portal/static/img/LogoDOSYS.png")
+    assert status == 200 and content_type == "image/png" and logo.startswith(b"\x89PNG"), (
+        "El logo debe servirse como PNG"
+    )
+
+    # Pantalla Usuarios: ancho amplio y acciones secundarias dentro de «Más».
+    status, html = get(admin, "/portal/usuarios")
+    assert status == 200
+    assert "content-wide" in html, "La tabla de usuarios debe usar el ancho amplio"
+    user_rows = [row for row in html.split("<tr>") if "/editar" in row]
+    assert user_rows, "La lista de usuarios debe traer filas"
+    for row in user_rows:
+        assert "data-more" in row, "Cada fila debe traer el menú Más"
+        assert "/estado" in row and "/reset" in row, "Cada fila conserva las acciones de contraseña y estado"
+        if ">2FA<" in row:
+            assert "/reset-2fa" in row, "La acción de reiniciar 2FA debe conservarse"
+        if "Bloqueada" in row:
+            assert "/desbloquear" in row, "La acción de desbloqueo debe conservarse"
+    assert "/liberar-dispositivo" in html, "La liberación del dispositivo de confianza debe conservarse"
+
     doctor_username = f"prueba_med_{suffix}"
     status, html = form_request(
         admin,
@@ -288,6 +343,12 @@ def main() -> None:
     doctor_portal = new_session()
     status, _ = form_request(doctor_portal, "/portal/login", {"username": doctor_username, "password": new_password})
     assert status == 200, "El médico entra al portal"
+    status, html = get(doctor_portal, "/portal")
+    assert status == 200
+    assert "/portal/seguridad" in html, "El engranaje debe mostrar Mi seguridad a todos los roles"
+    assert "/portal/roles" not in html, "Un médico sin roles:manage no debe ver Roles (ni oculto)"
+    assert "/portal/actividad" in html, "Un médico con audit:read debe ver Actividad en el engranaje"
+    assert "Administración" in html, "El encabezado de administración debe aparecer con al menos una opción"
     status, _ = get(doctor_portal, "/portal/usuarios")
     assert status == 403, f"Un médico no debe ver la gestión de usuarios (fue {status})"
 
@@ -319,7 +380,16 @@ def main() -> None:
     status, login = api("/api/v1/auth/login", method="POST", body={"username": doctor_username, "password": new_password})
     token_after = login["access_token"]
 
-    status, _ = get(doctor_portal, "/portal")  # el médico ya no tiene patients:read? sí lo tiene
+    status, html = get(doctor_portal, "/portal")  # el rol de enfermería conserva patients:read
+    assert status == 200
+    assert "/portal/seguridad" in html, "El engranaje sigue mostrando Mi seguridad"
+    assert "/portal/actividad" not in html, "Sin audit:read no debe aparecer Actividad (ni oculta)"
+    assert "/portal/roles" not in html, "Sin roles:manage no debe aparecer Roles (ni oculto)"
+    assert "Administración" not in html, "Sin opciones de administración no debe aparecer el encabezado"
+    status, _ = get(doctor_portal, "/portal/roles")
+    assert status == 403, "El acceso directo a roles debe seguir denegado"
+    status, _ = get(doctor_portal, "/portal/actividad")
+    assert status == 403, "El acceso directo a la actividad debe seguir denegado"
     status, _ = get(doctor_portal, "/portal/citas")
     assert status == 403, f"El rol de enfermería no debe ver la agenda (fue {status})"
 
