@@ -31,9 +31,11 @@ app = FastAPI(
         "Contiene solamente datos ficticios de demostración."
     ),
     version="0.1.0",
-    docs_url="/docs" if settings.docs_enabled else None,
-    redoc_url="/redoc" if settings.docs_enabled else None,
-    openapi_url="/openapi.json",
+    # Doble candado: aunque el .env diga DOCS_ENABLED=true, en producción no se
+    # publican Swagger ni ReDoc.
+    docs_url="/docs" if settings.docs_enabled and settings.app_env != "production" else None,
+    redoc_url="/redoc" if settings.docs_enabled and settings.app_env != "production" else None,
+    openapi_url="/openapi.json" if settings.docs_enabled and settings.app_env != "production" else None,
     lifespan=lifespan,
 )
 

@@ -72,6 +72,8 @@ Reglas importantes:
 
 - `POSTGRES_PASSWORD` **debe ser la misma** con la que se creó el volumen.
   Cambiarla en `.env` no cambia la contraseña real de PostgreSQL.
+- `DOCS_ENABLED=false` en producción. El código además oculta `/docs` y
+  `/openapi.json` cuando `APP_ENV=production`, pero conviene dejarlo explícito.
 - Conserva `JWT_SECRET_KEY` y `DOCUMENTS_SIGNING_KEY`: si cambian, las sesiones
   actuales se invalidan y los documentos existentes fallan la verificación de
   integridad.
