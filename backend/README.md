@@ -265,7 +265,14 @@ variante `release` el dominio HTTPS. Los endpoints del paciente son:
 
 ## Despliegue en el VPS con Nginx Proxy Manager
 
-1. Copia `backend/` al VPS y crea el `.env` de producción:
+> **No copies `backend/` encima de una instalación existente sin conservar
+> `.env` y `secrets/`.** El `.env` contiene la contraseña real de PostgreSQL y
+> las claves que firman sesiones y documentos. Si se pierde, sigue
+> [`RECUPERAR_VPS.md`](RECUPERAR_VPS.md).
+
+1. Copia `backend/` al VPS y crea el `.env` de producción. Usa la **misma**
+   `POSTGRES_PASSWORD` del volumen existente; si es una instalación nueva,
+   genera una contraseña larga y única:
 
    ```dotenv
    APP_ENV=production
@@ -290,10 +297,14 @@ variante `release` el dominio HTTPS. Los endpoints del paciente son:
 2. Levanta el stack con el daemon donde vive Nginx Proxy Manager:
 
    ```bash
-   sudo docker compose -f compose.production.yaml up -d --build
+   bash scripts/deploy_vps.sh
+   # equivale a:
+   # sudo docker compose -f compose.production.yaml up -d --build
    ```
 
-   La API queda publicada en `127.0.0.1:8000` y `172.17.0.1:8000` (nunca expuesta a internet).
+   El script valida `.env`, comprueba que la contraseña coincida con la base
+   existente y espera a que `/health` responda. La API queda publicada en
+   `127.0.0.1:8000` y `172.17.0.1:8000` (nunca expuesta a internet).
 
 3. En Nginx Proxy Manager crea un **Proxy Host**:
    - Domain: `medicos.tudominio.dev`

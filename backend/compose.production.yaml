@@ -49,6 +49,11 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
       - "172.17.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
     networks:
       # `data` es interna (la base no ve internet); `edge` le da a la API
       # salida a internet para servicios externos como el correo (Resend).
