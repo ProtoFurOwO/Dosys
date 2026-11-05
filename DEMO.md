@@ -17,10 +17,11 @@ Demostración de 7 a 10 minutos con dos dispositivos: **laptop** (portal clínic
    `medico` / `Medico123!`. Deja la ventana maximizada.
    Cuentas de apoyo: `laboratorio` / `Lab12345!` y `recepcion` / `Recepcion123!`.
 
-3. **Celular**: instala `dosys-clinico-vps.apk` (ya apunta al VPS), inicia sesión con
-   `paciente` / `Paciente123!` **una vez** para comprobar que todo carga, y sal de la
-   sesión. Deja el celular en la pantalla de acceso con datos móviles o wifi.
-   Concede el permiso de ubicación y ten la huella configurada.
+3. **Celular**: instala `dosys-clinico-vps.apk` (ya apunta al VPS; el backend debe
+   tener esta rama desplegada). Para emulador, usa `dosys-clinico-local.apk`.
+   Inicia sesión con `paciente` / `Paciente123!` **una vez** para comprobar que todo
+   carga, y sal de la sesión. Deja el celular en la pantalla de acceso con datos móviles
+   o wifi. Concede el permiso de ubicación y ten la huella configurada.
 
 4. **Citas de reserva**: en el portal, agenda 2 citas **para dentro de los próximos
    30 minutos** (el check-in abre 2 horas antes). Cada cita genera su propio QR y código.

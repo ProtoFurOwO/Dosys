@@ -36,7 +36,8 @@ Si el emulador no aparece: **Device Manager** (icono de celular con una lupa) �
 El APK ya viene compilado apuntando al backend real (`https://medicos.stolasimp.dev/api/v1/`):
 
 ```
-Proyecto/dosys-clinico-vps.apk
+Proyecto/dosys-clinico-vps.apk      # apunta al VPS (requiere el backend nuevo desplegado)
+Proyecto/dosys-clinico-local.apk    # emulador con backend local en 10.0.2.2:8000
 ```
 
 Cópialo al teléfono (cable, Drive o WhatsApp) e instálalo. Android pedirá permitir
