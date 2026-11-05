@@ -11,6 +11,7 @@ Todos los datos usados son ficticios.
 import json
 import os
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from http.cookiejar import CookieJar
 from urllib.error import HTTPError
@@ -28,6 +29,8 @@ PATIENT = {
     "device_name": "Verificación check-in",
 }
 STAFF = {"username": "medico", "password": "Medico123!"}
+ADMIN = {"username": "admin", "password": "Admin123!"}
+PASSWORD = "Prueba1234"
 
 
 def request(path: str, *, method: str = "GET", body: dict | None = None, token: str | None = None):
@@ -49,10 +52,10 @@ def request(path: str, *, method: str = "GET", body: dict | None = None, token: 
             return error.code, {"detail": body[:300]}
 
 
-def portal_session():
-    """Sesión del portal (recepción/médico) para crear la cita y ver el QR."""
+def portal_session(credentials: dict | None = None):
+    """Sesión del portal (recepción/médico/admin) para crear la cita y ver el QR."""
     opener = build_opener(HTTPCookieProcessor(CookieJar()))
-    data = urlencode(STAFF).encode()
+    data = urlencode(credentials or STAFF).encode()
     opener.open(Request(f"{BASE_URL}/portal/login", data=data, headers={"User-Agent": USER_AGENT}), timeout=15).read()
     return opener
 
@@ -79,6 +82,53 @@ def portal_post(opener, path: str, body: dict) -> tuple[int, str, str]:
             return response.status, response.read().decode("utf-8", "replace"), response.url
     except HTTPError as error:
         return error.code, error.read().decode("utf-8", "replace"), error.url
+
+
+
+def create_doctor(admin, suffix: str) -> str:
+    """Crea un médico nuevo para que su agenda no choque con citas de pruebas."""
+    username = f"checkin_med_{suffix}"
+    status, html, _ = portal_post(
+        admin,
+        "/portal/usuarios/nuevo",
+        {
+            "full_name": f"Dra. Check-in {suffix}",
+            "role_code": "doctor",
+            "specialty": "Medicina General",
+            "email": f"{username}@correo.com",
+            "username": username,
+            "password": PASSWORD,
+            "password_confirm": PASSWORD,
+        },
+    )
+    assert status == 201 and username in html, f"No se creó el médico de check-in ({status})"
+    return username
+
+
+def create_patient(opener, suffix: str) -> tuple[int, str]:
+    username = f"checkin_{suffix}"
+    status, html, _ = portal_post(
+        opener,
+        "/portal/pacientes/nuevo",
+        {
+            "full_name": f"Paciente Check-in {suffix}",
+            "curp": f"TEST{suffix}HCSRRN77",
+            "birth_date": "1998-07-21",
+            "blood_type": "O+",
+            "emergency_contact": "Contacto 961 000 1122",
+            "email": f"{username}@correo.com",
+            "username": username,
+            "password": PASSWORD,
+            "password_confirm": PASSWORD,
+            "allergies": "Sin alergias conocidas",
+            "medical_history": "Sin antecedentes de importancia",
+            "chronic_conditions": "Ninguno",
+        },
+    )
+    assert status == 201, f"No se creó el paciente de check-in ({status})"
+    match = re.search(r'/portal/pacientes/(\d+)"', html)
+    assert match, "La credencial debe enlazar al expediente"
+    return int(match.group(1)), username
 
 
 def schedule_checkin_cita(
@@ -122,15 +172,28 @@ def qr_code_for(opener, appointment_id: int) -> str:
 
 
 def main() -> None:
-    _, login = request("/api/v1/auth/login", method="POST", body=PATIENT)
-    token = login["access_token"]
-    status, profile = request("/api/v1/patients/me", token=token)
-    assert status == 200, "El paciente demo debe existir"
+    suffix = time.strftime("%H%M%S")
+    admin = portal_session(ADMIN)
+    doctor_username = create_doctor(admin, suffix)
+    portal = portal_session({"username": doctor_username, "password": PASSWORD})
+    patient_id, username = create_patient(portal, suffix)
 
-    portal = portal_session()
-    near_id = schedule_checkin_cita(portal, profile["id"], offsets=(10, 40, 70, 100))
+    status, login = request(
+        "/api/v1/auth/login",
+        method="POST",
+        body={
+            "username": username,
+            "password": PASSWORD,
+            "device_id": f"verify-checkin-{suffix}",
+            "device_name": "Check-in de verificación",
+        },
+    )
+    assert status == 200, "El paciente de check-in debe entrar a la app"
+    token = login["access_token"]
+
+    near_id = schedule_checkin_cita(portal, patient_id, offsets=(10, 40, 70, 100))
     near_code = qr_code_for(portal, near_id)
-    far_id = schedule_checkin_cita(portal, profile["id"], offsets=(1440, 1500, 1560), room="Consultorio 2")
+    far_id = schedule_checkin_cita(portal, patient_id, offsets=(1440, 1500, 1560), room="Consultorio 2")
     far_code = qr_code_for(portal, far_id)
 
     status, appointments = request("/api/v1/patients/me/appointments", token=token)
