@@ -203,6 +203,44 @@ control por permisos).
 - En local, abre `/docs`: están documentados `GET/PUT/DELETE /admin/users` y
   `GET/PUT/DELETE /admin/roles` (en producción Swagger va apagado).
 
+## Demo de transferencia de sesión entre dispositivos (3 min)
+
+**Preparación:** dos emuladores o dos teléfonos con la app instalada. En el teléfono A
+inicia sesión con `paciente` / `Paciente123!` (queda como **dispositivo de confianza**).
+Deja el teléfono B en la pantalla de acceso. Si es Android 13+, concede las notificaciones
+en A; si no, la app también detecta la solicitud al estar abierta (sondeo cada 5 s).
+
+1. En **B**, inicia sesión con el mismo paciente. La respuesta **no** trae tokens: aparece
+   *“Autoriza este dispositivo”* con la cuenta regresiva.
+2. En **A** llega la notificación **D.O.S.Y.S · Seguridad** (o, con la app abierta, la
+   pantalla de aprobación aparece sola). Pide **huella** y muestra un código de 6 dígitos.
+3. Escribe ese código en **B** y pulsa **Enviar código**.
+4. **A** compara el código localmente y aprueba la solicitud; **B** entra a su sesión.
+5. Vuelve a **A** y toca cualquier opción: la sesión ya no sirve (el servidor responde 401
+   de inmediato, no a los 30 minutos del JWT).
+
+> El servidor nunca genera, compara ni guarda el código; solo enruta la propuesta entre los
+> dos teléfonos. El código vive 60 segundos en la memoria de A y se destruye al expirar,
+> al aprobar o si la app pasa a segundo plano.
+
+### Para repetir la demo
+
+- Portal → **Usuarios** → **Restablecer dispositivo de confianza** (permiso `users:manage`,
+  auditado). El siguiente login desde cualquier teléfono es normal y vuelve a registrar el
+  dispositivo.
+- También se libera al **restablecer la contraseña** o al **cerrar sesión** en la app.
+- Límites: 3 propuestas por solicitud y 5 solicitudes por hora; una solicitud nueva
+  reemplaza a la anterior.
+
+### Alternativas que conviene mencionar
+
+- **“No tengo mi dispositivo anterior”** en B: si la cuenta tiene 2FA, pide el código TOTP
+  (o uno de recuperación) y libera el teléfono anterior; si no, invita a restablecer la
+  contraseña.
+- **Sin Firebase** todo funciona: `services/push.py` queda en modo simulado y la app sondea
+  cada 5 s con la pantalla abierta. Con `google-services.json` y `fcm.json` en el servidor,
+  la notificación despierta la app en segundo plano.
+
 ## Frases que ayudan a explicar
 
 - **"Solo lectura para el paciente"**: la app nunca modifica datos clínicos; las únicas

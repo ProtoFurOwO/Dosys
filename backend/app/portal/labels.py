@@ -47,6 +47,16 @@ ACTION_LABELS = {
     "two_factor_disabled": "Segundo factor desactivado",
     "portal_reset_two_factor": "Segundo factor reiniciado (soporte)",
     "recovery_code_used": "Código de recuperación usado",
+    # Dispositivos y transferencia de sesión
+    "device_registered": "Dispositivo de confianza registrado",
+    "device_transfer_requested": "Transferencia de sesión solicitada",
+    "device_transfer_code_submitted": "Código propuesto por el dispositivo nuevo",
+    "device_transfer_approved": "Transferencia de sesión aprobada",
+    "device_transfer_rejected": "Transferencia de sesión rechazada",
+    "device_transfer_failed": "Transferencia fallida por códigos incorrectos",
+    "device_transfer_expired": "Transferencia de sesión expirada",
+    "device_transfer_fallback": "Transferencia resuelta con segundo factor",
+    "device_released": "Dispositivo de confianza liberado",
     # Roles y permisos
     "portal_create_role": "Rol creado",
     "portal_update_role": "Permisos del rol actualizados",
@@ -75,6 +85,8 @@ ENTITY_LABELS = {
     "role": "Rol",
     "study_order": "Estudio",
     "prescription": "Receta",
+    "device": "Dispositivo",
+    "device_transfer": "Transferencia",
 }
 
 DETAIL_KEYS = {

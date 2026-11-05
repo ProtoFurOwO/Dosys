@@ -4,6 +4,7 @@ from app.db.session import Base
 from app.models.appointment import Appointment
 from app.models.audit_log import AuditLog
 from app.models.consultation import Consultation
+from app.models.device_transfer import DeviceTransfer
 from app.models.doctor import Doctor
 from app.models.document import Document
 from app.models.lab_study import LabStudy
@@ -15,6 +16,7 @@ from app.models.role import Role, role_permissions
 from app.models.session_token import PasswordResetToken, RefreshToken
 from app.models.study_order import StudyOrder
 from app.models.user import User
+from app.models.user_device import UserDevice
 
 __all__ = [
     "Base",
@@ -34,4 +36,6 @@ __all__ = [
     "StudyOrder",
     "Prescription",
     "PrescriptionItem",
+    "UserDevice",
+    "DeviceTransfer",
 ]

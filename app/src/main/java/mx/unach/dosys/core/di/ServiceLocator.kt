@@ -2,9 +2,12 @@ package mx.unach.dosys.core.di
 
 import android.content.Context
 import mx.unach.dosys.core.auth.SessionManager
+import mx.unach.dosys.core.device.DeviceIdentity
 import mx.unach.dosys.data.repository.AuthRepository
+import mx.unach.dosys.data.repository.DeviceRepository
 import mx.unach.dosys.data.repository.PatientRepository
 import mx.unach.dosys.data.repository.RemoteAuthRepository
+import mx.unach.dosys.data.repository.RemoteDeviceRepository
 import mx.unach.dosys.data.repository.RemotePatientRepository
 import mx.unach.dosys.data.repository.RemoteSecurityRepository
 import mx.unach.dosys.data.repository.SecurityRepository
@@ -29,12 +32,21 @@ object ServiceLocator {
     lateinit var securityRepository: SecurityRepository
         private set
 
+    lateinit var deviceIdentity: DeviceIdentity
+        private set
+
+    lateinit var deviceRepository: DeviceRepository
+        private set
+
     fun init(context: Context) {
-        sessionManager = SessionManager(context.applicationContext)
+        val application = context.applicationContext
+        sessionManager = SessionManager(application)
+        deviceIdentity = DeviceIdentity(application)
         val api = NetworkModule.create()
         val refresher = TokenRefresher(api, sessionManager)
-        authRepository = RemoteAuthRepository(api, sessionManager)
+        authRepository = RemoteAuthRepository(api, sessionManager, deviceIdentity)
         patientRepository = RemotePatientRepository(api, sessionManager, refresher)
         securityRepository = RemoteSecurityRepository(api, sessionManager, refresher)
+        deviceRepository = RemoteDeviceRepository(api, sessionManager, refresher, deviceIdentity)
     }
 }

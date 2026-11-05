@@ -1,9 +1,10 @@
 from app.models.appointment import Appointment
 from app.models.audit_log import AuditLog
 from app.models.consultation import Consultation
+from app.models.device_transfer import DeviceTransfer
 from app.models.doctor import Doctor
 from app.models.document import Document
-from app.models.enums import AppointmentStatus, UserRole
+from app.models.enums import AppointmentStatus, DeviceTransferStatus, UserRole
 from app.models.lab_study import LabStudy
 from app.models.patient import Patient
 from app.models.permission import Permission
@@ -13,12 +14,15 @@ from app.models.role import Role
 from app.models.session_token import PasswordResetToken, RefreshToken
 from app.models.study_order import StudyOrder
 from app.models.user import User
+from app.models.user_device import UserDevice
 
 __all__ = [
     "Appointment",
     "AppointmentStatus",
     "AuditLog",
     "Consultation",
+    "DeviceTransfer",
+    "DeviceTransferStatus",
     "Doctor",
     "Document",
     "LabStudy",
@@ -32,5 +36,6 @@ __all__ = [
     "Role",
     "StudyOrder",
     "User",
+    "UserDevice",
     "UserRole",
 ]

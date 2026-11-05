@@ -28,6 +28,8 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dosys}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-dosys}
+      # Sin el archivo, las notificaciones quedan simuladas (solo sondeo).
+      FCM_CREDENTIALS_FILE: ${FCM_CREDENTIALS_FILE:-/run/secrets/fcm.json}
     command: >-
       sh -c "alembic upgrade head &&
       uvicorn app.main:app --host 0.0.0.0 --port 8000"
@@ -37,6 +39,8 @@ services:
     # Los documentos clínicos viven en un volumen propio, fuera de la base.
     volumes:
       - documents_data:/data/documents
+      # Credenciales FCM fuera de la imagen y del repositorio (solo lectura).
+      - ./secrets:/run/secrets:ro
     # Solo se expone en la propia computadora. El emulador Android usa 10.0.2.2.
     # API_PORT permite cambiar el puerto local si el 8000 está ocupado.
     ports:

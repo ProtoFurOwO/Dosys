@@ -1,5 +1,10 @@
 package mx.unach.dosys.ui.home
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -21,6 +26,7 @@ import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,17 +36,27 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
+import mx.unach.dosys.core.di.ServiceLocator
 import mx.unach.dosys.data.mock.MockData
 import mx.unach.dosys.data.model.PatientAppointment
 import mx.unach.dosys.ui.format.formatClinicalDateTime
@@ -64,6 +80,14 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+
+    NotificationPermissionPrompt()
+
+    // El login puede navegar antes de que su ViewModel termine; aquí se
+    // garantiza el registro/actualización del dispositivo de confianza.
+    LaunchedEffect(Unit) {
+        ServiceLocator.deviceRepository.registerDevice()
+    }
 
     Scaffold(
         topBar = {
@@ -157,6 +181,71 @@ fun HomeScreen(
             }
         }
     }
+}
+
+/**
+ * Permiso de notificaciones (Android 13+) en un momento natural: tras entrar.
+ * Si se niega, la transferencia sigue funcionando con el sondeo en primer plano.
+ */
+@Composable
+private fun NotificationPermissionPrompt() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+    val context = LocalContext.current
+    val identity = ServiceLocator.deviceIdentity
+    val scope = rememberCoroutineScope()
+    var visible by remember { mutableStateOf(false) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        // El resultado no bloquea nada: el sondeo cubre el flujo sin permisos.
+    }
+
+    LaunchedEffect(Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted && !identity.notificationsPrompted()) {
+            visible = true
+        }
+    }
+
+    if (!visible) return
+
+    fun markPrompted() {
+        scope.launch { identity.markNotificationsPrompted() }
+    }
+
+    AlertDialog(
+        onDismissRequest = {
+            visible = false
+            markPrompted()
+        },
+        title = { Text("Avisos de seguridad") },
+        text = {
+            Text(
+                "Activa las notificaciones para enterarte al instante cuando alguien intente " +
+                    "entrar a tu cuenta desde otro teléfono. Si no las activas, la app revisará " +
+                    "la solicitud al abrirse."
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                visible = false
+                markPrompted()
+                launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }) {
+                Text("Permitir")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = {
+                visible = false
+                markPrompted()
+            }) {
+                Text("Ahora no")
+            }
+        },
+    )
 }
 
 @Composable
