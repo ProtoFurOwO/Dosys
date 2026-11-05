@@ -56,6 +56,23 @@ class TransferCodeSession(
         )
     }
 
+    /**
+     * Compara el hash SHA-256 de la propuesta que envió B con el hash local.
+     * El servidor nunca conoce el código en claro.
+     */
+    fun matchesHash(candidateHash: String?): Boolean {
+        val current = currentCode() ?: return false
+        val expected = candidateHash?.trim()?.lowercase() ?: return false
+        if (expected.length != 64) return false
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(current.toByteArray(Charsets.US_ASCII))
+        val local = digest.joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        return MessageDigest.isEqual(
+            local.toByteArray(Charsets.US_ASCII),
+            expected.toByteArray(Charsets.US_ASCII),
+        )
+    }
+
     /** Destruye el código (al expirar, salir de la pantalla o aprobar). */
     fun destroy() {
         code = null

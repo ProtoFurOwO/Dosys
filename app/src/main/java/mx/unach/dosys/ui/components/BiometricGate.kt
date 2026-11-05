@@ -42,6 +42,7 @@ fun BiometricGate(
     modifier: Modifier = Modifier,
     title: String = "Desbloquea tu expediente",
     description: String = "Usa tu huella o el bloqueo del teléfono para ver tu información clínica.",
+    allowFallback: Boolean = true,
 ) {
     val context = LocalContext.current
     val activity = context as? FragmentActivity
@@ -123,16 +124,30 @@ fun BiometricGate(
             }
         } else {
             Text(
-                text = "Este teléfono no tiene huella configurada.",
+                text = if (allowFallback) {
+                    "Este teléfono no tiene huella configurada."
+                } else {
+                    "Este teléfono no tiene huella ni PIN configurado."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(10.dp))
-            Button(
-                onClick = currentOnUnlocked,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Continuar")
+            if (allowFallback) {
+                Button(
+                    onClick = currentOnUnlocked,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Continuar")
+                }
+            } else {
+                Text(
+                    text = "Configura un bloqueo de pantalla para autorizar el acceso.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                )
             }
         }
 

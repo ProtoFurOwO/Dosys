@@ -6,8 +6,9 @@ from app.models.enums import DeviceTransferStatus
 class LoginRequest(BaseModel):
     username: str = Field(min_length=3, max_length=64, examples=["paciente"])
     password: str = Field(min_length=8, max_length=128, examples=["Paciente123!"])
-    # Opcionales y retrocompatibles: la app identifica el dispositivo de confianza.
-    device_id: str | None = Field(default=None, max_length=64)
+    # Obligatorio para pacientes en la ruta; se deja opcional para no romper
+    # los esquemas de roles que no usan dispositivo.
+    device_id: str | None = Field(default=None, min_length=8, max_length=64)
     device_name: str | None = Field(default=None, max_length=120)
 
 

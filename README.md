@@ -168,5 +168,5 @@ Comprueba dentro del emulador: `adb shell ping -c 1 10.0.2.2`. Si falla, reinici
 - El código de transferencia se genera con `SecureRandom`, vive 60 s en memoria, se compara
   con `MessageDigest.isEqual` y la pantalla aplica `FLAG_SECURE` mientras se muestra.
 - El token de sesión **no** se incluye en respaldos.
-- El expediente se protege con huella; si el teléfono no tiene biometría, se avisa y se deja continuar (decisión de demostración).
+- El expediente se protege con huella; si el teléfono no tiene biometría, se avisa y se deja continuar (decisión de demostración). La **aprobación de transferencia de sesión es fail-closed**: sin huella/PIN no se puede autorizar.
 - `SessionManager` pendiente de endurecer con Android Keystore.

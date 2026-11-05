@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.security.MessageDigest
 import java.security.SecureRandom
 
 class TransferCodeSessionTest {
@@ -71,5 +72,20 @@ class TransferCodeSessionTest {
         codeSession.generate()
         now += 60_000
         assertFalse(codeSession.matches("482913"))
+    }
+
+    @Test
+    fun `compara el hash sin guardar el codigo`() {
+        val codeSession = session()
+        codeSession.generate()
+        val hash = MessageDigest.getInstance("SHA-256")
+            .digest("482913".toByteArray(Charsets.US_ASCII))
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+
+        assertTrue(codeSession.matchesHash(hash))
+        assertFalse(codeSession.matchesHash("0".repeat(64)))
+
+        codeSession.destroy()
+        assertFalse(codeSession.matchesHash(hash))
     }
 }

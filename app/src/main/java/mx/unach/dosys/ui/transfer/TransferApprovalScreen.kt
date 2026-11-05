@@ -79,6 +79,7 @@ fun TransferApprovalScreen(
                 modifier = Modifier.padding(padding),
                 title = "Confirma que eres tú",
                 description = "Usa tu huella para ver el código con el que autorizas el nuevo dispositivo.",
+                allowFallback = false,
             )
         }
         return
@@ -245,7 +246,7 @@ private fun PendingContent(
     )
 
     Spacer(Modifier.height(16.dp))
-    if (!transfer.submittedCode.isNullOrBlank()) {
+    if (!transfer.submittedCodeHash.isNullOrBlank()) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -266,7 +267,7 @@ private fun PendingContent(
         Spacer(Modifier.height(12.dp))
     }
 
-    state.error?.takeIf { transfer.submittedCode.isNullOrBlank() }?.let { message ->
+    state.error?.takeIf { transfer.submittedCodeHash.isNullOrBlank() }?.let { message ->
         Text(
             text = message,
             style = MaterialTheme.typography.bodySmall,

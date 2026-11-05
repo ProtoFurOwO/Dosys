@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+import hmac
+
 import jwt as pyjwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,6 +53,10 @@ router = APIRouter(prefix="/auth", tags=["Autenticación"])
 _TRANSFER_EXPIRED_MESSAGE = "La solicitud de transferencia expiró. Inicia sesión otra vez."
 
 
+def _no_store(response: Response) -> None:
+    response.headers["Cache-Control"] = "no-store"
+
+
 async def _transfer_from_challenge(
     db: AsyncSession, transfer_id: str, challenge_token: str
 ) -> tuple[DeviceTransfer, int]:
@@ -82,8 +88,10 @@ async def _transfer_from_challenge(
 async def login(
     payload: LoginRequest,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
+    _no_store(response)
     """Autentica a un usuario; si tiene 2FA activo devuelve un token de desafío.
 
     El mensaje es deliberadamente genérico para no revelar si un usuario existe.
@@ -148,10 +156,18 @@ async def login(
     await login_security.reset_failed_attempts(db, user)
 
     # ── Dispositivo de confianza (solo pacientes) ─────────────────────────────
-    # Un dispositivo activo distinto (o ausente) exige transferencia de sesión;
-    # omitir ``device_id`` jamás debe saltarse este control.
+    # Un dispositivo activo distinto exige transferencia de sesión. Para
+    # pacientes, ``device_id`` es obligatorio: sin él no se emite ningún token.
     device = None
     if user.role.code == UserRole.PATIENT.value:
+        if not payload.device_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Actualiza la app e inicia sesión de nuevo: este dispositivo "
+                    "no tiene identificador de confianza."
+                ),
+            )
         active = await devices.active_device(db, user.id)
         if active is not None and not devices.matches_device(active, payload.device_id):
             if rate_limit.exceeded("api-device-transfer", request):
@@ -193,7 +209,9 @@ async def login(
                 expires_in=expires_in,
             )
 
-        if payload.device_id:
+        # Si hay 2FA, el dispositivo se registra/activa después de verificar el
+        # segundo factor. Así una contraseña sola no puede ocupar el slot activo.
+        if not (user.totp_enabled and user.totp_secret):
             device = await devices.register_or_touch(
                 db,
                 user,
@@ -213,11 +231,21 @@ async def login(
                 )
 
     if user.totp_enabled and user.totp_secret:
-        extra_claims: dict[str, str] = {}
-        if device is not None:
-            # Conserva el dispositivo para que el acceso final lleve ``did``.
-            extra_claims["did"] = device.device_hash
-            extra_claims["device_name"] = device.name
+        extra_claims: dict[str, object] = {}
+        if user.role.code == UserRole.PATIENT.value and payload.device_id:
+            # El hash del dispositivo viaja en el challenge; se activa al
+            # verificar el 2FA, nunca antes.
+            extra_claims["did"] = (
+                device.device_hash
+                if device is not None
+                else devices.hash_device_id(payload.device_id)
+            )
+            extra_claims["device_name"] = (
+                device.name
+                if device is not None
+                else devices.normalize_name(payload.device_name)
+            )
+            extra_claims["epoch"] = user.device_epoch or 0
         challenge, _ = create_challenge_token(user.id, extra_claims or None)
         await write_audit_event(
             db,
@@ -255,8 +283,10 @@ async def login(
 async def verify_two_factor(
     payload: TwoFactorVerifyRequest,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
+    _no_store(response)
     """Completa el inicio de sesión con el código TOTP o un código de recuperación."""
     try:
         decoded = decode_token(payload.challenge_token, purpose=TWO_FACTOR_PURPOSE)
@@ -273,6 +303,36 @@ async def verify_two_factor(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="El proceso de verificación expiró. Vuelve a iniciar sesión.",
         )
+
+    # Un challenge emitido antes de transferir/liberar el dispositivo no puede
+    # reactivarlo: el epoch cambia con cada cambio de dispositivo de confianza.
+    is_patient = user.role.code == UserRole.PATIENT.value
+    device_hash = decoded.get("did")
+    device_name = decoded.get("device_name")
+    fallback_transfer_id = decoded.get("transfer")
+    active = None
+    if is_patient:
+        if not device_hash:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Actualiza la app e inicia sesión de nuevo para vincular este dispositivo.",
+            )
+        epoch = decoded.get("epoch")
+        if epoch is None or int(epoch) != (user.device_epoch or 0):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="La sesión cambió de dispositivo. Vuelve a iniciar sesión.",
+            )
+        active = await devices.active_device(db, user.id)
+        if (
+            not fallback_transfer_id
+            and active is not None
+            and not hmac.compare_digest(active.device_hash, str(device_hash))
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Esta sesión se transfirió a otro dispositivo. Inicia sesión de nuevo.",
+            )
 
     used_recovery = False
     valid = two_factor.verify_code(user.totp_secret, payload.code)
@@ -308,33 +368,57 @@ async def verify_two_factor(
     # El desafío puede conservar el dispositivo (login normal con 2FA) o la
     # transferencia (alternativa "no tengo mi dispositivo anterior").
     device = None
-    device_hash = decoded.get("did")
-    device_name = decoded.get("device_name")
-    fallback_transfer_id = decoded.get("transfer")
-    if device_hash:
+    if is_patient:
         if fallback_transfer_id:
             transfer = await devices.get_transfer(db, str(fallback_transfer_id))
-            if transfer is not None and transfer.user_id == user.id:
-                await devices.reject_pending_for_fallback(db, transfer)
-                await accounts.revoke_user_sessions(db, user)
+            if transfer is None or transfer.user_id != user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="La solicitud de transferencia ya no está disponible.",
+                )
+            await devices.reject_pending_for_fallback(db, transfer)
+            await accounts.revoke_user_sessions(db, user)
+            await write_audit_event(
+                db,
+                user=user,
+                action="device_transfer_fallback",
+                entity_type="device_transfer",
+                entity_id=transfer.id,
+                request=request,
+                detail="2fa=correcto",
+            )
+            device = await devices.activate_device_hash(
+                db,
+                user,
+                str(device_hash),
+                device_name if isinstance(device_name, str) else None,
+            )
+        elif active is not None:
+            # El dispositivo sigue siendo el activo: no se reactiva nada.
+            device = active
+        else:
+            # Primer login con 2FA: recién aquí se activa el dispositivo.
+            device = await devices.activate_device_hash(
+                db,
+                user,
+                str(device_hash),
+                device_name if isinstance(device_name, str) else None,
+            )
+            if device is not None:
                 await write_audit_event(
                     db,
                     user=user,
-                    action="device_transfer_fallback",
-                    entity_type="device_transfer",
-                    entity_id=transfer.id,
+                    action="device_registered",
+                    entity_type="device",
+                    entity_id=device.id,
                     request=request,
-                    detail="2fa=correcto",
+                    detail=f"nombre={device.name}",
                 )
-        device = await devices.activate_device_hash(
-            db,
-            user,
-            str(device_hash),
-            device_name if isinstance(device_name, str) else None,
-        )
-    elif fallback_transfer_id:
-        # El dispositivo nuevo no envió identificador: se libera el de confianza.
-        await devices.release_device(db, user)
+        if device is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="No se pudo vincular este dispositivo. Inicia sesión de nuevo.",
+            )
 
     token, expires_in = create_access_token(
         user.id,
@@ -452,8 +536,10 @@ async def two_factor_disable(
 async def refresh_session(
     payload: RefreshRequest,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
+    _no_store(response)
     """Rota el token de renovación y entrega un acceso nuevo sin pedir credenciales."""
     if rate_limit.exceeded("api-refresh", request):
         raise HTTPException(
@@ -669,8 +755,10 @@ async def submit_device_transfer_code(
     transfer_id: str,
     payload: DeviceTransferCodeRequest,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ) -> DeviceTransferCodeResponse:
+    _no_store(response)
     """Deja la propuesta de código disponible para el dispositivo activo."""
     if rate_limit.exceeded("api-transfer-code", request):
         raise HTTPException(
@@ -729,8 +817,10 @@ async def device_transfer_status(
     transfer_id: str,
     payload: DeviceTransferStatusRequest,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ) -> DeviceTransferStatusResponse:
+    _no_store(response)
     """Sondeo del dispositivo nuevo; entrega los tokens una sola vez."""
     # El sondeo es cada ~2 s: un límite propio más alto evita falsos 429.
     if rate_limit.exceeded("api-transfer-status", request, limit=180):
@@ -825,8 +915,10 @@ async def device_transfer_fallback(
     transfer_id: str,
     payload: DeviceTransferStatusRequest,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ) -> TwoFactorChallengeResponse:
+    _no_store(response)
     """Alternativa si el paciente ya no tiene el dispositivo anterior."""
     if rate_limit.exceeded("api-transfer-fallback", request):
         raise HTTPException(
@@ -866,6 +958,7 @@ async def device_transfer_fallback(
                 "fallback": True,
                 "did": transfer.new_device_hash,
                 "device_name": transfer.new_device_name,
+                "epoch": user.device_epoch or 0,
             },
         )
         await devices.reject_pending_for_fallback(db, transfer)

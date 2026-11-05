@@ -17,7 +17,12 @@ from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
 
 BASE_URL = os.getenv("DOSYS_API_URL", "http://127.0.0.1:8000").rstrip("/")
 USER_AGENT = "D.O.S.Y.S/1.0 (verificacion academica)"
-PATIENT = {"username": "paciente", "password": "Paciente123!"}
+PATIENT = {
+    "username": "paciente",
+    "password": "Paciente123!",
+    "device_id": "verify-local-device-0001",
+    "device_name": "Verificación check-in",
+}
 STAFF = {"username": "medico", "password": "Medico123!"}
 EXPECTED_CODE = "A7K9M2"
 

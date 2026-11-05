@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.security import hash_password, verify_password
+from app.models.enums import UserRole
 from app.models.patient import Patient
 from app.models.session_token import PasswordResetToken, RefreshToken
 from app.models.user import User
@@ -95,6 +96,9 @@ async def rotate_refresh_token(
     device = await db.get(UserDevice, record.device_id) if record.device_id else None
     if device is not None and not device.is_active:
         # La sesión pertenecía a un dispositivo que ya fue reemplazado.
+        return None
+    if user.role.code == UserRole.PATIENT.value and device is None:
+        # Sesión vieja o emitida sin dispositivo: ya no se renueva.
         return None
     record.revoked_at = _now()
     new_token = await issue_refresh_token(db, user, device_id=record.device_id)

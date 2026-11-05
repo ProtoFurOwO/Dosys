@@ -83,17 +83,21 @@ Un paciente tiene **un solo dispositivo de confianza**. Si intenta entrar desde 
 teléfono, el servidor **no emite tokens**: crea una solicitud y avisa al dispositivo activo
 (notificación FCM o sondeo en primer plano). El dispositivo activo muestra un código de
 6 dígitos generado con `SecureRandom`, que vive **60 segundos y solo en memoria**; el
-dispositivo nuevo lo escribe y el servidor se lo reenvía al activo, que lo compara con
-tiempo constante. **El servidor nunca genera, compara ni registra el código.**
+dispositivo nuevo lo escribe y el servidor guarda solo su **hash SHA-256** para
+reenviarlo al activo, que compara el hash con el de su código local. **El servidor
+nunca genera, compara ni conoce el código en claro.**
 
 ### Flujo
 
-1. `POST /api/v1/auth/login` acepta `device_id` y `device_name` opcionales (UUID aleatorio
-   que genera la app; el servidor guarda solo su hash SHA-256).
-2. Si la cuenta no tiene dispositivo activo, el login es normal y el `device_id` queda
-   registrado. Si coincide con el activo, también es normal. Si es distinto **o no llega**,
-   la respuesta es `DeviceTransferChallengeResponse` con `transfer_id`, `challenge_token`
-   y `expires_in`; nunca incluye tokens.
+1. `POST /api/v1/auth/login` exige `device_id` para pacientes (UUID aleatorio que
+   genera la app; el servidor guarda solo su hash SHA-256). `device_name` es opcional.
+2. Si la cuenta no tiene dispositivo activo y no tiene 2FA, el login es normal y el
+   `device_id` queda registrado. Si tiene 2FA, el dispositivo se registra **después**
+   de verificar el segundo factor. Si el `device_id` coincide con el activo, el login
+   es normal. Si es distinto, la respuesta es `DeviceTransferChallengeResponse` con
+   `transfer_id`, `challenge_token` y `expires_in`; nunca incluye tokens. Si el
+   paciente omite `device_id`, se rechaza con **400**: no se emiten tokens sin
+   dispositivo.
 3. El dispositivo activo consulta `GET /devices/transfers/pending`, pide huella, genera el
    código local y sondea cada 2 s. El nuevo propone el código con
    `POST /auth/device-transfer/{id}/code` (máximo una propuesta pendiente y 3 por solicitud).
@@ -105,11 +109,17 @@ tiempo constante. **El servidor nunca genera, compara ni registra el código.**
    anterior quedan revocadas. Su access token responde **401 de inmediato** porque lleva el
    claim `did` (hash del dispositivo) y `get_current_user` lo compara con el activo.
 
+> Los tokens de paciente sin `did` se rechazan (obliga a re-login tras actualizar).
+> `users.device_epoch` invalida cualquier challenge 2FA emitido antes de una
+> transferencia, logout o liberación desde el portal: un challenge viejo no puede
+> reactivar el teléfono anterior. La aprobación exige biometría/PIN; si el teléfono
+> no tiene bloqueo de pantalla, la app no permite continuar.
+
 ### Endpoints nuevos
 
 | Método y ruta | Quién | Uso |
 |---|---|---|
-| `POST /auth/login` | público | Añade `device_id`/`device_name`; puede devolver el desafío de transferencia |
+| `POST /auth/login` | público | `device_id` obligatorio para pacientes; puede devolver el desafío de transferencia |
 | `POST /auth/device-transfer/{id}/code` | dispositivo nuevo | Propone el código (202) |
 | `POST /auth/device-transfer/{id}/status` | dispositivo nuevo | Estado; entrega `tokens` una sola vez |
 | `POST /auth/device-transfer/{id}/cancel` | dispositivo nuevo | Cancela la solicitud |
@@ -165,7 +175,7 @@ py -3.12 scripts\verify_vertical_slice.py   # API: médico crea, paciente lee, R
 py -3.12 scripts\verify_portal.py           # Portal: pacientes, consultas, citas, usuarios, credenciales y bitácora
 py -3.12 scripts\verify_checkin.py          # Check-in: código incorrecto 400, correcto 200 e idempotente
 py -3.12 scripts\verify_agenda.py           # Agenda: vistas, filtros por URL, modal, estado y consultorio dinámico
-py -3.12 scripts\verify_login_security.py   # Login: bloqueo 423, desbloqueo, 2FA y códigos de recuperación
+py -3.12 scripts\verify_login_security.py   # Login: bloqueo 429, desbloqueo, 2FA y códigos de recuperación
 py -3.12 scripts\verify_account_security.py # Cuentas: cambio y recuperación de contraseña, refresh con rotación, rate limit y API admin
 py -3.12 scripts\verify_device_transfer.py  # Transferencia: desafío, aprobación, 401 inmediato, límites, 2FA y portal
 py -3.12 scripts\demo_api_seguridad.py     # Demostración guiada para la presentación: 401, JWT con permisos, 403 por rol, firma y rotación

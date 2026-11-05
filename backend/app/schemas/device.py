@@ -23,7 +23,7 @@ class PendingTransferResponse(BaseModel):
     requested_at: datetime
     expires_in: int
     approval_token: str
-    submitted_code: str | None = None
+    submitted_code_hash: str | None = None
     submissions_left: int = 0
 
 

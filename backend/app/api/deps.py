@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import ACCESS_PURPOSE, decode_token
 from app.db.session import get_db
+from app.models.enums import UserRole
 from app.models.user import User
 from app.models.user_device import UserDevice
 from app.services.permissions import has_any_permission
@@ -47,6 +48,15 @@ async def get_current_user(
     # Si ese dispositivo dejó de ser el activo (transferencia aprobada o cierre
     # de sesión), el acceso se rechaza al instante, sin esperar al JWT de 30 min.
     device_hash = payload.get("did")
+    is_patient = user.role.code == UserRole.PATIENT.value
+    if is_patient and not device_hash:
+        # Compatibilidad cerrada a propósito: un token de paciente sin ``did``
+        # permitiría saltarse el dispositivo de confianza. Obliga a re-login.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Actualiza la app e inicia sesión de nuevo para vincular este dispositivo.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     if device_hash:
         active = await db.scalar(
             select(UserDevice)

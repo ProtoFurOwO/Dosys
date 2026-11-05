@@ -22,7 +22,13 @@ BASE_URL = os.getenv("DOSYS_API_URL", "http://127.0.0.1:8000").rstrip("/")
 USER_AGENT = "D.O.S.Y.S/1.0 (verificacion academica)"
 DOCTOR = {"username": "medico", "password": "Medico123!"}
 ADMIN = {"username": "admin", "password": "Admin123!"}
-PATIENT = {"username": "paciente", "password": "Paciente123!"}
+PATIENT = {
+    "username": "paciente",
+    "password": "Paciente123!",
+    "device_id": "verify-local-device-0001",
+    "device_name": "Verificación portal",
+}
+VERIFY_DEVICE = {"device_id": "verify-local-device-0001", "device_name": "Verificación portal"}
 
 
 def api(path: str, *, method: str = "GET", body: dict | None = None, token: str | None = None):
@@ -159,7 +165,7 @@ def main() -> None:
             "specialty": "Cardiología",
             "fecha": future,
             "hora": "11:30",
-            "location": "Consultorio 7",
+            "location": "Consultorio 1",
             "notes": "Acude con ayuno de 8 horas.",
         },
     )
@@ -178,7 +184,7 @@ def main() -> None:
     status, html = form_request(
         opener,
         f"/portal/pacientes/{patient_id}/cita",
-        {"specialty": "Cardiología", "fecha": "2020-01-01", "hora": "11:30", "location": "Consultorio 7", "notes": ""},
+        {"specialty": "Cardiología", "fecha": "2020-01-01", "hora": "11:30", "location": "Consultorio 1", "notes": ""},
     )
     assert status == 422 and "futuras" in html, "El portal debe rechazar citas en el pasado"
 
@@ -228,7 +234,9 @@ def main() -> None:
     assert status == 200 and "Correo enviado" in html, "El envío simulado debe mostrar la vista previa"
 
     status, login = api(
-        "/api/v1/auth/login", method="POST", body={"username": patient_username, "password": patient_password}
+        "/api/v1/auth/login",
+        method="POST",
+        body={"username": patient_username, "password": patient_password, **VERIFY_DEVICE},
     )
     assert status == 200 and login["role"] == "patient", "El paciente registrado debe entrar a la app"
     status, profile = api("/api/v1/patients/me", token=login["access_token"])

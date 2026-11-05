@@ -172,13 +172,13 @@ class TransferApprovalViewModel : ViewModel() {
                                 secondsLeft = codeSession.remainingSeconds(),
                             )
                         }
-                        val submitted = transfer.submittedCode
+                        val submitted = transfer.submittedCodeHash
                         if (!submitted.isNullOrBlank() &&
                             submitted != handledSubmission &&
                             !approving
                         ) {
                             handledSubmission = submitted
-                            if (codeSession.matches(submitted)) {
+                            if (codeSession.matchesHash(submitted)) {
                                 approve(transfer)
                                 break
                             }

@@ -20,7 +20,7 @@ data class PendingTransfer(
     @SerialName("requested_at") val requestedAt: String = "",
     @SerialName("expires_in") val expiresIn: Int = 0,
     @SerialName("approval_token") val approvalToken: String,
-    @SerialName("submitted_code") val submittedCode: String? = null,
+    @SerialName("submitted_code_hash") val submittedCodeHash: String? = null,
     @SerialName("submissions_left") val submissionsLeft: Int = 0,
 )
 

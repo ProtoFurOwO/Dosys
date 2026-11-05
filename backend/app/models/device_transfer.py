@@ -20,10 +20,11 @@ def _values(enum_class: type[DeviceTransferStatus]) -> list[str]:
 class DeviceTransfer(Base):
     """Solicitud de transferencia de sesión hacia un dispositivo nuevo.
 
-    El servidor actúa solo como enrutador: nunca genera, compara ni registra el
-    código de 6 dígitos. ``submitted_code`` es la propuesta que el dispositivo
-    nuevo escribió y que el dispositivo activo debe comparar localmente; se
-    borra al resolver cada propuesta y al terminar la transferencia.
+    El servidor actúa solo como enrutador: nunca genera, compara ni conoce el
+    código de 6 dígitos. ``submitted_code_hash`` es el hash SHA-256 de la
+    propuesta que escribió el dispositivo nuevo; el dispositivo activo compara
+    ese hash con el hash de su código local. Se borra al resolver la propuesta
+    y al terminar la transferencia.
     """
 
     __tablename__ = "device_transfers"
@@ -44,7 +45,7 @@ class DeviceTransfer(Base):
         nullable=False,
     )
     approval_token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    submitted_code: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    submitted_code_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     code_submissions: Mapped[int] = mapped_column(
         Integer, default=0, server_default="0", nullable=False
     )

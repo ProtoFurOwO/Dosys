@@ -115,6 +115,7 @@ async def register_or_touch(
 ) -> UserDevice:
     """Registra o actualiza el dispositivo; si se activa, desactiva los demás."""
     device_hash = hash_device_id(device_id)
+    previous = await active_device(db, user.id) if activate else None
     if activate:
         await db.execute(
             update(UserDevice)
@@ -146,6 +147,10 @@ async def register_or_touch(
         device.last_seen_at = _now()
         if activate:
             device.is_active = True
+    if activate and (
+        previous is None or not hmac.compare_digest(previous.device_hash, device_hash)
+    ):
+        user.device_epoch = (user.device_epoch or 0) + 1
     if fcm_token is not None:
         device.fcm_token = fcm_token.strip()[:255] or None
     await db.flush()
@@ -156,12 +161,15 @@ async def activate_device_hash(
     db: AsyncSession, user: User, device_hash: str | None, name: str | None
 ) -> UserDevice | None:
     """Activa un dispositivo a partir de su hash (login ya validado)."""
+    previous = await active_device(db, user.id)
     if not device_hash:
         await db.execute(
             update(UserDevice)
             .where(UserDevice.user_id == user.id, UserDevice.is_active.is_(True))
             .values(is_active=False)
         )
+        if previous is not None:
+            user.device_epoch = (user.device_epoch or 0) + 1
         await db.flush()
         return None
 
@@ -193,6 +201,8 @@ async def activate_device_hash(
         device.last_seen_at = _now()
         if name:
             device.name = normalize_name(name)
+    if previous is None or not hmac.compare_digest(previous.device_hash, device_hash):
+        user.device_epoch = (user.device_epoch or 0) + 1
     await db.flush()
     return device
 
@@ -223,6 +233,8 @@ async def release_device(db: AsyncSession, user: User) -> bool:
         .where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))
         .values(revoked_at=_now())
     )
+    if released:
+        user.device_epoch = (user.device_epoch or 0) + 1
     await db.flush()
     return bool(released)
 
@@ -237,6 +249,9 @@ async def release_device_by_id(db: AsyncSession, device_id: int) -> bool:
         .where(RefreshToken.device_id == device_id, RefreshToken.revoked_at.is_(None))
         .values(revoked_at=_now())
     )
+    user = await db.get(User, device.user_id)
+    if user is not None:
+        user.device_epoch = (user.device_epoch or 0) + 1
     await db.flush()
     return True
 
@@ -260,7 +275,7 @@ async def expire_if_needed(db: AsyncSession, transfer: DeviceTransfer) -> bool:
     if transfer.status in _ACTIVE_STATUSES and transfer.expires_at <= _now():
         transfer.status = DeviceTransferStatus.EXPIRED
         transfer.resolved_at = _now()
-        transfer.submitted_code = None
+        transfer.submitted_code_hash = None
         await db.flush()
         return True
     return False
@@ -294,6 +309,11 @@ async def create_transfer(
     device_name: str | None,
 ) -> tuple[DeviceTransfer, str]:
     """Crea la solicitud. Una nueva sustituye a la pendiente anterior."""
+    if not device_id:
+        raise DeviceTransferError(
+            "Actualiza la app e inicia sesión de nuevo para identificar este dispositivo.",
+            status_code=400,
+        )
     since = _now() - timedelta(hours=1)
     recent = await db.scalar(
         select(func.count(DeviceTransfer.id)).where(
@@ -315,12 +335,12 @@ async def create_transfer(
         .values(
             status=DeviceTransferStatus.EXPIRED,
             resolved_at=_now(),
-            submitted_code=None,
+            submitted_code_hash=None,
         )
     )
 
     transfer_id = str(uuid4())
-    new_hash = hash_device_id(device_id) if device_id else None
+    new_hash = hash_device_id(device_id)
     approval_token = derive_approval_token(transfer_id, user.id, new_hash)
     transfer = DeviceTransfer(
         id=transfer_id,
@@ -358,7 +378,7 @@ async def submit_code(
         )
     if transfer.status not in _ACTIVE_STATUSES:
         raise DeviceTransferError("La solicitud ya no está disponible.")
-    if transfer.submitted_code is not None:
+    if transfer.submitted_code_hash is not None:
         raise DeviceTransferError(
             "Ya hay un código esperando aprobación en tu otro dispositivo. "
             "Espera a que lo revises."
@@ -369,7 +389,7 @@ async def submit_code(
         await db.flush()
         raise DeviceTransferError("Se agotaron los intentos de esta solicitud.")
 
-    transfer.submitted_code = code
+    transfer.submitted_code_hash = hash_token(code)
     transfer.code_submissions += 1
     transfer.status = DeviceTransferStatus.CODE_SUBMITTED
     await db.flush()
@@ -396,10 +416,15 @@ async def approve_transfer(
         raise DeviceTransferError("Este dispositivo ya no es el activo.", status_code=403)
     if not verify_approval_token(transfer, approval_token):
         raise DeviceTransferError("El token de aprobación no es válido.", status_code=403)
+    if not transfer.new_device_hash:
+        raise DeviceTransferError(
+            "La solicitud no identifica el dispositivo nuevo. Inicia sesión de nuevo.",
+            status_code=409,
+        )
 
     transfer.status = DeviceTransferStatus.APPROVED
     transfer.resolved_at = _now()
-    transfer.submitted_code = None
+    transfer.submitted_code_hash = None
 
     # B pasa a ser el único dispositivo activo; A queda fuera de inmediato
     # porque su claim ``did`` deja de coincidir con el dispositivo activo.
@@ -437,6 +462,7 @@ async def approve_transfer(
         .where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))
         .values(revoked_at=_now())
     )
+    user.device_epoch = (user.device_epoch or 0) + 1
     await db.flush()
     return transfer
 
@@ -452,7 +478,7 @@ async def reject_transfer(
         if transfer.status in _ACTIVE_STATUSES:
             transfer.status = DeviceTransferStatus.EXPIRED
             transfer.resolved_at = _now()
-            transfer.submitted_code = None
+            transfer.submitted_code_hash = None
             await db.flush()
         return transfer
 
@@ -464,9 +490,9 @@ async def reject_transfer(
     if reason == "not_me":
         transfer.status = DeviceTransferStatus.REJECTED
         transfer.resolved_at = _now()
-        transfer.submitted_code = None
+        transfer.submitted_code_hash = None
     elif reason == "mismatch":
-        transfer.submitted_code = None
+        transfer.submitted_code_hash = None
         if transfer.code_submissions >= settings.device_transfer_max_code_submissions:
             transfer.status = DeviceTransferStatus.FAILED
             transfer.resolved_at = _now()
@@ -485,7 +511,7 @@ async def cancel_transfer(db: AsyncSession, transfer: DeviceTransfer) -> None:
     if transfer.status in _ACTIVE_STATUSES:
         transfer.status = DeviceTransferStatus.REJECTED
         transfer.resolved_at = _now()
-        transfer.submitted_code = None
+        transfer.submitted_code_hash = None
         await db.flush()
 
 
@@ -493,7 +519,7 @@ async def reject_pending_for_fallback(db: AsyncSession, transfer: DeviceTransfer
     if transfer.status in _ACTIVE_STATUSES:
         transfer.status = DeviceTransferStatus.REJECTED
         transfer.resolved_at = _now()
-        transfer.submitted_code = None
+        transfer.submitted_code_hash = None
         await db.flush()
 
 
@@ -504,23 +530,25 @@ async def issue_tokens_for_approved(
     locked = await _lock_transfer(db, transfer.id)
     if locked is None or locked.status != DeviceTransferStatus.APPROVED or locked.consumed_at is not None:
         return None
+    if locked.user_id != user.id or not locked.new_device_hash:
+        return None
     transfer = locked
 
-    device = None
-    if transfer.new_device_hash:
-        device = await db.scalar(
-            select(UserDevice).where(
-                UserDevice.user_id == user.id,
-                UserDevice.device_hash == transfer.new_device_hash,
-                UserDevice.is_active.is_(True),
-            )
+    device = await db.scalar(
+        select(UserDevice).where(
+            UserDevice.user_id == user.id,
+            UserDevice.device_hash == transfer.new_device_hash,
+            UserDevice.is_active.is_(True),
         )
-    device_hash = device.device_hash if device else None
+    )
+    if device is None:
+        # No se emiten tokens sin un dispositivo activo: evitaría el control did.
+        return None
     access, expires_in = create_access_token(
         user.id,
         user.role.code,
         sorted(permission_codes(user)),
-        device_hash=device_hash,
+        device_hash=device.device_hash,
     )
     refresh = secrets.token_urlsafe(_REFRESH_BYTES)
     db.add(
@@ -528,11 +556,10 @@ async def issue_tokens_for_approved(
             user_id=user.id,
             token_hash=hash_token(refresh),
             expires_at=_now() + timedelta(days=settings.refresh_token_expire_days),
-            device_id=device.id if device else None,
+            device_id=device.id,
         )
     )
     transfer.consumed_at = _now()
-    if device is not None:
-        device.last_seen_at = _now()
+    device.last_seen_at = _now()
     await db.flush()
     return access, refresh, expires_in

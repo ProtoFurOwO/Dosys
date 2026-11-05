@@ -65,6 +65,7 @@ async def register_my_device(
 )
 async def pending_transfer(
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(_patient_only),
 ) -> PendingTransferResponse | Response:
@@ -72,7 +73,10 @@ async def pending_transfer(
     transfer = await devices.pending_transfer(db, current_user.id)
     if transfer is None:
         await db.commit()
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
+        return Response(
+            status_code=status.HTTP_204_NO_CONTENT,
+            headers={"Cache-Control": "no-store"},
+        )
 
     approval_token = devices.derive_approval_token(
         transfer.id, transfer.user_id, transfer.new_device_hash
@@ -83,12 +87,13 @@ async def pending_transfer(
         requested_at=transfer.created_at,
         expires_in=devices.seconds_left(transfer),
         approval_token=approval_token,
-        submitted_code=transfer.submitted_code,
+        submitted_code_hash=transfer.submitted_code_hash,
         submissions_left=max(
             0,
             settings.device_transfer_max_code_submissions - transfer.code_submissions,
         ),
     )
+    response.headers["Cache-Control"] = "no-store"
     await db.commit()
     return payload
 

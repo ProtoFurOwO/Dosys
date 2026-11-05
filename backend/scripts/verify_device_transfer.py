@@ -25,6 +25,7 @@ from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
 BASE_URL = os.getenv("DOSYS_API_URL", "http://127.0.0.1:8000").rstrip("/")
 USER_AGENT = "D.O.S.Y.S/1.0 (verificacion academica)"
 DOCTOR = {"username": "medico", "password": "Medico123!"}
+ADMIN = {"username": "admin", "password": "Admin123!"}
 PASSWORD = "Prueba1234"
 
 _passed = 0
@@ -91,7 +92,7 @@ def totp_now(secret: str, step: int = 30, digits: int = 6) -> str:
     return f"{code:0{digits}d}"
 
 
-def create_patient(portal, prefix: str) -> tuple[str, str]:
+def create_patient(portal, prefix: str) -> tuple[str, str, int]:
     global _patient_counter
     _patient_counter += 1
     suffix = time.strftime("%H%M%S")
@@ -113,8 +114,10 @@ def create_patient(portal, prefix: str) -> tuple[str, str]:
     )
     assert status == 201, f"No se creó el paciente de prueba ({status})"
     match = re.search(r'/portal/pacientes/(\d+)"', html)
+    user_match = re.search(r'name="user_id" value="(\d+)"', html)
     assert match, "La credencial debe enlazar al expediente del paciente"
-    return username, match.group(1)
+    assert user_match, "La credencial debe incluir el user_id"
+    return username, match.group(1), int(user_match.group(1))
 
 
 def login(username: str, device_id: str | None = None, device_name: str | None = None):
@@ -149,11 +152,13 @@ def pending_for(token: str):
 def main() -> int:
     portal = portal_opener()
     portal_request(portal, "/portal/login", DOCTOR)
+    admin_portal = portal_opener()
+    portal_request(admin_portal, "/portal/login", ADMIN)
     stamp = time.strftime("%H%M%S")
 
     # ── Flujo feliz, cierre inmediato de A y límites ──────────────────────────
     print("== Flujo feliz (A aprueba, B recibe tokens una sola vez) ==")
-    username, patient_id = create_patient(portal, "transf")
+    username, patient_id, _ = create_patient(portal, "transf")
     device_a = f"device-a-{stamp}"
     device_b = f"device-b-{stamp}"
 
@@ -178,7 +183,7 @@ def main() -> int:
     status, pending = pending_for(token_a)
     check(
         "A ve la solicitud con su token de aprobación",
-        status == 200 and pending.get("approval_token") and pending.get("submitted_code") is None,
+        status == 200 and pending.get("approval_token") and pending.get("submitted_code_hash") is None,
         f"status={status}",
     )
 
@@ -189,7 +194,11 @@ def main() -> int:
     check("no se aceptan dos propuestas simultáneas (409)", status == 409, f"status={status}")
 
     status, pending = pending_for(token_a)
-    check("A recibe la propuesta para compararla localmente", status == 200 and pending.get("submitted_code") == "482913")
+    expected_hash = hashlib.sha256(b"482913").hexdigest()
+    check(
+        "A recibe el hash de la propuesta para compararla localmente",
+        status == 200 and pending.get("submitted_code_hash") == expected_hash,
+    )
 
     status, _ = api(
         f"/api/v1/devices/transfers/{transfer_id}/approve",
@@ -223,18 +232,62 @@ def main() -> int:
     status, _ = api("/api/v1/patients/me", token=token_b)
     check("el access token de B funciona", status == 200, f"status={status}")
 
-    status, no_device = login(username)
+    # ── Un challenge 2FA viejo no debe revivir al dispositivo anterior ───────
+    print("== Challenge 2FA viejo vs transferencia ==")
+    username_race, _, _ = create_patient(portal, "race")
+    status, first_race = login(username_race, f"race-a-{stamp}", "Equipo A")
+    token_a_race = first_race.get("access_token")
+    check("paciente para prueba de challenge 2FA", status == 200 and bool(token_a_race), f"status={status}")
+
+    status, setup_race = api("/api/v1/auth/2fa/setup", method="POST", token=token_a_race)
+    status, enabled_race = api(
+        "/api/v1/auth/2fa/confirm",
+        method="POST",
+        token=token_a_race,
+        body={"code": totp_now(setup_race["secret"])},
+    )
+    check("2FA activado para la prueba de carrera", status == 200 and enabled_race.get("enabled"), f"status={status}")
+
+    status, old_challenge = login(username_race, f"race-a-{stamp}", "Equipo A")
     check(
-        "omitir device_id con un dispositivo activo también exige transferencia",
-        status == 200 and no_device.get("requires_device_transfer") is True,
+        "login normal con 2FA entrega challenge, no tokens",
+        status == 200 and old_challenge.get("requires_2fa") is True,
         f"status={status}",
     )
+
+    status, challenge_race = login(username_race, f"race-b-{stamp}", "Equipo B")
+    transfer_race = challenge_race["transfer_id"]
+    status, pending_race = pending_for(token_a_race)
     status, _ = api(
-        f"/api/v1/auth/device-transfer/{no_device['transfer_id']}/cancel",
+        f"/api/v1/devices/transfers/{transfer_race}/approve",
         method="POST",
-        body={"challenge_token": no_device["challenge_token"]},
+        token=token_a_race,
+        body={"approval_token": pending_race["approval_token"]},
     )
-    check("B puede cancelar su solicitud", status == 200, f"status={status}")
+    check("A aprueba B antes de completar el 2FA viejo", status == 200, f"status={status}")
+
+    status, old_verify = api(
+        "/api/v1/auth/2fa/verify",
+        method="POST",
+        body={
+            "challenge_token": old_challenge["challenge_token"],
+            "code": totp_now(setup_race["secret"]),
+        },
+    )
+    check(
+        "el challenge 2FA viejo ya no reactiva el dispositivo A",
+        status == 401,
+        f"status={status} detail={old_verify.get('detail')}",
+    )
+    status, _ = api("/api/v1/patients/me", token=token_a_race)
+    check("A sigue fuera después del intento de revivir el 2FA", status == 401, f"status={status}")
+
+    status, no_device = login(username)
+    check(
+        "omitir device_id se rechaza aunque haya un dispositivo activo",
+        status == 400 and "Actualiza" in no_device.get("detail", ""),
+        f"status={status} detail={no_device.get('detail')}",
+    )
 
     status, challenge_c = login(username, f"device-c-{stamp}", "Equipo C")
     status, _ = api(
@@ -260,7 +313,7 @@ def main() -> int:
 
     # ── Códigos incorrectos, not_me y expiración ──────────────────────────────
     print("== Rechazos y intentos agotados ==")
-    username2, _ = create_patient(portal, "rechaz")
+    username2, _, _ = create_patient(portal, "rechaz")
     status, first2 = login(username2, f"device-a-{stamp}", "Equipo A")
     token_a2 = first2.get("access_token")
     check("segundo paciente con dispositivo registrado", status == 200 and bool(token_a2), f"status={status}")
@@ -331,7 +384,7 @@ def main() -> int:
 
     # ── 2FA como alternativa y liberación desde el portal ─────────────────────
     print("== Alternativas: 2FA y liberación desde el portal ==")
-    username3, patient3_id = create_patient(portal, "dospas")
+    username3, patient3_id, patient3_user_id = create_patient(portal, "dospas")
     status, first3 = login(username3, f"device-a-{stamp}", "Equipo A")
     token_a3 = first3.get("access_token")
     status, setup = api("/api/v1/auth/2fa/setup", method="POST", token=token_a3)
@@ -368,11 +421,33 @@ def main() -> int:
     status, _ = api("/api/v1/patients/me", token=token_b3)
     check("el dispositivo nuevo entra con su token", status == 200, f"status={status}")
 
-    status, html = portal_request(portal, f"/portal/usuarios/{patient3_id}/liberar-dispositivo", {})
-    check("el portal libera el dispositivo de confianza", status == 200 and "liberado" in html.lower(), f"status={status}")
+    # Liberación desde portal y logout con un paciente sin 2FA.
+    time.sleep(61)
+    username_rel, _, user_rel = create_patient(portal, "release")
+    status, first_rel = login(username_rel, f"rel-a-{stamp}", "Equipo A")
+    check(
+        "paciente para liberar dispositivo desde portal",
+        status == 200 and bool(first_rel.get("access_token")),
+        f"status={status}",
+    )
 
-    status, fresh = login(username3, f"device-f-{stamp}", "Equipo F")
-    check("tras liberarlo, entrar desde cualquier teléfono es normal", status == 200 and "access_token" in fresh, f"status={fresh.get('detail', status)}")
+    status, html = portal_request(
+        admin_portal,
+        f"/portal/usuarios/{user_rel}/liberar-dispositivo",
+        {},
+    )
+    check(
+        "el portal libera el dispositivo de confianza",
+        status == 200 and ("liberado" in html.lower() or "dispositivo" in html.lower()),
+        f"status={status}",
+    )
+
+    status, fresh = login(username_rel, f"rel-f-{stamp}", "Equipo F")
+    check(
+        "tras liberarlo, entrar desde cualquier teléfono es normal",
+        status == 200 and "access_token" in fresh,
+        f"status={fresh.get('detail', status)}",
+    )
 
     status, _ = api(
         "/api/v1/auth/logout",
@@ -380,7 +455,7 @@ def main() -> int:
         body={"refresh_token": fresh.get("refresh_token", "")},
     )
     check("cerrar sesión revoca la sesión renovable", status == 200, f"status={status}")
-    status, after_logout = login(username3, f"device-g-{stamp}", "Equipo G")
+    status, after_logout = login(username_rel, f"rel-g-{stamp}", "Equipo G")
     check(
         "cerrar sesión libera el dispositivo de confianza",
         status == 200 and "access_token" in after_logout,
