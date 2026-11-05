@@ -20,7 +20,7 @@ from app.portal import deps
 from app.portal.labels import ROLE_LABELS, action_label
 from app.portal.routes import forbidden, portal_staff
 from app.portal.templating import credential_context, templates
-from app.services import login_security, two_factor
+from app.services import devices, login_security, two_factor
 from app.services.audit import write_audit_event
 from app.services.email import delivery_enabled, send_email
 from app.services.permissions import has_permission
@@ -467,6 +467,38 @@ async def user_reset_two_factor(
     )
     await db.commit()
     return users_redirect()
+
+
+@router.post("/usuarios/{user_id:int}/liberar-dispositivo")
+async def user_release_device(
+    user_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Libera el dispositivo de confianza (permite entrar desde otro teléfono)."""
+    session = await require_staff(request, db)
+    if session is None:
+        return login_redirect()
+    current_user, _ = session
+    if not has_permission(current_user, "users:manage"):
+        return users_redirect("permiso")
+
+    account = await db.get(User, user_id)
+    if account is None:
+        return users_redirect("no-encontrado")
+
+    released = await devices.release_device(db, account)
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="device_released",
+        entity_type="user",
+        entity_id=account.id,
+        request=request,
+        detail=f"username={account.username} portal=si",
+    )
+    await db.commit()
+    return users_redirect("dispositivo" if released else "sin-dispositivo")
 
 
 @router.post("/usuarios/{user_id:int}/reset", response_class=HTMLResponse)

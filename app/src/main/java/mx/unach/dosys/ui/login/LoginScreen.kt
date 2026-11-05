@@ -2,6 +2,7 @@ package mx.unach.dosys.ui.login
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +20,8 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,13 +48,15 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 /**
- * Pantalla de acceso en dos pasos:
- * 1) usuario y contraseña; 2) código del segundo factor si la cuenta lo tiene activo.
+ * Pantalla de acceso en pasos:
+ * 1) usuario y contraseña; 2) código del segundo factor si la cuenta lo tiene
+ * activo; o transferencia de sesión si la cuenta ya vive en otro teléfono.
  * El paciente recibe sus credenciales en el hospital (no hay autorregistro).
  */
 @Composable
 fun LoginScreen(
     onLoggedIn: () -> Unit,
+    notice: String? = null,
     viewModel: LoginViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -74,10 +79,28 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            if (state.step == LoginStep.TWO_FACTOR) {
-                TwoFactorStep(state = state, viewModel = viewModel)
-            } else {
-                CredentialsStep(state = state, viewModel = viewModel)
+            if (notice != null && state.step == LoginStep.CREDENTIALS) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ),
+                ) {
+                    Text(
+                        text = notice,
+                        modifier = Modifier.padding(14.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                Spacer(Modifier.height(20.dp))
+            }
+
+            when (state.step) {
+                LoginStep.TWO_FACTOR -> TwoFactorStep(state = state, viewModel = viewModel)
+                LoginStep.DEVICE_TRANSFER -> DeviceTransferStep(state = state, viewModel = viewModel)
+                LoginStep.CREDENTIALS -> CredentialsStep(state = state, viewModel = viewModel)
             }
         }
     }
@@ -265,6 +288,147 @@ private fun TwoFactorStep(state: LoginUiState, viewModel: LoginViewModel) {
     }
 }
 
+/**
+ * Paso B: la cuenta está activa en otro teléfono. El usuario escribe el código
+ * que aparece en el dispositivo de confianza y espera la aprobación.
+ */
+@Composable
+private fun DeviceTransferStep(state: LoginUiState, viewModel: LoginViewModel) {
+    Icon(
+        imageVector = Icons.Filled.Shield,
+        contentDescription = null,
+        modifier = Modifier.size(72.dp),
+        tint = MaterialTheme.colorScheme.primary,
+    )
+    Spacer(Modifier.height(12.dp))
+    Text(
+        text = "Autoriza este dispositivo",
+        fontSize = 26.sp,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        textAlign = TextAlign.Center,
+    )
+    Text(
+        text = "Tu cuenta ya está activa en tu teléfono de confianza. Ahí verás un código de " +
+            "6 dígitos: escríbelo aquí para transferir la sesión.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+    )
+    Spacer(Modifier.height(20.dp))
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Tiempo restante",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = clockText(state.transferSecondsLeft),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (state.transferSecondsLeft <= 20) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Intentos restantes: ${state.transferSubmissionsLeft}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            state.transferHint?.let { hint ->
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = hint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+
+    Spacer(Modifier.height(18.dp))
+    OutlinedTextField(
+        value = state.code,
+        onValueChange = { value ->
+            viewModel.onCodeChange(value.filter { it.isDigit() }.take(6))
+        },
+        label = { Text("Código de 6 dígitos") },
+        leadingIcon = { Icon(Icons.Filled.Shield, contentDescription = null) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Done,
+        ),
+        keyboardActions = KeyboardActions(onDone = { viewModel.submitTransferCode() }),
+        modifier = Modifier.fillMaxWidth(),
+    )
+
+    state.error?.let { message ->
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = message,
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center,
+        )
+    }
+
+    Spacer(Modifier.height(20.dp))
+    Button(
+        onClick = viewModel::submitTransferCode,
+        enabled = !state.isLoading && state.code.length == 6,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp),
+    ) {
+        if (state.isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(22.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+        } else {
+            Text("Enviar código", fontSize = 16.sp)
+        }
+    }
+
+    Spacer(Modifier.height(10.dp))
+    Text(
+        text = "Si no ves el código en tu otro teléfono, revisa que tenga la app abierta o espera la notificación.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+    )
+
+    TextButton(onClick = viewModel::useTransferFallback) {
+        Text("No tengo mi dispositivo anterior")
+    }
+    TextButton(onClick = viewModel::cancelTransfer) {
+        Text("Cancelar")
+    }
+    if (state.error != null) {
+        TextButton(onClick = viewModel::backToCredentials) {
+            Text("Intentar de nuevo")
+        }
+    }
+}
+
 @Composable
 private fun RecoveryDialog(state: LoginUiState, viewModel: LoginViewModel) {
     AlertDialog(
@@ -323,3 +487,5 @@ private fun RecoveryDialog(state: LoginUiState, viewModel: LoginViewModel) {
         },
     )
 }
+
+private fun clockText(seconds: Int): String = "%d:%02d".format(seconds / 60, seconds % 60)

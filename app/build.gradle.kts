@@ -5,6 +5,12 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// Firebase es opcional en tiempo de compilación: sin google-services.json el
+// proyecto compila y la transferencia funciona solo con el sondeo en primer plano.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 // Permite compilar apuntando a otro backend sin tocar el código:
 //   .\gradlew.bat :app:assembleDebug -PapiBaseUrl=https://medicos.stolasimp.dev/api/v1/
 val apiBaseUrlOverride: String? = (project.findProperty("apiBaseUrl") as String?)?.takeIf { it.isNotBlank() }
@@ -99,6 +105,10 @@ dependencies {
 
     // Mapa del hospital (OpenStreetMap, sin API key)
     implementation(libs.osmdroid.android)
+
+    // Notificaciones de seguridad (FCM): activas solo con google-services.json
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 
     // Pruebas
     testImplementation(libs.junit)

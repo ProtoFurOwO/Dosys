@@ -34,6 +34,8 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dosys}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-dosys}
+      # Sin el archivo, las notificaciones quedan simuladas (solo sondeo).
+      FCM_CREDENTIALS_FILE: ${FCM_CREDENTIALS_FILE:-/run/secrets/fcm.json}
     command: >-
       sh -c "alembic upgrade head &&
       uvicorn app.main:app --host 0.0.0.0 --port 8000"
@@ -42,6 +44,8 @@ services:
         condition: service_healthy
     volumes:
       - documents_data:/data/documents
+      # La cuenta de servicio FCM vive fuera de la imagen (montaje de solo lectura).
+      - ./secrets:/run/secrets:ro
     ports:
       - "127.0.0.1:8000:8000"
       - "172.17.0.1:8000:8000"

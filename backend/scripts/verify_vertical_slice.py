@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 
 BASE_URL = os.getenv("DOSYS_API_URL", "http://127.0.0.1:8000").rstrip("/")
 USER_AGENT = "D.O.S.Y.S/1.0 (verificacion academica)"
+DEVICE = {"device_id": "verify-local-device-0001", "device_name": "Verificación vertical"}
 
 
 def request(path: str, *, method: str = "GET", body: dict | None = None, token: str | None = None) -> tuple[int, object]:
@@ -38,7 +39,7 @@ def login(username: str, password: str) -> dict:
     _, result = request(
         "/api/v1/auth/login",
         method="POST",
-        body={"username": username, "password": password},
+        body={"username": username, "password": password, **DEVICE},
     )
     return result  # type: ignore[return-value]
 

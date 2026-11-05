@@ -1,9 +1,15 @@
 from pydantic import BaseModel, Field
 
+from app.models.enums import DeviceTransferStatus
+
 
 class LoginRequest(BaseModel):
     username: str = Field(min_length=3, max_length=64, examples=["paciente"])
     password: str = Field(min_length=8, max_length=128, examples=["Paciente123!"])
+    # Obligatorio para pacientes en la ruta; se deja opcional para no romper
+    # los esquemas de roles que no usan dispositivo.
+    device_id: str | None = Field(default=None, min_length=8, max_length=64)
+    device_name: str | None = Field(default=None, max_length=120)
 
 
 class TokenResponse(BaseModel):
@@ -50,6 +56,40 @@ class TwoFactorChallengeResponse(BaseModel):
     requires_2fa: bool = True
     challenge_token: str
     message: str = "Escribe el código de 6 dígitos de tu app autenticadora."
+
+
+class DeviceTransferChallengeResponse(BaseModel):
+    """La cuenta ya tiene un dispositivo activo y este es distinto."""
+
+    requires_device_transfer: bool = True
+    transfer_id: str
+    challenge_token: str
+    expires_in: int
+    message: str = (
+        "Enviamos una solicitud al dispositivo de confianza. Escribe ahí el código de 6 dígitos."
+    )
+
+
+class DeviceTransferCodeRequest(BaseModel):
+    challenge_token: str = Field(min_length=20)
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$", examples=["482913"])
+
+
+class DeviceTransferStatusRequest(BaseModel):
+    challenge_token: str = Field(min_length=20)
+
+
+class DeviceTransferCodeResponse(BaseModel):
+    submissions_left: int
+    detail: str = "Código enviado al dispositivo de confianza."
+
+
+class DeviceTransferStatusResponse(BaseModel):
+    status: DeviceTransferStatus
+    expires_in: int = 0
+    submissions_left: int = 0
+    # Solo aparece una vez, al aprobarse la transferencia.
+    tokens: TokenResponse | None = None
 
 
 class TwoFactorVerifyRequest(BaseModel):

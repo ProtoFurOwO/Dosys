@@ -8,6 +8,9 @@ import kotlinx.serialization.Serializable
 data class LoginRequest(
     @SerialName("username") val username: String,
     @SerialName("password") val password: String,
+    /** Identificador aleatorio persistente del dispositivo (se envía su hash). */
+    @SerialName("device_id") val deviceId: String? = null,
+    @SerialName("device_name") val deviceName: String? = null,
 )
 
 /**
@@ -22,6 +25,10 @@ data class LoginResponse(
     val role: String = "",
     @SerialName("requires_2fa") val requires2fa: Boolean = false,
     @SerialName("challenge_token") val challengeToken: String? = null,
+    @SerialName("requires_device_transfer") val requiresDeviceTransfer: Boolean = false,
+    @SerialName("transfer_id") val transferId: String? = null,
+    @SerialName("expires_in") val expiresIn: Int = 0,
+    val message: String? = null,
 )
 
 /** Verificación del segundo factor (código TOTP o código de recuperación). */

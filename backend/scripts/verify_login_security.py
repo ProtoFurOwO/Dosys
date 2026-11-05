@@ -23,6 +23,7 @@ BASE_URL = os.getenv("DOSYS_API_URL", "http://127.0.0.1:8000").rstrip("/")
 USER_AGENT = "D.O.Y.S.S/1.0 (verificacion academica)"
 DOCTOR = {"username": "medico", "password": "Medico123!"}
 WRONG_PASSWORD = "Incorrecta999"
+DEVICE = {"device_id": "verify-local-device-0001", "device_name": "Verificación login"}
 
 
 def api(path: str, *, method: str = "GET", body: dict | None = None, token: str | None = None):
@@ -101,9 +102,9 @@ def main() -> None:
 
     # 2. Bloqueo por intentos fallidos.
     for _ in range(5):
-        status, _ = api("/api/v1/auth/login", method="POST", body={"username": username, "password": WRONG_PASSWORD})
+        status, _ = api("/api/v1/auth/login", method="POST", body={"username": username, "password": WRONG_PASSWORD, **DEVICE})
         assert status == 401, "Cada intento fallido debe responder 401"
-    status, body = api("/api/v1/auth/login", method="POST", body={"username": username, "password": password})
+    status, body = api("/api/v1/auth/login", method="POST", body={"username": username, "password": password, **DEVICE})
     assert status == 429, f"La cuenta bloqueada debe responder 429 (fue {status})"
     assert "bloqueada" in body["detail"].lower()
 
@@ -114,7 +115,7 @@ def main() -> None:
     status, body_text = portal_request(portal, f"/portal/pacientes/{patient_id}/desbloquear", {})
     assert status == 200, f"desbloqueo respondio {status}: {body_text[:160]}"
 
-    status, login = api("/api/v1/auth/login", method="POST", body={"username": username, "password": password})
+    status, login = api("/api/v1/auth/login", method="POST", body={"username": username, "password": password, **DEVICE})
     assert status == 200 and "access_token" in login, "Tras desbloquear debe poder entrar"
     token = login["access_token"]
 
@@ -141,7 +142,7 @@ def main() -> None:
     assert status == 200 and status_body["enabled"] and status_body["recovery_codes_remaining"] == 8
 
     # 6. Login en dos pasos.
-    status, challenge = api("/api/v1/auth/login", method="POST", body={"username": username, "password": password})
+    status, challenge = api("/api/v1/auth/login", method="POST", body={"username": username, "password": password, **DEVICE})
     assert status == 200 and challenge.get("requires_2fa") is True, "El login debe pedir el segundo factor"
     challenge_token = challenge["challenge_token"]
 
@@ -160,7 +161,7 @@ def main() -> None:
     assert status == 200 and "access_token" in tokens, "El código correcto completa el login"
 
     # 7. Código de recuperación: sirve una vez y no se repite.
-    status, challenge = api("/api/v1/auth/login", method="POST", body={"username": username, "password": password})
+    status, challenge = api("/api/v1/auth/login", method="POST", body={"username": username, "password": password, **DEVICE})
     challenge_token = challenge["challenge_token"]
     status, recovered = api(
         "/api/v1/auth/2fa/verify",
@@ -169,7 +170,7 @@ def main() -> None:
     )
     assert status == 200 and "access_token" in recovered, "El código de recuperación debe servir"
 
-    status, challenge = api("/api/v1/auth/login", method="POST", body={"username": username, "password": password})
+    status, challenge = api("/api/v1/auth/login", method="POST", body={"username": username, "password": password, **DEVICE})
     challenge_token = challenge["challenge_token"]
     status, _ = api(
         "/api/v1/auth/2fa/verify",
@@ -185,7 +186,7 @@ def main() -> None:
     status, body_text = portal_request(portal, f"/portal/pacientes/{patient_id}/reiniciar-2fa", {})
     assert status == 200, f"el reinicio de 2FA respondio {status}: {body_text[:120]}"
 
-    status, login = api("/api/v1/auth/login", method="POST", body={"username": username, "password": password})
+    status, login = api("/api/v1/auth/login", method="POST", body={"username": username, "password": password, **DEVICE})
     assert status == 200 and "access_token" in login, "Tras reiniciar el 2FA debe entrar solo con la contraseña"
 
     status, status_body = api("/api/v1/auth/2fa/status", token=login["access_token"])

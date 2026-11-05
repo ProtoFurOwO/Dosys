@@ -27,6 +27,7 @@ BASE_URL = os.getenv("DOSYS_API_URL", "https://medicos.stolasimp.dev").rstrip("/
 USER_AGENT = "D.O.S.Y.S/1.0 (demostracion academica)"
 USERNAME = os.getenv("DOSYS_DEMO_USUARIO", "medico")
 PASSWORD = os.getenv("DOSYS_DEMO_PASSWORD", "Medico123!")
+VERIFY_DEVICE = {"device_id": "verify-local-device-0001", "device_name": "Verificación demo"}
 ANCHO = 66
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -106,7 +107,11 @@ def main() -> int:
     veredicto(status == 401, "Sin JWT no se entrega ningún dato (401).")
 
     titulo("2", "Inicio de sesión: aquí nace el JWT")
-    status, login = api("/api/v1/auth/login", method="POST", body={"username": USERNAME, "password": PASSWORD})
+    status, login = api(
+        "/api/v1/auth/login",
+        method="POST",
+        body={"username": USERNAME, "password": PASSWORD, **VERIFY_DEVICE},
+    )
     if status == 200 and login.get("requires_2fa"):
         print("  Esta cuenta tiene segundo factor activo.")
         print("  Desde el portal: Pacientes/Usuarios -> 'Reiniciar 2FA', o usa otra cuenta con DOSYS_DEMO_USUARIO.")

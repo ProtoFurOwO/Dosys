@@ -19,7 +19,13 @@ from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
 BASE_URL = os.getenv("DOSYS_API_URL", "http://127.0.0.1:8000").rstrip("/")
 USER_AGENT = "D.O.S.Y.S/1.0 (verificacion academica)"
 ADMIN = {"username": "admin", "password": "Admin123!"}
-PATIENT = {"username": "paciente", "password": "Paciente123!"}
+PATIENT = {
+    "username": "paciente",
+    "password": "Paciente123!",
+    "device_id": "verify-local-device-0001",
+    "device_name": "Verificación cuentas",
+}
+VERIFY_DEVICE = {"device_id": "verify-local-device-0001", "device_name": "Verificación cuentas"}
 
 _passed = 0
 _failed = 0
@@ -83,7 +89,7 @@ def main() -> int:
     recovered = "Final12345"
 
     print("== Cambio de contraseña (API) ==")
-    _, login = api("/api/v1/auth/login", method="POST", body={"username": PATIENT["username"], "password": PATIENT["password"]})
+    _, login = api("/api/v1/auth/login", method="POST", body=PATIENT)
     check("login de paciente con token de renovación", bool(login.get("refresh_token")))
 
     # Cuenta desechable creada desde el portal para no tocar las cuentas demo.
@@ -102,7 +108,7 @@ def main() -> int:
     )
     check("cuenta desechable creada desde el portal", status < 400, f"status={status}")
 
-    status, login = api("/api/v1/auth/login", method="POST", body={"username": username, "password": original})
+    status, login = api("/api/v1/auth/login", method="POST", body={"username": username, "password": original, **VERIFY_DEVICE})
     check("login inicial de la cuenta desechable", status == 200, f"status={status}")
     token = login.get("access_token")
 
@@ -130,15 +136,15 @@ def main() -> int:
     )
     check("cambio correcto responde 200", status == 200, f"status={status}")
 
-    status, _ = api("/api/v1/auth/login", method="POST", body={"username": username, "password": original})
+    status, _ = api("/api/v1/auth/login", method="POST", body={"username": username, "password": original, **VERIFY_DEVICE})
     check("la contraseña anterior ya no sirve", status == 401, f"status={status}")
-    status, login = api("/api/v1/auth/login", method="POST", body={"username": username, "password": changed})
+    status, login = api("/api/v1/auth/login", method="POST", body={"username": username, "password": changed, **VERIFY_DEVICE})
     check("la contraseña nueva sí sirve", status == 200, f"status={status}")
     token = login.get("access_token")
 
     print("== Cambio de contraseña (portal) ==")
     doctor_portal = portal_opener()
-    portal_request(doctor_portal, "/portal/login", {"username": username, "password": changed})
+    portal_request(doctor_portal, "/portal/login", {"username": username, "password": changed, **VERIFY_DEVICE})
     status, html = portal_request(
         doctor_portal,
         "/portal/seguridad/contrasena",
@@ -168,7 +174,7 @@ def main() -> int:
         )
         check("el restablecimiento se guarda", status < 400, f"status={status}")
 
-        status, _ = api("/api/v1/auth/login", method="POST", body={"username": username, "password": recovered})
+        status, _ = api("/api/v1/auth/login", method="POST", body={"username": username, "password": recovered, **VERIFY_DEVICE})
         check("se puede entrar con la contraseña restablecida", status == 200, f"status={status}")
 
         status, _ = portal_request(
@@ -179,7 +185,7 @@ def main() -> int:
         check("el token de un solo uso ya no sirve", status == 400, f"status={status}")
 
     print("== Sesión renovable (refresh con rotación) ==")
-    status, login = api("/api/v1/auth/login", method="POST", body={"username": PATIENT["username"], "password": PATIENT["password"]})
+    status, login = api("/api/v1/auth/login", method="POST", body=PATIENT)
     first_refresh = login.get("refresh_token", "")
     check("el login entrega refresh token", bool(first_refresh))
 

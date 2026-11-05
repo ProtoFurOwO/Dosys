@@ -20,6 +20,9 @@ Backend académico con **FastAPI + SQLAlchemy async + Alembic + PostgreSQL** y u
 - **Login seguro**: bloqueo de la cuenta tras 5 intentos fallidos (con desbloqueo desde el
   portal), **segundo factor TOTP** (Google Authenticator y similares) para médicos y
   pacientes, y **códigos de recuperación** de un solo uso.
+- **Transferencia de sesión entre dispositivos** para la app del paciente: un solo teléfono
+  de confianza, código OTP generado localmente (60 s) y aprobación criptográfica; funciona
+  sin Firebase (sondeo) y mejora con FCM.
 - PostgreSQL aislado, migraciones Alembic versionadas y bitácora de auditoría de todos
   los accesos, sin guardar tokens ni texto clínico.
 
@@ -74,6 +77,95 @@ Credenciales exclusivamente locales/de demostración:
 | Paciente (app) | `paciente` | `Paciente123!` |
 | Médico (portal) | `medico` | `Medico123!` |
 
+## Transferencia de sesión entre dispositivos (app del paciente)
+
+Un paciente tiene **un solo dispositivo de confianza**. Si intenta entrar desde otro
+teléfono, el servidor **no emite tokens**: crea una solicitud y avisa al dispositivo activo
+(notificación FCM o sondeo en primer plano). El dispositivo activo muestra un código de
+6 dígitos generado con `SecureRandom`, que vive **60 segundos y solo en memoria**; el
+dispositivo nuevo lo escribe y el servidor guarda solo su **hash SHA-256** para
+reenviarlo al activo, que compara el hash con el de su código local. **El servidor
+nunca genera, compara ni conoce el código en claro.**
+
+### Flujo
+
+1. `POST /api/v1/auth/login` exige `device_id` para pacientes (UUID aleatorio que
+   genera la app; el servidor guarda solo su hash SHA-256). `device_name` es opcional.
+2. Si la cuenta no tiene dispositivo activo y no tiene 2FA, el login es normal y el
+   `device_id` queda registrado. Si tiene 2FA, el dispositivo se registra **después**
+   de verificar el segundo factor. Si el `device_id` coincide con el activo, el login
+   es normal. Si es distinto, la respuesta es `DeviceTransferChallengeResponse` con
+   `transfer_id`, `challenge_token` y `expires_in`; nunca incluye tokens. Si el
+   paciente omite `device_id`, se rechaza con **400**: no se emiten tokens sin
+   dispositivo.
+3. El dispositivo activo consulta `GET /devices/transfers/pending`, pide huella, genera el
+   código local y sondea cada 2 s. El nuevo propone el código con
+   `POST /auth/device-transfer/{id}/code` (máximo una propuesta pendiente y 3 por solicitud).
+4. El activo compara en local. Si coincide, llama `POST /devices/transfers/{id}/approve`
+   con el `approval_token`; si no, `reject` con `mismatch`; el botón **“No fui yo”** usa
+   `not_me` y termina la solicitud.
+5. Tras aprobar, el dispositivo nuevo obtiene sus tokens **una sola vez** al sondear
+   `POST /auth/device-transfer/{id}/status`, pasa a ser el activo y las sesiones del
+   anterior quedan revocadas. Su access token responde **401 de inmediato** porque lleva el
+   claim `did` (hash del dispositivo) y `get_current_user` lo compara con el activo.
+
+> Los tokens de paciente sin `did` se rechazan (obliga a re-login tras actualizar).
+> `users.device_epoch` invalida cualquier challenge 2FA emitido antes de una
+> transferencia, logout o liberación desde el portal: un challenge viejo no puede
+> reactivar el teléfono anterior. La aprobación exige biometría/PIN; si el teléfono
+> no tiene bloqueo de pantalla, la app no permite continuar.
+
+### Endpoints nuevos
+
+| Método y ruta | Quién | Uso |
+|---|---|---|
+| `POST /auth/login` | público | `device_id` obligatorio para pacientes; puede devolver el desafío de transferencia |
+| `POST /auth/device-transfer/{id}/code` | dispositivo nuevo | Propone el código (202) |
+| `POST /auth/device-transfer/{id}/status` | dispositivo nuevo | Estado; entrega `tokens` una sola vez |
+| `POST /auth/device-transfer/{id}/cancel` | dispositivo nuevo | Cancela la solicitud |
+| `POST /auth/device-transfer/{id}/fallback` | dispositivo nuevo | 2FA si el paciente perdió el teléfono anterior; 409 si no tiene 2FA |
+| `PUT /devices/me` | dispositivo activo | Registra el dispositivo y su token FCM |
+| `GET /devices/transfers/pending` | dispositivo activo | Solicitud pendiente + `approval_token` + código propuesto |
+| `POST /devices/transfers/{id}/approve` | dispositivo activo | Aprueba y cierra la sesión anterior |
+| `POST /devices/transfers/{id}/reject` | dispositivo activo | `not_me`, `mismatch` o `expired` |
+
+### Límites y alternativas
+
+| Variable | Valor por defecto | Efecto |
+|---|---|---|
+| `DEVICE_TRANSFER_TTL_SECONDS` | `120` | Vida total de la solicitud (cubre push + huella) |
+| `DEVICE_TRANSFER_MAX_CODE_SUBMISSIONS` | `3` | Propuestas por transferencia, impuestas por el servidor |
+| `DEVICE_TRANSFER_MAX_PER_HOUR` | `5` | Solicitudes por usuario y hora (429 al exceder) |
+| `FCM_CREDENTIALS_FILE` | vacío | Cuenta de servicio; sin archivo el envío es simulado |
+
+- Una solicitud nueva sustituye a la pendiente anterior (la anterior queda `expired`).
+- **Restablecer la contraseña** libera el dispositivo de confianza, además de revocar
+  sesiones. En el portal, **Usuarios → Restablecer dispositivo de confianza** hace lo mismo
+  (permiso `users:manage`, auditado). **Cerrar sesión** en la app también lo libera.
+- Si el paciente ya no tiene el teléfono anterior y tiene 2FA, `fallback` devuelve el
+  desafío TOTP existente (acepta código o de recuperación); al verificarlo se libera el
+  dispositivo anterior. Si no tiene 2FA, responde 409 invitando a recuperar la contraseña.
+- El portal web y los roles distintos de `patient` no cambian.
+
+### Auditoría
+
+Cada evento queda en la bitácora con etiqueta en español: `device_registered`,
+`device_transfer_requested`, `device_transfer_code_submitted`, `device_transfer_approved`,
+`device_transfer_rejected`, `device_transfer_failed`, `device_transfer_expired`,
+`device_transfer_fallback` y `device_released`. **Nunca se registra el código ni ningún
+ token.**
+
+### Firebase Cloud Messaging (opcional)
+
+1. Crea el proyecto en Firebase y registra la app Android `mx.unach.dosys` con el SHA-1 de
+   debug. Descarga `google-services.json` en `app/` (está en `.gitignore`).
+2. Genera una cuenta de servicio y colócala **solo en el servidor** como
+   `backend/secrets/fcm.json`. Compose monta esa carpeta en `/run/secrets` (solo lectura);
+   nunca va dentro de la imagen ni del repositorio.
+3. Apunta `FCM_CREDENTIALS_FILE=/run/secrets/fcm.json` en el `.env` (ya es el valor por
+   defecto de Compose). Sin archivo, `services/push.py` registra el envío como simulado y
+   todo funciona con el sondeo de la app.
+
 ## Pruebas de aceptación repetibles
 
 Con los contenedores levantados:
@@ -83,8 +175,9 @@ py -3.12 scripts\verify_vertical_slice.py   # API: médico crea, paciente lee, R
 py -3.12 scripts\verify_portal.py           # Portal: pacientes, consultas, citas, usuarios, credenciales y bitácora
 py -3.12 scripts\verify_checkin.py          # Check-in: código incorrecto 400, correcto 200 e idempotente
 py -3.12 scripts\verify_agenda.py           # Agenda: vistas, filtros por URL, modal, estado y consultorio dinámico
-py -3.12 scripts\verify_login_security.py   # Login: bloqueo 423, desbloqueo, 2FA y códigos de recuperación
+py -3.12 scripts\verify_login_security.py   # Login: bloqueo 429, desbloqueo, 2FA y códigos de recuperación
 py -3.12 scripts\verify_account_security.py # Cuentas: cambio y recuperación de contraseña, refresh con rotación, rate limit y API admin
+py -3.12 scripts\verify_device_transfer.py  # Transferencia: desafío, aprobación, 401 inmediato, límites, 2FA y portal
 py -3.12 scripts\demo_api_seguridad.py     # Demostración guiada para la presentación: 401, JWT con permisos, 403 por rol, firma y rotación
 ```
 
@@ -98,7 +191,11 @@ Los tres scripts aceptan `DOSYS_API_URL` para apuntar a otro entorno (por ejempl
 La variante `debug` usa por defecto `http://10.0.2.2:8000/api/v1/` (emulador → PC) y la
 variante `release` el dominio HTTPS. Los endpoints del paciente son:
 
-- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/login` (con `device_id`/`device_name`)
+- `PUT /api/v1/devices/me`
+- `GET /api/v1/devices/transfers/pending`
+- `POST /api/v1/devices/transfers/{id}/approve` · `/reject`
+- `POST /api/v1/auth/device-transfer/{id}/code` · `/status` · `/cancel` · `/fallback`
 - `GET /api/v1/patients/me`
 - `GET /api/v1/patients/me/appointments`
 - `GET /api/v1/patients/me/consultations`
@@ -121,6 +218,11 @@ variante `release` el dominio HTTPS. Los endpoints del paciente son:
    # Correo real (opcional): sin clave se usa la vista previa simulada del portal.
    RESEND_API_KEY=
    EMAIL_FROM=D.O.S.Y.S <no-reply@tudominio.dev>
+   # Transferencia de sesión y notificaciones (opcional).
+   DEVICE_TRANSFER_TTL_SECONDS=120
+   DEVICE_TRANSFER_MAX_CODE_SUBMISSIONS=3
+   DEVICE_TRANSFER_MAX_PER_HOUR=5
+   FCM_CREDENTIALS_FILE=/run/secrets/fcm.json
    ```
 
 2. Levanta el stack con el daemon donde vive Nginx Proxy Manager:
@@ -147,7 +249,9 @@ con refresh tokens de 7 días, rotación y revocación** (API y portal), contras
 Argon2, **cambio de contraseña propio** y **recuperación con token de un solo uso**, RBAC
 validado en servidor, bitácora de auditoría visible desde el portal,
 **bloqueo por intentos fallidos** con desbloqueo, **límite de peticiones por IP** en los
-accesos sensibles, **segundo factor TOTP** con códigos de recuperación, HTTPS en producción +
+accesos sensibles, **segundo factor TOTP** con códigos de recuperación, **transferencia de
+sesión entre dispositivos** con código local y aprobación criptográfica, cierre inmediato
+del dispositivo anterior por el claim `did`, HTTPS en producción +
 HSTS, cookie del portal `HttpOnly` y `SameSite=Lax`, cabeceras de seguridad (CSP,
 X-Frame-Options), Swagger apagado en producción, PostgreSQL sin puertos públicos, alta de
 cuentas con contraseña temporal mostrada una sola vez, **API de administración con verbos

@@ -1,9 +1,17 @@
 package mx.unach.dosys.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import mx.unach.dosys.core.di.ServiceLocator
+import mx.unach.dosys.data.repository.DeviceResult
 import mx.unach.dosys.ui.appointments.AppointmentsScreen
 import mx.unach.dosys.ui.checkin.CheckInScreen
 import mx.unach.dosys.ui.documents.DocumentsScreen
@@ -14,14 +22,47 @@ import mx.unach.dosys.ui.qr.QrScreen
 import mx.unach.dosys.ui.record.RecordScreen
 import mx.unach.dosys.ui.security.SecurityScreen
 import mx.unach.dosys.ui.studies.StudiesScreen
+import mx.unach.dosys.ui.transfer.TransferApprovalScreen
 
 /**
  * Grafo de navegación de la app.
  * Al iniciar sesión se limpia el backstack para que "atrás" no regrese al login.
+ *
+ * Además, con la app en primer plano se sondea cada 5 s si este teléfono tiene
+ * una solicitud de transferencia pendiente (cubre FCM retrasado o sin Firebase).
  */
 @Composable
-fun DosysNavHost() {
+fun DosysNavHost(openTransferApproval: Boolean = false) {
     val navController = rememberNavController()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    LaunchedEffect(openTransferApproval) {
+        if (openTransferApproval) {
+            navController.navigate(Routes.TRANSFER_APPROVAL) { launchSingleTop = true }
+        }
+    }
+
+    LaunchedEffect(lifecycleOwner, navController) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (isActive) {
+                val route = navController.currentDestination?.route
+                val hasSession = ServiceLocator.sessionManager.currentToken() != null
+                if (hasSession && route != Routes.TRANSFER_APPROVAL) {
+                    when (val pending = ServiceLocator.deviceRepository.pendingTransfer()) {
+                        is DeviceResult.Success -> {
+                            if (pending.value != null) {
+                                navController.navigate(Routes.TRANSFER_APPROVAL) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        }
+                        is DeviceResult.Error -> Unit
+                    }
+                }
+                delay(5_000)
+            }
+        }
+    }
 
     NavHost(navController = navController, startDestination = Routes.LOGIN) {
         composable(Routes.LOGIN) {
@@ -29,6 +70,26 @@ fun DosysNavHost() {
                 onLoggedIn = {
                     navController.navigate(Routes.HOME) {
                         popUpTo(Routes.LOGIN) { inclusive = true }
+                    }
+                },
+            )
+        }
+        composable(Routes.LOGIN_TRANSFERRED) {
+            LoginScreen(
+                notice = "Tu sesión se transfirió al nuevo dispositivo. Este teléfono ya no tiene acceso.",
+                onLoggedIn = {
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.LOGIN_TRANSFERRED) { inclusive = true }
+                    }
+                },
+            )
+        }
+        composable(Routes.TRANSFER_APPROVAL) {
+            TransferApprovalScreen(
+                onBack = { navController.popBackStack() },
+                onSessionTransferred = {
+                    navController.navigate(Routes.LOGIN_TRANSFERRED) {
+                        popUpTo(0) { inclusive = true }
                     }
                 },
             )

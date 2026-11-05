@@ -1,5 +1,7 @@
 *.iml
 .gradle
+# JDK local para compilar en máquinas sin JDK 17/21 instalado.
+/.jdk/
 /local.properties
 /.idea
 .DS_Store
@@ -12,6 +14,11 @@ local.properties
 # Project exclude paths
 /app/build/
 /app/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/
+
+# Firebase: la configuración del proyecto y la cuenta de servicio son secretas.
+/app/google-services.json
+/backend/secrets/*
+!/backend/secrets/.gitkeep
 
 # Backend: secretos y artefactos locales nunca se suben al repositorio.
 /backend/.env
