@@ -4,6 +4,9 @@
     <!-- La app consume la API REST del hospital -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Avisos de seguridad (Android 13+): si se niegan, la app sondea igual. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Módulos del celular: cámara para el check-in y GPS para ubicar al paciente -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -41,6 +44,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Avisos de transferencia de sesión (FCM). No exportado. -->
+        <service
+            android:name=".core.push.DosysMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
 
         <!-- Entrega los documentos descargados a la app que el paciente elija, sin exponerlos. -->
         <provider

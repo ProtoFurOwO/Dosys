@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -51,7 +52,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.text.KeyboardOptions
+import mx.unach.dosys.core.device.DeviceIdentity
 import mx.unach.dosys.ui.components.ScreenScaffold
+import mx.unach.dosys.ui.components.StatusChip
 
 /**
  * Módulo de seguridad del paciente: activa o desactiva el segundo factor (TOTP)
@@ -105,6 +108,51 @@ fun SecurityScreen(
                                 } else {
                                     "Protege tu cuenta: además de la contraseña se pedirá un código temporal."
                                 },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Smartphone,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.size(10.dp))
+                        Column {
+                            Text(
+                                text = "Dispositivo de confianza",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = DeviceIdentity.localDeviceName(),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                Spacer(Modifier.size(8.dp))
+                                StatusChip(
+                                    text = "Activo",
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            Text(
+                                text = "Solo este teléfono puede autorizar el acceso desde otro " +
+                                    "dispositivo. Si cambias de equipo, transfiere la sesión al iniciar sesión.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     totp_issuer: str = "D.O.S.Y.S"
     two_factor_challenge_minutes: int = Field(default=5, ge=1, le=15)
 
+    # Transferencia de sesión entre dispositivos (app del paciente).
+    device_transfer_ttl_seconds: int = Field(default=120, ge=60, le=600)
+    device_transfer_max_code_submissions: int = Field(default=3, ge=1, le=10)
+    device_transfer_max_per_hour: int = Field(default=5, ge=1, le=50)
+    fcm_credentials_file: str = ""
+
     # Documentos clínicos.
     documents_dir: str = "/data/documents"
     documents_max_mb: int = Field(default=10, ge=1, le=50)

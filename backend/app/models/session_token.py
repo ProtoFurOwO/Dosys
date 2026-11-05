@@ -23,6 +23,10 @@ class RefreshToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # Sesión ligada al dispositivo de confianza que la emitió (nulo en portal).
+    device_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_devices.id", ondelete="SET NULL"), index=True, nullable=True
+    )
 
     user: Mapped[User] = relationship()
 
