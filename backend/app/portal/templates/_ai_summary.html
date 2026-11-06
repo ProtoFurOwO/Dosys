@@ -1,0 +1,96 @@
+<section class="chart ai-card" id="resumen-ia" aria-labelledby="resumen-ia-title">
+  <div class="ai-head">
+    <h2 class="section-title" id="resumen-ia-title">
+      Resumen del expediente
+      <span class="ai-tag">IA</span>
+      {% if ai_local %}<span class="ai-tag ai-tag-quiet">modo local</span>{% endif %}
+    </h2>
+    {% if ai_outdated %}<span class="chip chip-scheduled">Hay registros nuevos desde este resumen</span>{% endif %}
+  </div>
+
+  <p class="ai-disclaimer">
+    Resumen automático de lo registrado. No es un diagnóstico ni sustituye el criterio médico; verifícalo en el expediente.
+  </p>
+
+  {% if ai_message %}
+  <div class="note note-info" role="status"><p>{{ ai_message }}</p></div>
+  {% endif %}
+
+  {% if ai_summary_data %}
+  <p class="ai-text">{{ ai_summary_data.resumen }}</p>
+
+  {% for titulo, clave in [
+    ("Padecimientos registrados", "padecimientos_registrados"),
+    ("Antecedentes y eventos", "antecedentes_y_eventos"),
+    ("Estudios relevantes", "estudios_relevantes"),
+    ("Tratamientos registrados", "tratamientos_registrados")
+  ] %}
+  {% if ai_summary_data[clave] %}
+  <div class="ai-group">
+    <h3 class="ai-group-title">{{ titulo }}</h3>
+    <ul class="ai-list">
+      {% for item in ai_summary_data[clave] %}
+      <li class="ai-item">
+        <p>{{ item.texto }}</p>
+        <p class="ai-sources">
+          {% for ref in item.fuentes %}<span class="ai-source">{{ ai_refs.get(ref, ref) }}</span>{% endfor %}
+        </p>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  {% endfor %}
+
+  {% if ai_summary_data.puntos_por_confirmar %}
+  <div class="ai-group">
+    <h3 class="ai-group-title">Por confirmar</h3>
+    <ul class="ai-list ai-list-plain">
+      {% for punto in ai_summary_data.puntos_por_confirmar %}
+      <li class="ai-item"><p>{{ punto }}</p></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if ai_summary_data.limitaciones %}
+  <p class="ai-limitation">{{ ai_summary_data.limitaciones }}</p>
+  {% endif %}
+
+  <p class="ai-foot">
+    Generado el {{ ai_generated_at | fecha_hora }} · Basado en {{ ai_records }} registros.
+    {% if ai_con_ocr %}Incluye {{ ai_ocr_count }} PDF de resultados leído del expediente.{% endif %}
+  </p>
+  {% else %}
+  <p class="page-note">Todavía no hay un resumen generado para este expediente.</p>
+  {% endif %}
+
+  <form class="ai-form" method="post" action="/portal/pacientes/{{ patient.id }}/resumen-ia" data-ai-form>
+    {% if ai_ocr_enabled %}
+    <label class="ai-toggle">
+      <input type="checkbox" name="incluir_pdfs" value="1" {% if ai_con_ocr %}checked{% endif %}>
+      Incluir resultados en PDF (lectura local)
+    </label>
+    {% endif %}
+    <div class="ai-actions">
+      <button class="btn btn-primary" type="submit" data-ai-submit>
+        {% if ai_summary_data %}Actualizar resumen{% else %}Generar resumen{% endif %}
+      </button>
+    </div>
+  </form>
+
+  {% if ai_local %}
+  <p class="ai-privacy">
+    Resumen generado en el servidor con reglas locales; ningún dato clínico sale del sistema.
+    {% if ai_ocr_enabled %}Los PDF se leen aquí mismo.{% endif %}
+  </p>
+  {% else %}
+  <p class="ai-privacy">
+    Los datos clínicos se envían sin identificadores al proveedor del modelo.
+    {% if ai_ocr_enabled %}Los PDF se leen en el servidor con OCR.{% endif %}
+  </p>
+  {% endif %}
+  {% if not ai_ocr_enabled %}
+  <p class="ai-privacy">No analiza el contenido de PDFs subidos.</p>
+  {% endif %}
+</section>

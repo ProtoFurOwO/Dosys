@@ -3073,3 +3073,303 @@ body.login {
   }
 }
 
+/* ── Resumen del expediente con IA ─────────────────────────────────────────── */
+
+.ai-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.ai-head .section-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+
+.ai-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-tint);
+  color: var(--accent-deep);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.ai-tag-quiet {
+  background: var(--line-soft);
+  color: var(--ink-muted);
+  font-weight: 500;
+  letter-spacing: normal;
+}
+
+.ai-disclaimer {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--canvas);
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+}
+
+.ai-card .note {
+  margin-bottom: 16px;
+}
+
+.ai-text {
+  margin: 0 0 20px;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.ai-group {
+  margin-bottom: 18px;
+}
+
+.ai-group-title {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.ai-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-list-plain {
+  grid-template-columns: 1fr;
+}
+
+.ai-item {
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.ai-item p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.ai-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px !important;
+}
+
+.ai-source {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-tint);
+  color: var(--accent-deep);
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+
+.ai-limitation {
+  margin: 0 0 12px;
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+}
+
+.ai-foot {
+  margin: 14px 0 0;
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+}
+
+.ai-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.ai-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.ai-actions {
+  margin-left: auto;
+}
+
+.ai-privacy {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+@media (max-width: 920px) {
+  .ai-list {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .ai-actions .btn {
+    width: 100%;
+  }
+}
+
+/* ── Ficha del paciente: expediente a la izquierda, resumen IA a la derecha ──
+   El resumen va en una columna propia (sticky) para no empujar documentos,
+   estudios ni resultados descargables hacia abajo. */
+
+.patient-layout {
+  display: block;
+}
+
+/* La ficha ocupa todo el ancho de la ventana: el expediente se queda con el
+   espacio restante y el resumen crece con la pantalla, sin franja vacía. */
+.content.patient-page {
+  max-width: none;
+}
+
+.patient-layout.has-side {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(340px, 25vw, 440px);
+  gap: 24px;
+  align-items: start;
+}
+
+.patient-main {
+  min-width: 0;
+}
+
+.patient-side {
+  position: sticky;
+  top: 24px;
+  min-width: 0;
+}
+
+.patient-side .ai-card {
+  margin: 0;
+  padding: 16px 18px;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.patient-side .ai-head {
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.patient-side .ai-head .section-title {
+  font-size: 1rem;
+}
+
+.patient-side .ai-disclaimer {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  font-size: 0.75rem;
+}
+
+.patient-side .ai-text {
+  margin-bottom: 14px;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+.patient-side .ai-group {
+  margin-bottom: 14px;
+}
+
+.patient-side .ai-list {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.patient-side .ai-item {
+  padding: 8px 10px;
+}
+
+.patient-side .ai-item p {
+  font-size: 0.8125rem;
+}
+
+.patient-side .ai-sources {
+  margin-top: 6px !important;
+}
+
+.patient-side .ai-form {
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.patient-side .ai-toggle {
+  font-size: 0.75rem;
+}
+
+.patient-side .ai-actions {
+  width: 100%;
+  margin-left: 0;
+}
+
+.patient-side .ai-actions .btn {
+  width: 100%;
+}
+
+.patient-side .ai-foot,
+.patient-side .ai-privacy,
+.patient-side .ai-limitation {
+  font-size: 0.6875rem;
+}
+
+@media (max-width: 1200px) {
+  .patient-layout.has-side {
+    display: block;
+  }
+
+  .patient-side {
+    position: static;
+    margin-top: 24px;
+  }
+
+  .patient-side .ai-card {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .patient-side .ai-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 920px) {
+  .patient-side .ai-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+

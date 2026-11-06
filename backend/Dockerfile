@@ -8,6 +8,12 @@ WORKDIR /app
 
 RUN addgroup --system dosys && adduser --system --ingroup dosys dosys
 
+# OCR local para los PDF de resultados (texto en español). El archivo nunca sale
+# del servidor: Tesseract trabaja sobre las páginas renderizadas en la propia API.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-spa \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt ./
 RUN pip install --upgrade pip && pip install -r requirements.txt
 

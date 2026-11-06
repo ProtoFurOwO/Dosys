@@ -22,6 +22,7 @@ from app.core.security import (
     verify_password,
 )
 from app.db.session import get_db
+from app.models.ai_summary import AiSummary
 from app.models.appointment import Appointment
 from app.models.consultation import Consultation
 from app.models.doctor import Doctor
@@ -36,7 +37,7 @@ from app.portal import deps
 from app.portal.labels import ROLE_LABELS
 from app.portal.qr import qr_svg
 from app.portal.templating import credential_context, templates
-from app.services import accounts, email, login_security, rate_limit, two_factor
+from app.services import accounts, ai_summary as ai_service, email, login_security, rate_limit, two_factor
 from app.services.appointments import AppointmentError, create_appointment, ensure_available
 from app.services.audit import write_audit_event
 from app.services.consultations import create_consultation
@@ -52,6 +53,7 @@ from app.services.documents import (
 from app.services.lab import LabError, complete_order, create_orders
 from app.services.permissions import has_permission, permission_codes
 from app.services.reports import build_prescription_pdf
+from app.services.llm_client import AiUnavailable
 from app.services.users import (
     CURP_PATTERN,
     EMAIL_PATTERN,
@@ -89,6 +91,14 @@ STUDY_STATUS_LABELS = {
     StudyOrderStatus.IN_PROGRESS: "En proceso",
     StudyOrderStatus.COMPLETED: "Listo",
     StudyOrderStatus.CANCELLED: "Cancelado",
+}
+
+AI_NOTICES = {
+    "generado": "Resumen generado a partir de los registros del expediente.",
+    "generado_ocr": "Resumen generado. Algunos PDF de resultados no se pudieron leer con OCR.",
+    "cache": "Sin cambios desde el último resumen: se reutilizó el que ya estaba guardado.",
+    "limite": "Has alcanzado el límite de resúmenes por hora. Inténtalo de nuevo más tarde.",
+    "error": "No se pudo generar el resumen ahora. Inténtalo de nuevo más tarde.",
 }
 
 
@@ -891,6 +901,7 @@ async def patient_detail(
     creada: int | None = None,
     documento: int | None = None,
     documento_error: str | None = None,
+    ia: str = "",
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     user = await deps.current_doctor(request, db)
@@ -970,6 +981,43 @@ async def patient_detail(
             ).all()
         )
 
+    # Resumen con IA: solo se lee de la base de datos; el modelo se invoca
+    # únicamente al pulsar el botón. «Outdated» compara la huella de la entrada
+    # actual (sin OCR) con la guardada al generar.
+    ai_enabled = ai_service.ai_available()
+    can_use_ai = ai_enabled and ai_service.can_use_summary(user)
+    ai_ocr_enabled = ai_enabled and settings.ai_ocr_enabled
+    ai_last = None
+    ai_summary_data = None
+    ai_refs: dict[str, str] = {}
+    ai_generated_at = None
+    ai_records = 0
+    ai_outdated = False
+    ai_con_ocr = False
+    ai_ocr_count = 0
+    if can_use_ai:
+        ai_last = await db.scalar(
+            select(AiSummary)
+            .where(AiSummary.patient_id == patient.id)
+            .order_by(AiSummary.created_at.desc())
+            .limit(1)
+        )
+        if ai_last is not None:
+            content = ai_last.content or {}
+            ai_summary_data = content.get("datos")
+            ai_refs = content.get("referencias") or {}
+            ai_generated_at = ai_last.created_at
+            ai_records = ai_last.records_count
+            ai_con_ocr = bool(content.get("con_ocr"))
+            ai_ocr_count = int(content.get("ocr_leidos") or 0)
+            try:
+                actual = await ai_service.build_summary_input(db, patient=patient, user=user)
+                saved_hash = content.get("hash_sin_ocr") or ai_last.input_hash
+                ai_outdated = actual.input_hash != saved_hash
+            except Exception:
+                # La ficha nunca deja de funcionar por el resumen.
+                ai_outdated = False
+
     await write_audit_event(
         db,
         user=user,
@@ -1003,7 +1051,95 @@ async def patient_detail(
             "study_orders": study_orders,
             "study_status_labels": STUDY_STATUS_LABELS,
             "prescriptions": prescriptions,
+            "ai_enabled": ai_enabled,
+            "can_use_ai": can_use_ai,
+            "ai_ocr_enabled": ai_ocr_enabled,
+            "ai_local": settings.ai_provider in ("local", "fake"),
+            "ai_summary_data": ai_summary_data,
+            "ai_refs": ai_refs,
+            "ai_generated_at": ai_generated_at,
+            "ai_records": ai_records,
+            "ai_outdated": ai_outdated,
+            "ai_con_ocr": ai_con_ocr,
+            "ai_ocr_count": ai_ocr_count,
+            "ai_message": AI_NOTICES.get(ia),
         },
+    )
+
+
+@router.post("/pacientes/{patient_id:int}/resumen-ia")
+async def patient_ai_summary(
+    patient_id: int,
+    request: Request,
+    incluir_pdfs: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Genera (o reutiliza) el resumen del expediente. Solo al pulsar el botón."""
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await portal_staff(db, user)
+
+    if not ai_service.ai_available():
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": doctor.full_name}, status_code=status.HTTP_404_NOT_FOUND
+        )
+
+    patient = await db.get(Patient, patient_id)
+    if patient is None:
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": doctor.full_name}, status_code=status.HTTP_404_NOT_FOUND
+        )
+
+    if not ai_service.can_use_summary(user):
+        return forbidden(request, doctor.full_name, "Tu rol no puede generar el resumen del expediente.")
+
+    if await ai_service.hourly_summaries(db, user) >= settings.ai_max_requests_per_user_hour:
+        return RedirectResponse(
+            f"/portal/pacientes/{patient.id}?ia=limite#resumen-ia",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    try:
+        result = await ai_service.generate_summary(
+            db,
+            patient=patient,
+            user=user,
+            include_pdf_text=ai_service.ocr_requested(incluir_pdfs),
+        )
+    except AiUnavailable:
+        await write_audit_event(
+            db,
+            user=user,
+            action="portal_ai_summary_failed",
+            entity_type="patient",
+            entity_id=patient.id,
+            request=request,
+            detail="error=proveedor",
+        )
+        await db.commit()
+        return RedirectResponse(
+            f"/portal/pacientes/{patient.id}?ia=error#resumen-ia",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    await write_audit_event(
+        db,
+        user=user,
+        action="portal_ai_summary",
+        entity_type="patient",
+        entity_id=patient.id,
+        request=request,
+        detail=ai_service.audit_detail(result),
+    )
+    await db.commit()
+
+    code = "cache" if result.cached else "generado"
+    if not result.cached and result.con_ocr and result.ocr_pendientes:
+        code = "generado_ocr"
+    return RedirectResponse(
+        f"/portal/pacientes/{patient.id}?ia={code}#resumen-ia",
+        status_code=status.HTTP_303_SEE_OTHER,
     )
 
 

@@ -1,3 +1,4 @@
+from app.models.ai_summary import AiSummary
 from app.models.appointment import Appointment
 from app.models.audit_log import AuditLog
 from app.models.consultation import Consultation
@@ -17,6 +18,7 @@ from app.models.user import User
 from app.models.user_device import UserDevice
 
 __all__ = [
+    "AiSummary",
     "Appointment",
     "AppointmentStatus",
     "AuditLog",

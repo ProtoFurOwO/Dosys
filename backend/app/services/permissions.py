@@ -26,6 +26,7 @@ PERMISSIONS: tuple[tuple[str, str, str, str], ...] = (
     ("studies:perform", "Laboratorio", "escritura", "Realizar estudios y capturar resultados"),
     ("prescriptions:write", "Recetas", "escritura", "Emitir recetas médicas"),
     ("prescriptions:read", "Recetas", "lectura", "Consultar recetas emitidas"),
+    ("ai:summary", "Expediente", "lectura", "Generar resumen del expediente con IA"),
 )
 
 BASE_ROLES: tuple[tuple[str, str, str], ...] = (
@@ -54,6 +55,7 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {
         "studies:request",
         "prescriptions:write",
         "prescriptions:read",
+        "ai:summary",
     ),
     "laboratory": (
         "portal:access",

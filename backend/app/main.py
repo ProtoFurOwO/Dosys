@@ -12,6 +12,7 @@ from app.db.session import SessionLocal, engine
 from app.portal.admin import router as portal_admin_router
 from app.portal.routes import router as portal_router
 from app.schemas.health import HealthResponse
+from app.services.ai_summary import warm_up as ai_warm_up
 from app.services.seed import seed_demo_data
 
 
@@ -19,6 +20,7 @@ from app.services.seed import seed_demo_data
 async def lifespan(_: FastAPI):
     # Las migraciones se ejecutan antes, desde Docker Compose. Luego sembramos
     # datos ficticios solo para que la demo sea funcional desde el primer arranque.
+    ai_warm_up()
     await seed_demo_data()
     yield
     await engine.dispose()

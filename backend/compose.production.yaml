@@ -36,6 +36,14 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dosys}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-dosys}
       # Sin el archivo, las notificaciones quedan simuladas (solo sondeo).
       FCM_CREDENTIALS_FILE: ${FCM_CREDENTIALS_FILE:-/run/secrets/fcm.json}
+      # Resumen con IA: apagado por defecto. La llave no tiene valor por defecto.
+      AI_ENABLED: ${AI_ENABLED:-false}
+      AI_PROVIDER: ${AI_PROVIDER:-local}
+      AI_API_KEY: ${AI_API_KEY}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-30}
+      AI_MAX_REQUESTS_PER_USER_HOUR: ${AI_MAX_REQUESTS_PER_USER_HOUR:-10}
+      AI_OCR_ENABLED: ${AI_OCR_ENABLED:-false}
     command: >-
       sh -c "alembic upgrade head &&
       uvicorn app.main:app --host 0.0.0.0 --port 8000"

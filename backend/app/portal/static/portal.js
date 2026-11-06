@@ -242,3 +242,15 @@ if (popovers.length) {
     });
   });
 }
+
+// Resumen del expediente con IA: al enviar, se bloquea el botón para evitar
+// dobles peticiones. Sin fetch ni scripts en línea.
+document.querySelectorAll("[data-ai-form]").forEach((form) => {
+  form.addEventListener("submit", () => {
+    const button = form.querySelector("[data-ai-submit]");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Generando…";
+    }
+  });
+});

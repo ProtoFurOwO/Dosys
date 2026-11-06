@@ -143,6 +143,25 @@ def main() -> None:
                 break
     assert patient_id, "El listado debe mostrar al paciente sembrado"
 
+    # 4.b Resumen del expediente con IA (apagado por defecto).
+    # La página es la fuente de verdad: la configuración vive en el contenedor,
+    # no en el entorno de quien ejecuta esta prueba.
+    status, patient_html = get(opener, f"/portal/pacientes/{patient_id}")
+    assert status == 200, "La ficha del paciente debe abrir"
+    ai_shown = 'id="resumen-ia"' in patient_html
+    if ai_shown:
+        assert 'id="resumen-ia"' in patient_html, "Con la IA activa, el médico debe ver la tarjeta de resumen"
+        assert "No es un diagnóstico" in patient_html, "El aviso de que no es un diagnóstico debe estar visible"
+        status, summary_html = form_request(opener, f"/portal/pacientes/{patient_id}/resumen-ia", {})
+        assert status == 200 and "Resumen del expediente" in summary_html, (
+            "El resumen de demostración debe generarse y mostrarse"
+        )
+        assert "No es un diagnóstico" in summary_html, "El aviso debe seguir visible tras generar"
+    else:
+        assert 'id="resumen-ia"' not in patient_html, "Con AI_ENABLED=false no debe aparecer la tarjeta"
+        status, _ = form_request(opener, f"/portal/pacientes/{patient_id}/resumen-ia", {})
+        assert status == 404, "Con AI_ENABLED=false la ruta de resumen debe responder 404"
+
     # 5. Registro de consulta desde el portal.
     marker = f"PORTAL-{datetime.now():%Y%m%d%H%M%S}"
     status, html = form_request(
@@ -466,6 +485,7 @@ def main() -> None:
                 "invalid_credentials": 401,
                 "patient_role_denied": 403,
                 "form_validation": 422,
+                "ai_summary": "on" if ai_shown else "off",
             },
             ensure_ascii=False,
         )

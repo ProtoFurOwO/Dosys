@@ -36,6 +36,8 @@ ACTION_LABELS = {
     "portal_user_deactivated": "Usuario desactivado",
     "portal_reset_password": "Contraseña restablecida",
     "portal_send_credentials": "Credenciales enviadas por correo",
+    "portal_ai_summary": "Resumen del expediente generado con IA",
+    "portal_ai_summary_failed": "Resumen con IA no disponible",
     # Seguridad del login
     "account_locked": "Cuenta bloqueada por intentos fallidos",
     "account_unlocked": "Cuenta desbloqueada",
@@ -102,6 +104,10 @@ DETAIL_KEYS = {
     "code": "código",
     "permisos": "permisos",
     "specialty": "especialidad",
+    "modelo": "modelo",
+    "registros": "registros",
+    "cache": "caché",
+    "ocr": "PDF con OCR",
 }
 
 DETAIL_VALUES = {
@@ -109,7 +115,7 @@ DETAIL_VALUES = {
     "alterado": "alterada",
 }
 
-DETAIL_SEPARATORS = ("·", "|")
+DETAIL_SEPARATORS = ("·", "|", ";")
 
 
 def entity_label(entity_type: str, entity_id: str | None) -> str:

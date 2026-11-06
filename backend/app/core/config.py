@@ -45,6 +45,21 @@ class Settings(BaseSettings):
     resend_api_key: str = ""
     email_from: str = "D.O.S.Y.S <no-reply@example.com>"
 
+    # Resumen del expediente con IA (desactivado por defecto).
+    ai_enabled: bool = False
+    ai_provider: str = "local"  # "local" (reglas en el servidor, sin red) | "anthropic"
+    ai_api_key: str = ""
+    ai_model: str = ""  # p. ej. "claude-sonnet-5-5"; confirma el identificador vigente
+    ai_timeout_seconds: int = Field(default=30, ge=5, le=120)
+    ai_max_requests_per_user_hour: int = Field(default=10, ge=1, le=100)
+
+    # Lectura de PDFs de resultados con OCR (opcional, desactivado por defecto).
+    ai_ocr_enabled: bool = False
+    ai_ocr_max_documents: int = Field(default=5, ge=1, le=10)
+    ai_ocr_max_chars_per_document: int = Field(default=4000, ge=500, le=10000)
+    ai_ocr_language: str = "spa"
+    tesseract_cmd: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
