@@ -190,15 +190,20 @@ class AppointmentRequestViewModel : ViewModel() {
             -> return true
 
             AppointmentRequestStep.DATE -> _state.update {
-                it.copy(step = AppointmentRequestStep.DOCTOR, selectedDoctor = null)
+                it.copy(step = AppointmentRequestStep.DOCTOR, selectedDoctor = null, error = null)
             }
 
             AppointmentRequestStep.SLOTS -> _state.update {
-                it.copy(step = AppointmentRequestStep.DATE, selectedDate = null, slots = emptyList())
+                it.copy(
+                    step = AppointmentRequestStep.DATE,
+                    selectedDate = null,
+                    slots = emptyList(),
+                    error = null,
+                )
             }
 
             AppointmentRequestStep.REASON -> _state.update {
-                it.copy(step = AppointmentRequestStep.SLOTS, selectedSlot = null)
+                it.copy(step = AppointmentRequestStep.SLOTS, selectedSlot = null, error = null)
             }
         }
         return false
