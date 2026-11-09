@@ -24,7 +24,7 @@ sealed interface AuthResult {
     /** La contraseña es correcta pero falta el segundo factor. */
     data class NeedsTwoFactor(val challengeToken: String) : AuthResult
 
-    /** La cuenta ya está activa en otro teléfono: hay que transferir la sesión. */
+    /** La cuenta ya tiene dispositivos de confianza: hay que autorizar este teléfono. */
     data class NeedsDeviceTransfer(
         val transferId: String,
         val challengeToken: String,
@@ -121,19 +121,19 @@ class FakeAuthRepository(private val session: SessionManager) : AuthRepository {
         transferId: String,
         challengeToken: String,
         code: String,
-    ): TransferSubmitResult = TransferSubmitResult.Error("La transferencia no está disponible en el modo demo")
+    ): TransferSubmitResult = TransferSubmitResult.Error("El alta de dispositivos no está disponible en el modo demo")
 
     override suspend fun transferStatus(
         transferId: String,
         challengeToken: String,
-    ): TransferStatusResult = TransferStatusResult.Error("La transferencia no está disponible en el modo demo")
+    ): TransferStatusResult = TransferStatusResult.Error("El alta de dispositivos no está disponible en el modo demo")
 
     override suspend fun cancelTransfer(transferId: String, challengeToken: String) = Unit
 
     override suspend fun transferFallback(
         transferId: String,
         challengeToken: String,
-    ): TransferFallbackResult = TransferFallbackResult.Error("La transferencia no está disponible en el modo demo")
+    ): TransferFallbackResult = TransferFallbackResult.Error("El alta de dispositivos no está disponible en el modo demo")
 
     override suspend fun requestPasswordReset(identifier: String): RecoveryResult =
         RecoveryResult.Success(
@@ -171,7 +171,7 @@ class RemoteAuthRepository(
                     challengeToken = response.challengeToken,
                     expiresIn = response.expiresIn,
                     message = response.message
-                        ?: "Autoriza este dispositivo desde tu teléfono de confianza.",
+                        ?: "Autoriza este dispositivo desde cualquiera de tus dispositivos de confianza.",
                 )
 
             response.requires2fa && response.challengeToken != null ->

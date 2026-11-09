@@ -194,7 +194,7 @@ fun HomeScreen(
 
 /**
  * Permiso de notificaciones (Android 13+) en un momento natural: tras entrar.
- * Si se niega, la transferencia sigue funcionando con el sondeo en primer plano.
+ * Si se niega, el alta de dispositivos sigue funcionando con el sondeo en primer plano.
  */
 @Composable
 private fun NotificationPermissionPrompt() {
@@ -233,7 +233,7 @@ private fun NotificationPermissionPrompt() {
         text = {
             Text(
                 "Activa las notificaciones para enterarte al instante cuando alguien intente " +
-                    "entrar a tu cuenta desde otro teléfono. Si no las activas, la app revisará " +
+                    "agregar un dispositivo de confianza. Si no las activas, la app revisará " +
                     "la solicitud al abrirse."
             )
         },

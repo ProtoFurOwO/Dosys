@@ -27,6 +27,7 @@ import mx.unach.dosys.data.model.TransferCodeResponse
 import mx.unach.dosys.data.model.TransferRejectRequest
 import mx.unach.dosys.data.model.TransferStatusRequest
 import mx.unach.dosys.data.model.TransferStatusResponse
+import mx.unach.dosys.data.model.TrustedDevice
 import mx.unach.dosys.data.model.TwoFactorConfirmRequest
 import mx.unach.dosys.data.model.TwoFactorDisableRequest
 import mx.unach.dosys.data.model.TwoFactorEnableResult
@@ -35,6 +36,7 @@ import mx.unach.dosys.data.model.TwoFactorStatus
 import mx.unach.dosys.data.model.TwoFactorVerifyRequest
 import okhttp3.ResponseBody
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
@@ -58,7 +60,7 @@ interface ApiService {
     @POST("auth/2fa/verify")
     suspend fun verifyTwoFactor(@Body request: TwoFactorVerifyRequest): LoginResponse
 
-    // ── Transferencia de sesión (dispositivo nuevo, sin sesión) ───────────────
+    // ── Alta de dispositivo de confianza (dispositivo nuevo, sin sesión) ──────
 
     /** Deja el código propuesto para que el dispositivo activo lo compare. */
     @POST("auth/device-transfer/{id}/code")
@@ -93,6 +95,15 @@ interface ApiService {
     suspend fun registerDevice(
         @Header("Authorization") authorization: String,
         @Body request: DeviceRegisterRequest,
+    ): SimpleMessage
+
+    @GET("devices/me")
+    suspend fun trustedDevices(@Header("Authorization") authorization: String): List<TrustedDevice>
+
+    @DELETE("devices/me/{id}")
+    suspend fun revokeDevice(
+        @Header("Authorization") authorization: String,
+        @Path("id") deviceId: Int,
     ): SimpleMessage
 
     @GET("devices/transfers/pending")

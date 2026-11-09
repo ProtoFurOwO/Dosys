@@ -12,6 +12,16 @@ data class DeviceRegisterRequest(
     @SerialName("fcm_token") val fcmToken: String? = null,
 )
 
+/** Teléfono activo de la cuenta (GET /devices/me). */
+@Serializable
+data class TrustedDevice(
+    val id: Int,
+    val name: String,
+    @SerialName("is_current") val isCurrent: Boolean = false,
+    @SerialName("last_seen_at") val lastSeenAt: String? = null,
+    @SerialName("created_at") val createdAt: String = "",
+)
+
 /** Solicitud pendiente que el dispositivo activo debe revisar al abrir la alerta. */
 @Serializable
 data class PendingTransfer(

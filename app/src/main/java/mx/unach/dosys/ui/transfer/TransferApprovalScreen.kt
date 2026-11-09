@@ -31,7 +31,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
@@ -57,28 +56,24 @@ import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
 /**
- * Lado A: el paciente confirma con huella y autoriza (o rechaza) la sesión que
- * intenta abrirse en otro teléfono. El código nunca sale de este dispositivo.
+ * Lado A: cualquier dispositivo activo puede autorizar el alta de otro.
+ * El nuevo teléfono se suma a los dispositivos de confianza; este sigue activo.
  */
 @Composable
 fun TransferApprovalScreen(
     onBack: () -> Unit,
-    onSessionTransferred: () -> Unit,
+    onOpenDevices: () -> Unit,
     viewModel: TransferApprovalViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
 
-    LaunchedEffect(state.sessionTransferred) {
-        if (state.sessionTransferred) onSessionTransferred()
-    }
-
     if (!state.unlocked) {
-        ScreenScaffold(title = "Solicitud de acceso", onBack = onBack) { padding ->
+        ScreenScaffold(title = "Agregar dispositivo", onBack = onBack) { padding ->
             BiometricGate(
                 onUnlocked = viewModel::unlock,
                 modifier = Modifier.padding(padding),
                 title = "Confirma que eres tú",
-                description = "Usa tu huella para ver el código con el que autorizas el nuevo dispositivo.",
+                description = "Usa tu huella para ver el código con el que autorizas el nuevo dispositivo. Este teléfono seguirá activo.",
                 allowFallback = false,
             )
         }
@@ -94,7 +89,7 @@ fun TransferApprovalScreen(
         onDispose { viewModel.onBackground() }
     }
 
-    ScreenScaffold(title = "Solicitud de acceso", onBack = onBack) { padding ->
+    ScreenScaffold(title = "Agregar dispositivo", onBack = onBack) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -117,7 +112,9 @@ fun TransferApprovalScreen(
                     FinishedContent(
                         message = state.message ?: state.error ?: "La solicitud terminó.",
                         failed = state.failed || state.error != null,
+                        maxDevices = state.maxDevices,
                         onRetry = viewModel::retry,
+                        onOpenDevices = onOpenDevices,
                         onBack = onBack,
                     )
                 }
@@ -147,14 +144,14 @@ private fun PendingContent(
     )
     Spacer(Modifier.height(10.dp))
     Text(
-        text = "¿Eres tú quien intenta entrar?",
+        text = "¿Autorizas este dispositivo?",
         fontSize = 24.sp,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary,
         textAlign = TextAlign.Center,
     )
     Text(
-        text = "Otro teléfono pidió entrar a tu cuenta. Escribe en él este código para autorizarlo.",
+        text = "Otro teléfono quiere agregarse a tus dispositivos de confianza. Si escribes este código allí, se sumará a tu cuenta; este teléfono seguirá con acceso.",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
@@ -169,7 +166,7 @@ private fun PendingContent(
     ) {
         Column(Modifier.padding(16.dp)) {
             Text(
-                text = "Solicitud de",
+                text = "Nuevo dispositivo",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -198,7 +195,7 @@ private fun PendingContent(
 
     Spacer(Modifier.height(18.dp))
     Text(
-        text = "Tu código",
+        text = "Código para el nuevo dispositivo",
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -291,7 +288,7 @@ private fun PendingContent(
     }
     Spacer(Modifier.height(8.dp))
     Text(
-        text = "Si no fuiste tú, rechaza la solicitud y cambia tu contraseña.",
+        text = "Si no reconoces el dispositivo, rechaza la solicitud y cambia tu contraseña.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
@@ -306,7 +303,9 @@ private fun PendingContent(
 private fun FinishedContent(
     message: String,
     failed: Boolean,
+    maxDevices: Boolean,
     onRetry: () -> Unit,
+    onOpenDevices: () -> Unit,
     onBack: () -> Unit,
 ) {
     Spacer(Modifier.height(24.dp))
@@ -318,7 +317,7 @@ private fun FinishedContent(
     )
     Spacer(Modifier.height(12.dp))
     Text(
-        text = if (failed) "No se pudo completar" else "Solicitud resuelta",
+        text = if (failed) "No se pudo agregar" else "Dispositivo autorizado",
         style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.Bold,
         textAlign = TextAlign.Center,
@@ -333,6 +332,12 @@ private fun FinishedContent(
         )
     }
     Spacer(Modifier.height(18.dp))
+    if (maxDevices) {
+        Button(onClick = onOpenDevices, modifier = Modifier.fillMaxWidth()) {
+            Text("Administrar dispositivos")
+        }
+        Spacer(Modifier.height(6.dp))
+    }
     if (failed) {
         Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
             Text("Intentar de nuevo")

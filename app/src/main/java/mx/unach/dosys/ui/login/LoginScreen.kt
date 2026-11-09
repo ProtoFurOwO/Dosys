@@ -53,7 +53,7 @@ import mx.unach.dosys.R
 /**
  * Pantalla de acceso en pasos:
  * 1) usuario y contraseña; 2) código del segundo factor si la cuenta lo tiene
- * activo; o transferencia de sesión si la cuenta ya vive en otro teléfono.
+ * activo; o alta de un nuevo dispositivo de confianza si la cuenta ya tiene otros.
  * El paciente recibe sus credenciales en el hospital (no hay autorregistro).
  */
 @Composable
@@ -301,15 +301,15 @@ private fun DeviceTransferStep(state: LoginUiState, viewModel: LoginViewModel) {
     )
     Spacer(Modifier.height(12.dp))
     Text(
-        text = "Autoriza este dispositivo",
+        text = "Agrega este dispositivo",
         fontSize = 26.sp,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary,
         textAlign = TextAlign.Center,
     )
     Text(
-        text = "Tu cuenta ya está activa en tu teléfono de confianza. Ahí verás un código de " +
-            "6 dígitos: escríbelo aquí para transferir la sesión.",
+        text = "Tu cuenta ya tiene dispositivos de confianza. Pide en cualquiera de ellos el " +
+            "código de 6 dígitos y escríbelo aquí para agregar este teléfono. Los demás seguirán activos.",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
@@ -409,14 +409,14 @@ private fun DeviceTransferStep(state: LoginUiState, viewModel: LoginViewModel) {
 
     Spacer(Modifier.height(10.dp))
     Text(
-        text = "Si no ves el código en tu otro teléfono, revisa que tenga la app abierta o espera la notificación.",
+        text = "Si no ves el código en tus otros dispositivos, revisa que alguno tenga la app abierta o espera la notificación.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
     )
 
     TextButton(onClick = viewModel::useTransferFallback) {
-        Text("No tengo mi dispositivo anterior")
+        Text("No puedo acceder a mis otros dispositivos")
     }
     TextButton(onClick = viewModel::cancelTransfer) {
         Text("Cancelar")

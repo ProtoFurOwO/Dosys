@@ -52,9 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.text.KeyboardOptions
-import mx.unach.dosys.core.device.DeviceIdentity
 import mx.unach.dosys.ui.components.ScreenScaffold
-import mx.unach.dosys.ui.components.StatusChip
 
 /**
  * Módulo de seguridad del paciente: activa o desactiva el segundo factor (TOTP)
@@ -63,6 +61,7 @@ import mx.unach.dosys.ui.components.StatusChip
 @Composable
 fun SecurityScreen(
     onBack: () -> Unit,
+    onOpenDevices: () -> Unit,
     viewModel: SecurityViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -123,39 +122,32 @@ fun SecurityScreen(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     ),
                 ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Smartphone,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(Modifier.size(10.dp))
-                        Column {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Filled.Smartphone,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(Modifier.size(10.dp))
                             Text(
-                                text = "Dispositivo de confianza",
+                                text = "Dispositivos de confianza",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                             )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = DeviceIdentity.localDeviceName(),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                                Spacer(Modifier.size(8.dp))
-                                StatusChip(
-                                    text = "Activo",
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                            Text(
-                                text = "Solo este teléfono puede autorizar el acceso desde otro " +
-                                    "dispositivo. Si cambias de equipo, transfiere la sesión al iniciar sesión.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "Hasta 3 teléfonos pueden tener acceso completo. Cualquiera de ellos puede autorizar uno nuevo; los demás siguen activos.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = onOpenDevices,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Administrar dispositivos")
                         }
                     }
                 }

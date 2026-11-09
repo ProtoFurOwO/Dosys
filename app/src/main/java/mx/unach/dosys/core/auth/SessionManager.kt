@@ -5,6 +5,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
@@ -22,6 +25,11 @@ class SessionManager(private val context: Context) {
     private val tokenKey = stringPreferencesKey("access_token")
     private val refreshKey = stringPreferencesKey("refresh_token")
 
+    private val _expiredReason = MutableStateFlow<String?>(null)
+
+    /** Motivo por el que la sesión dejó de ser válida; el NavHost vuelve al login. */
+    val expiredReason: StateFlow<String?> = _expiredReason.asStateFlow()
+
     val tokenFlow: Flow<String?> = context.dataStore.data.map { preferences ->
         preferences[tokenKey]
     }
@@ -33,6 +41,7 @@ class SessionManager(private val context: Context) {
                 preferences[refreshKey] = refreshToken
             }
         }
+        _expiredReason.value = null
     }
 
     suspend fun currentToken(): String? = tokenFlow.first()
@@ -42,5 +51,20 @@ class SessionManager(private val context: Context) {
 
     suspend fun clear() {
         context.dataStore.edit { preferences -> preferences.clear() }
+        _expiredReason.value = null
+    }
+
+    /**
+     * Cierra la sesión local y publica el motivo para que la navegación vuelva
+     * al login una sola vez. Se usa cuando el servidor invalida el dispositivo.
+     *
+     * Si ya no hay token (por ejemplo, el usuario cerró sesión mientras una
+     * llamada seguía en vuelo), no se publica nada para no mostrar un aviso
+     * falso en el login.
+     */
+    suspend fun expire(reason: String) {
+        if (currentToken() == null) return
+        clear()
+        _expiredReason.value = reason
     }
 }

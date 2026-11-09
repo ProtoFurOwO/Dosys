@@ -62,7 +62,7 @@ class DosysMessagingService : FirebaseMessagingService() {
         val notification = NotificationCompat.Builder(this, DosysApp.SECURITY_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("D.O.S.Y.S · Seguridad")
-            .setContentText("Hay una solicitud de acceso esperando tu aprobación.")
+            .setContentText("Hay una solicitud para agregar un dispositivo de confianza.")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)

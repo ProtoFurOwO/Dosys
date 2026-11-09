@@ -2,6 +2,8 @@ package mx.unach.dosys.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -17,6 +19,7 @@ import mx.unach.dosys.data.repository.DeviceResult
 import mx.unach.dosys.ui.appointments.AppointmentRequestScreen
 import mx.unach.dosys.ui.appointments.AppointmentsScreen
 import mx.unach.dosys.ui.checkin.CheckInScreen
+import mx.unach.dosys.ui.devices.TrustedDevicesScreen
 import mx.unach.dosys.ui.documents.DocumentDetailScreen
 import mx.unach.dosys.ui.documents.DocumentsScreen
 import mx.unach.dosys.ui.home.HomeScreen
@@ -32,12 +35,22 @@ import mx.unach.dosys.ui.transfer.TransferApprovalScreen
  * Al iniciar sesión se limpia el backstack para que "atrás" no regrese al login.
  *
  * Además, con la app en primer plano se sondea cada 5 s si este teléfono tiene
- * una solicitud de transferencia pendiente (cubre FCM retrasado o sin Firebase).
+ * una solicitud para agregar un dispositivo pendiente (cubre FCM retrasado o sin Firebase).
  */
 @Composable
 fun DosysNavHost(openTransferApproval: Boolean = false) {
     val navController = rememberNavController()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val expiredReason by ServiceLocator.sessionManager.expiredReason.collectAsState()
+
+    LaunchedEffect(expiredReason) {
+        if (expiredReason != null && navController.currentDestination?.route != Routes.LOGIN) {
+            navController.navigate(Routes.LOGIN) {
+                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
 
     LaunchedEffect(openTransferApproval) {
         if (openTransferApproval) {
@@ -70,6 +83,7 @@ fun DosysNavHost(openTransferApproval: Boolean = false) {
     NavHost(navController = navController, startDestination = Routes.LOGIN) {
         composable(Routes.LOGIN) {
             LoginScreen(
+                notice = expiredReason,
                 onLoggedIn = {
                     navController.navigate(Routes.HOME) {
                         popUpTo(Routes.LOGIN) { inclusive = true }
@@ -79,7 +93,8 @@ fun DosysNavHost(openTransferApproval: Boolean = false) {
         }
         composable(Routes.LOGIN_TRANSFERRED) {
             LoginScreen(
-                notice = "Tu sesión se transfirió al nuevo dispositivo. Este teléfono ya no tiene acceso.",
+                notice = expiredReason
+                    ?: "Este dispositivo ya no está autorizado. Inicia sesión de nuevo.",
                 onLoggedIn = {
                     navController.navigate(Routes.HOME) {
                         popUpTo(Routes.LOGIN_TRANSFERRED) { inclusive = true }
@@ -90,11 +105,7 @@ fun DosysNavHost(openTransferApproval: Boolean = false) {
         composable(Routes.TRANSFER_APPROVAL) {
             TransferApprovalScreen(
                 onBack = { navController.popBackStack() },
-                onSessionTransferred = {
-                    navController.navigate(Routes.LOGIN_TRANSFERRED) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                },
+                onOpenDevices = { navController.navigate(Routes.TRUSTED_DEVICES) },
             )
         }
         composable(Routes.HOME) {
@@ -139,7 +150,13 @@ fun DosysNavHost(openTransferApproval: Boolean = false) {
             CheckInScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.SECURITY) {
-            SecurityScreen(onBack = { navController.popBackStack() })
+            SecurityScreen(
+                onBack = { navController.popBackStack() },
+                onOpenDevices = { navController.navigate(Routes.TRUSTED_DEVICES) },
+            )
+        }
+        composable(Routes.TRUSTED_DEVICES) {
+            TrustedDevicesScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.DOCUMENTS) {
             DocumentsScreen(

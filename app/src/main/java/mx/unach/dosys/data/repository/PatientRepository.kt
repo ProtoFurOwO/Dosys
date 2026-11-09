@@ -36,7 +36,7 @@ sealed interface ClinicalResult<out T> {
 
 /** Mensajes visibles del flujo de solicitud de cita. */
 internal fun appointmentRequestMessage(code: Int, serverDetail: String? = null): String = when (code) {
-    401 -> "Tu sesión terminó. Inicia sesión nuevamente"
+    401 -> "Este dispositivo ya no está autorizado. Inicia sesión de nuevo."
     409 -> "Ese horario acaba de ocuparse. Elige otro."
     422 -> serverDetail?.takeIf { it.isNotBlank() } ?: "Revisa los datos de la solicitud."
     429 -> "Espera un minuto antes de intentar de nuevo."
@@ -99,12 +99,12 @@ class RemotePatientRepository(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: SessionExpiredException) {
-            session.clear()
-            ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente", 401)
+            session.expire("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.")
+            ClinicalResult.Error("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.", 401)
         } catch (error: HttpException) {
             when (error.code()) {
                 401 -> {
-                    session.clear()
+                    session.expire("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.")
                     ClinicalResult.Error(appointmentRequestMessage(401), 401)
                 }
                 409 -> ClinicalResult.Error(appointmentRequestMessage(409), 409)
@@ -146,7 +146,7 @@ class RemotePatientRepository(
 
     override suspend fun documentFile(documentId: Int): ClinicalResult<ByteArray> {
         val token = session.currentToken()
-            ?: return ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
+            ?: return ClinicalResult.Error("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.")
 
         return try {
             ClinicalResult.Success(api.documentFile("Bearer $token", documentId).bytes())
@@ -154,8 +154,8 @@ class RemotePatientRepository(
             throw cancellation
         } catch (error: HttpException) {
             if (error.code() == 401) {
-                session.clear()
-                ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
+                session.expire("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.")
+                ClinicalResult.Error("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.")
             } else {
                 ClinicalResult.Error("No se pudo descargar el documento")
             }
@@ -168,7 +168,7 @@ class RemotePatientRepository(
 
     override suspend fun checkIn(appointmentId: Int, code: String): ClinicalResult<PatientAppointment> {
         val token = session.currentToken()
-            ?: return ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
+            ?: return ClinicalResult.Error("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.")
 
         return try {
             ClinicalResult.Success(api.checkIn("Bearer $token", appointmentId, CheckInRequest(code.trim().uppercase())))
@@ -185,7 +185,7 @@ class RemotePatientRepository(
 
     override suspend fun checkInWithCode(code: String): ClinicalResult<PatientAppointment> {
         val token = session.currentToken()
-            ?: return ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
+            ?: return ClinicalResult.Error("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.")
 
         return try {
             ClinicalResult.Success(api.checkInWithCode("Bearer $token", CheckInRequest(code.trim().uppercase())))
@@ -202,8 +202,8 @@ class RemotePatientRepository(
 
     private suspend fun checkInError(error: HttpException): ClinicalResult.Error {
         if (error.code() == 401) {
-            session.clear()
-            return ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
+            session.expire("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.")
+            return ClinicalResult.Error("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.")
         }
         val detail = runCatching {
             val body = error.response()?.errorBody()?.string().orEmpty()
@@ -243,12 +243,12 @@ class RemotePatientRepository(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: SessionExpiredException) {
-            session.clear()
-            ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente", 401)
+            session.expire("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.")
+            ClinicalResult.Error("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.", 401)
         } catch (error: HttpException) {
             if (error.code() == 401) {
-                session.clear()
-                ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente", 401)
+                session.expire("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.")
+                ClinicalResult.Error("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.", 401)
             } else {
                 ClinicalResult.Error(errorMessage, error.code())
             }
