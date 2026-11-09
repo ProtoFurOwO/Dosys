@@ -15,6 +15,16 @@ data class PatientConsultation(
     val notes: String? = null,
     @SerialName("created_at") val createdAt: String,
     @SerialName("updated_at") val updatedAt: String? = null,
+    // Signos vitales y exploración física. Son opcionales: las consultas
+    // antiguas no los traen y el backend puede devolver null.
+    @SerialName("blood_pressure") val bloodPressure: String? = null,
+    @SerialName("heart_rate") val heartRate: Int? = null,
+    @SerialName("respiratory_rate") val respiratoryRate: Int? = null,
+    @SerialName("temperature_c") val temperatureC: Double? = null,
+    @SerialName("oxygen_saturation") val oxygenSaturation: Int? = null,
+    @SerialName("weight_kg") val weightKg: Double? = null,
+    @SerialName("height_cm") val heightCm: Double? = null,
+    @SerialName("physical_exam") val physicalExam: String? = null,
 )
 
 @Serializable

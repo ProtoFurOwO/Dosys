@@ -5,9 +5,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import mx.unach.dosys.core.di.ServiceLocator
@@ -18,6 +20,7 @@ import mx.unach.dosys.ui.documents.DocumentsScreen
 import mx.unach.dosys.ui.home.HomeScreen
 import mx.unach.dosys.ui.login.LoginScreen
 import mx.unach.dosys.ui.prescriptions.PrescriptionsScreen
+import mx.unach.dosys.ui.record.ConsultationDetailScreen
 import mx.unach.dosys.ui.record.RecordScreen
 import mx.unach.dosys.ui.security.SecurityScreen
 import mx.unach.dosys.ui.studies.StudiesScreen
@@ -110,7 +113,21 @@ fun DosysNavHost(openTransferApproval: Boolean = false) {
             )
         }
         composable(Routes.RECORD) {
-            RecordScreen(onBack = { navController.popBackStack() })
+            RecordScreen(
+                onBack = { navController.popBackStack() },
+                onOpenConsultation = { id ->
+                    navController.navigate(Routes.consultation(id))
+                },
+            )
+        }
+        composable(
+            route = Routes.CONSULTATION,
+            arguments = listOf(navArgument("id") { type = NavType.IntType }),
+        ) { entry ->
+            ConsultationDetailScreen(
+                consultationId = entry.arguments?.getInt("id") ?: 0,
+                onBack = { navController.popBackStack() },
+            )
         }
         composable(Routes.STUDIES) {
             StudiesScreen(onBack = { navController.popBackStack() })

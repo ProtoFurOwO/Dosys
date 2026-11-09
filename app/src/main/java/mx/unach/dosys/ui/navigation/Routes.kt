@@ -9,6 +9,7 @@ object Routes {
     const val LOGIN_TRANSFERRED = "login_transferred"
     const val HOME = "home"
     const val RECORD = "record"
+    const val CONSULTATION = "consultation/{id}"
     const val STUDIES = "studies"
     const val PRESCRIPTIONS = "prescriptions"
     const val APPOINTMENTS = "appointments"
@@ -16,4 +17,6 @@ object Routes {
     const val SECURITY = "security"
     const val DOCUMENTS = "documents"
     const val TRANSFER_APPROVAL = "transfer_approval"
+
+    fun consultation(id: Int): String = "consultation/$id"
 }

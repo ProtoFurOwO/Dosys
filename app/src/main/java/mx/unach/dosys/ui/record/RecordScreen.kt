@@ -36,6 +36,7 @@ import mx.unach.dosys.ui.format.formatClinicalDateTime
 @Composable
 fun RecordScreen(
     onBack: () -> Unit,
+    onOpenConsultation: (Int) -> Unit,
     viewModel: RecordViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -43,7 +44,11 @@ fun RecordScreen(
     var unlocked by remember { mutableStateOf(false) }
 
     if (unlocked) {
-        RecordContent(state = state, onBack = onBack)
+        RecordContent(
+            state = state,
+            onBack = onBack,
+            onOpenConsultation = onOpenConsultation,
+        )
     } else {
         ScreenScaffold(title = "Mi expediente", onBack = onBack) { padding ->
             BiometricGate(
@@ -55,7 +60,11 @@ fun RecordScreen(
 }
 
 @Composable
-private fun RecordContent(state: RecordUiState, onBack: () -> Unit) {
+private fun RecordContent(
+    state: RecordUiState,
+    onBack: () -> Unit,
+    onOpenConsultation: (Int) -> Unit,
+) {
     ScreenScaffold(title = "Mi expediente", onBack = onBack) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -117,7 +126,10 @@ private fun RecordContent(state: RecordUiState, onBack: () -> Unit) {
                 )
             }
             items(state.consultations, key = { it.id }) { consultation ->
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    onClick = { onOpenConsultation(consultation.id) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     Column(Modifier.padding(16.dp)) {
                         Text(formatClinicalDateTime(consultation.createdAt), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                         consultation.updatedAt?.let { updated ->
@@ -132,6 +144,12 @@ private fun RecordContent(state: RecordUiState, onBack: () -> Unit) {
                         Spacer(Modifier.height(8.dp))
                         InfoRow("Motivo", consultation.reason)
                         InfoRow("Diagnóstico", consultation.diagnosis)
+                        Text(
+                            text = "Toca para ver la consulta completa (S · O · A · P)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
                     }
                 }
             }
