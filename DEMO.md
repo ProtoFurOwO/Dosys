@@ -1,6 +1,6 @@
 # Guía de demostración — D.O.S.Y.S
 
-> Para la presentación operativa de clínica (recepción → médico → laboratorio → paciente), usa **[GUION_DEMO_CLINICA.md](GUION_DEMO_CLINICA.md)**. Esta guía conserva las demos de seguridad, roles y documentos.
+> Para la presentación operativa de clínica (recepción → médico → laboratorio → paciente), usa **[GUION_DEMO_10MIN.md](GUION_DEMO_10MIN.md)**. Esta guía conserva las demos de seguridad, roles y documentos.
 
 Demostración de 7 a 10 minutos con dos dispositivos: **laptop** (portal clínico) y
 **celular** (app del paciente). Todo el flujo es real: portal → PostgreSQL → app.

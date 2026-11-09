@@ -41,7 +41,7 @@ from app.models.user_device import UserDevice
 from app.services.appointments import create_appointment
 from app.services.consultations import create_consultation
 from app.services.documents import document_path, store_document_bytes
-from app.services.lab import create_orders
+from app.services.lab import complete_order, create_orders
 from app.services.reports import build_consultation_pdf
 
 CLINIC_TZ = ZoneInfo("America/Mexico_City")
@@ -133,15 +133,34 @@ async def main(reset: bool, live: bool) -> None:
             height_cm=170,
             physical_exam="Paciente consciente, orientado, cardiopulmonar sin agregados, abdomen blando.",
         )
-        study = await db.scalar(select(LabStudy).where(LabStudy.code == "biometria"))
-        if study is not None:
-            await create_orders(
+        biometria = await db.scalar(select(LabStudy).where(LabStudy.code == "biometria"))
+        quimica = await db.scalar(select(LabStudy).where(LabStudy.code == "quimica"))
+        lab_user = await db.scalar(select(User).where(User.username == "laboratorio"))
+        studies = [item for item in (quimica, biometria) if item is not None]
+        orders = []
+        if studies:
+            orders = await create_orders(
                 db,
                 patient=patient,
                 doctor=doctor,
                 consultation_id=consultation.id,
-                studies=[study],
+                studies=studies,
                 indications="Control de demostración",
+            )
+        completed_order = None
+        if orders and lab_user is not None:
+            completed_order = next(
+                (order for order in orders if quimica and order.study_id == quimica.id),
+                orders[0],
+            )
+            await complete_order(
+                db,
+                order=completed_order,
+                performed_by=lab_user,
+                result_text=(
+                    "Glucosa 92 mg/dL; urea 28 mg/dL; creatinina 0.9 mg/dL; "
+                    "colesterol 180 mg/dL. Sin hallazgos agudos."
+                ),
             )
 
         pdf = build_consultation_pdf(
@@ -198,6 +217,16 @@ async def main(reset: bool, live: bool) -> None:
         )
         print(f"  Solicitud pendiente: {requested_at.isoformat(timespec='minutes')}")
         print(f"  Consulta SOAP: id {consultation.id}")
+        if completed_order is not None:
+            print(
+                f"  Estudio listo: {completed_order.study.name} "
+                f"(orden {completed_order.id})"
+            )
+        pending = [
+            order for order in orders if completed_order is None or order.id != completed_order.id
+        ]
+        for order in pending:
+            print(f"  Estudio pendiente: {order.study.name} (orden {order.id})")
         print("  Documento firmado: Nota de consulta demo")
 
 

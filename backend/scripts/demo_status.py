@@ -107,7 +107,27 @@ async def main() -> None:
         if not pending_orders:
             print("  (sin órdenes pendientes)")
         for order in pending_orders:
-            print(f"  - orden {order.id} · {order.status.value}")
+            print(f"  - orden {order.id} · {order.study.name} · {order.status.value}")
+
+        completed_orders = (
+            await db.scalars(
+                select(StudyOrder)
+                .where(
+                    StudyOrder.patient_id == patient.id,
+                    StudyOrder.status == StudyOrderStatus.COMPLETED,
+                )
+                .order_by(StudyOrder.id.desc())
+                .limit(3)
+            )
+        ).all()
+        print("\nResultados listos para la app:")
+        if not completed_orders:
+            print("  (sin resultados completados)")
+        for order in completed_orders:
+            print(
+                f"  - orden {order.id} · {order.study.name} · "
+                f"documento={order.document_id or 'sin PDF'}"
+            )
 
         print("\nSiguiente paso: abre /portal/citas/<id> y el teléfono con demo.paciente.")
 
