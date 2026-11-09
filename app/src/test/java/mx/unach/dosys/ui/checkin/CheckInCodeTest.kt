@@ -60,11 +60,12 @@ class CheckInCodeTest {
                 appointment(2, "2026-10-08T12:00:00Z"),
                 appointment(3, "2026-12-01T12:00:00Z", status = AppointmentStatus.ATTENDED),
                 appointment(4, "2026-12-02T12:00:00Z", status = AppointmentStatus.CANCELLED),
+                appointment(5, "2026-12-03T12:00:00Z", status = AppointmentStatus.REQUESTED),
             ),
             now,
         )
 
         assertEquals(listOf(1), eligible.map { it.id })
-        assertTrue(eligible.all { it.id != 2 && it.id != 3 && it.id != 4 })
+        assertTrue(eligible.all { it.id != 2 && it.id != 3 && it.id != 4 && it.id != 5 })
     }
 }

@@ -42,6 +42,7 @@ fun studyStatusColor(status: String): Color = when (status) {
 }
 
 fun appointmentStatusLabel(status: AppointmentStatus): String = when (status) {
+    AppointmentStatus.REQUESTED -> "Solicitada"
     AppointmentStatus.SCHEDULED -> "Agendada"
     AppointmentStatus.CONFIRMED -> "Confirmada"
     AppointmentStatus.ATTENDED -> "Atendida"
@@ -49,6 +50,7 @@ fun appointmentStatusLabel(status: AppointmentStatus): String = when (status) {
 }
 
 fun appointmentStatusColor(status: AppointmentStatus): Color = when (status) {
+    AppointmentStatus.REQUESTED -> Color(0xFFB45309)
     AppointmentStatus.SCHEDULED -> Color(0xFFB45309)
     AppointmentStatus.CONFIRMED -> Color(0xFF13653F)
     AppointmentStatus.ATTENDED -> Color(0xFF6B7280)

@@ -55,6 +55,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import mx.unach.dosys.core.di.ServiceLocator
+import mx.unach.dosys.data.model.AppointmentStatus
 import mx.unach.dosys.data.model.PatientAppointment
 import mx.unach.dosys.data.model.PatientPrescription
 import mx.unach.dosys.ui.format.formatClinicalDateTime
@@ -287,6 +288,12 @@ private fun NextAppointmentCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     when {
+                        appointment.status == AppointmentStatus.REQUESTED -> Text(
+                            text = "Solicitada · Pendiente de confirmación por recepción",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
                         appointment.checkedInAt != null -> Text(
                             text = "Llegada confirmada",
                             style = MaterialTheme.typography.labelMedium,

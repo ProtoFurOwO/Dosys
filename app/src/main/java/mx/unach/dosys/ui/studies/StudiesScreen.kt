@@ -34,7 +34,7 @@ import mx.unach.dosys.ui.format.formatClinicalDateTime
 
 /**
  * Estudios de laboratorio e imagen del paciente: estado y descarga del
- * resultado en PDF (protegido con huella SHA-256 en el servidor).
+ * resultado en PDF (protegido con firma electrónica en el servidor).
  */
 @Composable
 fun StudiesScreen(

@@ -5,15 +5,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import mx.unach.dosys.core.di.ServiceLocator
 import mx.unach.dosys.data.repository.DeviceResult
+import mx.unach.dosys.ui.appointments.AppointmentRequestScreen
 import mx.unach.dosys.ui.appointments.AppointmentsScreen
 import mx.unach.dosys.ui.checkin.CheckInScreen
+import mx.unach.dosys.ui.documents.DocumentDetailScreen
 import mx.unach.dosys.ui.documents.DocumentsScreen
 import mx.unach.dosys.ui.home.HomeScreen
 import mx.unach.dosys.ui.login.LoginScreen
@@ -121,7 +125,14 @@ fun DosysNavHost(openTransferApproval: Boolean = false) {
         composable(Routes.APPOINTMENTS) {
             AppointmentsScreen(
                 onBack = { navController.popBackStack() },
+                onRequestAppointment = { navController.navigate(Routes.APPOINTMENT_REQUEST) },
                 onOpenCheckIn = { navController.navigate(Routes.CHECKIN) },
+            )
+        }
+        composable(Routes.APPOINTMENT_REQUEST) {
+            AppointmentRequestScreen(
+                onBack = { navController.popBackStack() },
+                onDone = { navController.popBackStack() },
             )
         }
         composable(Routes.CHECKIN) {
@@ -131,7 +142,19 @@ fun DosysNavHost(openTransferApproval: Boolean = false) {
             SecurityScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.DOCUMENTS) {
-            DocumentsScreen(onBack = { navController.popBackStack() })
+            DocumentsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenDocument = { id -> navController.navigate(Routes.document(id)) },
+            )
+        }
+        composable(
+            route = Routes.DOCUMENT_DETAIL,
+            arguments = listOf(navArgument("id") { type = NavType.IntType }),
+        ) { entry ->
+            DocumentDetailScreen(
+                documentId = entry.arguments?.getInt("id") ?: 0,
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }

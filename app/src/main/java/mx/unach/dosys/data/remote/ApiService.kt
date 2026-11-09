@@ -1,8 +1,12 @@
 package mx.unach.dosys.data.remote
 
+import mx.unach.dosys.data.model.AppointmentAvailabilityResponse
+import mx.unach.dosys.data.model.AppointmentRequest
 import mx.unach.dosys.data.model.ChangePasswordRequest
 import mx.unach.dosys.data.model.CheckInRequest
 import mx.unach.dosys.data.model.DeviceRegisterRequest
+import mx.unach.dosys.data.model.DoctorOption
+import mx.unach.dosys.data.model.DocumentIntegrityResponse
 import mx.unach.dosys.data.model.LoginRequest
 import mx.unach.dosys.data.model.LoginResponse
 import mx.unach.dosys.data.model.LogoutRequest
@@ -36,6 +40,7 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
+import retrofit2.http.Query
 import retrofit2.http.Streaming
 
 /**
@@ -153,8 +158,30 @@ interface ApiService {
     @GET("patients/me/appointments")
     suspend fun myAppointments(@Header("Authorization") authorization: String): List<PatientAppointment>
 
+    @GET("appointments/doctors")
+    suspend fun appointmentDoctors(@Header("Authorization") authorization: String): List<DoctorOption>
+
+    @GET("appointments/availability")
+    suspend fun appointmentAvailability(
+        @Header("Authorization") authorization: String,
+        @Query("doctor_id") doctorId: Int,
+        @Query("date") date: String,
+    ): AppointmentAvailabilityResponse
+
+    @POST("appointments/requests")
+    suspend fun requestAppointment(
+        @Header("Authorization") authorization: String,
+        @Body request: AppointmentRequest,
+    ): PatientAppointment
+
     @GET("patients/me/documents")
     suspend fun myDocuments(@Header("Authorization") authorization: String): List<PatientDocument>
+
+    @GET("patients/me/documents/{id}/verify")
+    suspend fun verifyDocument(
+        @Header("Authorization") authorization: String,
+        @Path("id") documentId: Int,
+    ): DocumentIntegrityResponse
 
     @GET("patients/me/studies")
     suspend fun myStudies(@Header("Authorization") authorization: String): List<PatientStudy>

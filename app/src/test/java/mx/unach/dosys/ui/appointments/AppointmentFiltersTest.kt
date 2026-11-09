@@ -96,4 +96,31 @@ class AppointmentFiltersTest {
             )
         )
     }
+
+    @Test
+    fun `el check-in solo se habilita para citas agendadas o confirmadas`() {
+        assertFalse(
+            AppointmentFilters.canCheckIn(
+                listOf(appointment(1, "2026-11-20T12:00:00Z", status = AppointmentStatus.REQUESTED))
+            )
+        )
+        assertTrue(
+            AppointmentFilters.canCheckIn(
+                listOf(appointment(2, "2026-11-20T12:00:00Z", status = AppointmentStatus.SCHEDULED))
+            )
+        )
+        assertTrue(
+            AppointmentFilters.canCheckIn(
+                listOf(appointment(3, "2026-11-20T12:00:00Z", status = AppointmentStatus.CONFIRMED))
+            )
+        )
+        assertFalse(
+            AppointmentFilters.canCheckIn(
+                listOf(
+                    appointment(4, "2026-11-20T12:00:00Z", status = AppointmentStatus.REQUESTED),
+                    appointment(5, "2026-11-21T12:00:00Z", status = AppointmentStatus.CANCELLED),
+                )
+            )
+        )
+    }
 }

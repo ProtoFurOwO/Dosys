@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
@@ -44,6 +45,7 @@ import java.io.File
 @Composable
 fun DocumentsScreen(
     onBack: () -> Unit,
+    onOpenDocument: (Int) -> Unit,
     viewModel: DocumentsViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -96,6 +98,7 @@ fun DocumentsScreen(
                     document = document,
                     isOpening = state.openingId == document.id,
                     onOpen = { viewModel.open(document) },
+                    onOpenDetail = { onOpenDocument(document.id) },
                 )
             }
         }
@@ -103,8 +106,13 @@ fun DocumentsScreen(
 }
 
 @Composable
-private fun DocumentCard(document: PatientDocument, isOpening: Boolean, onOpen: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+private fun DocumentCard(
+    document: PatientDocument,
+    isOpening: Boolean,
+    onOpen: () -> Unit,
+    onOpenDetail: () -> Unit,
+) {
+    Card(onClick = onOpenDetail, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -127,6 +135,21 @@ private fun DocumentCard(document: PatientDocument, isOpening: Boolean, onOpen: 
                     )
                 }
             }
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Firma electrónica",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = signaturePreview(document.sha256),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Spacer(Modifier.height(12.dp))
             Button(
                 onClick = onOpen,
@@ -135,11 +158,20 @@ private fun DocumentCard(document: PatientDocument, isOpening: Boolean, onOpen: 
             ) {
                 Text(if (isOpening) "Descargando…" else "Abrir documento")
             }
+            Text(
+                text = "Toca para ver el detalle y verificar la firma.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 8.dp),
+            )
         }
     }
 }
 
-private fun categoryLabel(category: String): String = when (category) {
+internal fun signaturePreview(signature: String): String =
+    if (signature.length <= 16) signature else "${signature.take(16)}…"
+
+internal fun categoryLabel(category: String): String = when (category) {
     "estudio" -> "Estudio"
     "receta" -> "Receta"
     "informe" -> "Informe"
@@ -147,14 +179,14 @@ private fun categoryLabel(category: String): String = when (category) {
     else -> "Documento"
 }
 
-private fun sizeLabel(bytes: Long): String = when {
+internal fun sizeLabel(bytes: Long): String = when {
     bytes < 1024 -> "$bytes B"
     bytes < 1024 * 1024 -> "${bytes / 1024} KB"
     else -> String.format("%.1f MB", bytes / (1024.0 * 1024.0))
 }
 
 /** Guarda el archivo en la caché privada y lo entrega a la app que pueda abrirlo. */
-private fun openWithDevice(context: Context, document: OpenedDocument): Boolean {
+internal fun openWithDevice(context: Context, document: OpenedDocument): Boolean {
     val directory = File(context.cacheDir, "documentos").apply { mkdirs() }
     val file = File(directory, document.fileName.ifBlank { "documento" })
     file.writeBytes(document.bytes)
