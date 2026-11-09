@@ -3,7 +3,7 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Cruz médica blanca, centrada en el icono adaptativo -->
+    <!-- Cruz médica blanca para la notificación (el launcher usa el logo nuevo). -->
     <path
         android:fillColor="#FFFFFF"
         android:pathData="M48,30 h12 v18 h18 v12 h-18 v18 h-12 v-18 h-18 v-12 h18 z" />

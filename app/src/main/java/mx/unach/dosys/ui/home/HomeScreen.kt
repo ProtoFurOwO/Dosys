@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -48,12 +49,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
+import mx.unach.dosys.R
 import mx.unach.dosys.core.di.ServiceLocator
 import mx.unach.dosys.data.model.AppointmentStatus
 import mx.unach.dosys.data.model.PatientAppointment
@@ -99,6 +103,16 @@ fun HomeScreen(
                             fontWeight = FontWeight.Bold,
                         )
                     }
+                },
+                navigationIcon = {
+                    Image(
+                        painter = painterResource(R.drawable.logo_dosys_mark),
+                        contentDescription = "D.O.S.Y.S.",
+                        modifier = Modifier
+                            .padding(start = 12.dp)
+                            .size(36.dp),
+                        contentScale = ContentScale.Fit,
+                    )
                 },
                 actions = {
                     IconButton(onClick = { viewModel.logout(onLogout) }) {
