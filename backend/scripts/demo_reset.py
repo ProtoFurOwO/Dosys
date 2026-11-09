@@ -3,11 +3,13 @@
 Uso (dentro del contenedor de la API):
 
     sudo docker exec -it dosys-api python scripts/demo_reset.py --reset
+    sudo docker exec -it dosys-api python scripts/demo_reset.py --reset --live
 
 Borra solo las citas, consultas, recetas, estudios, documentos y dispositivos
 del paciente demo; conserva la cuenta y el resto de la base. Después crea un
 recorrido listo para exponer: cita agendada, solicitud pendiente, consulta SOAP,
-orden de laboratorio y nota firmada.
+orden de laboratorio y nota firmada. Con ``--live`` la cita principal es de hoy,
+nace confirmada y queda lista para el check-in con QR.
 """
 
 import argparse
@@ -45,7 +47,7 @@ from app.services.reports import build_consultation_pdf
 CLINIC_TZ = ZoneInfo("America/Mexico_City")
 
 
-async def main(reset: bool) -> None:
+async def main(reset: bool, live: bool) -> None:
     async with SessionLocal() as db:
         user = await db.scalar(select(User).where(User.username == "demo.paciente"))
         doctor_user = await db.scalar(select(User).where(User.username == "demo.medico"))
@@ -86,11 +88,23 @@ async def main(reset: bool) -> None:
                 await db.delete(row)
         await db.flush()
 
-        clinic_today = datetime.now(CLINIC_TZ).date()
-        target = clinic_today + timedelta(days=1)
-        while target.weekday() == 6:
-            target += timedelta(days=1)
-        scheduled = datetime.combine(target, time(10, 0), tzinfo=CLINIC_TZ)
+        clinic_now = datetime.now(CLINIC_TZ)
+        clinic_today = clinic_now.date()
+        if live:
+            # Cita de hoy, confirmada y con la ventana de check-in abierta.
+            scheduled = (clinic_now + timedelta(minutes=20)).replace(
+                second=0, microsecond=0
+            )
+            scheduled += timedelta(minutes=(-scheduled.minute) % 5)
+            appointment_status = AppointmentStatus.CONFIRMED
+            appointment_note = "Cita de demostración en vivo"
+        else:
+            target = clinic_today + timedelta(days=1)
+            while target.weekday() == 6:
+                target += timedelta(days=1)
+            scheduled = datetime.combine(target, time(10, 0), tzinfo=CLINIC_TZ)
+            appointment_status = AppointmentStatus.SCHEDULED
+            appointment_note = "Cita de demostración"
 
         appointment = await create_appointment(
             db,
@@ -100,7 +114,8 @@ async def main(reset: bool) -> None:
             scheduled_at=scheduled.astimezone(timezone.utc),
             location="Consultorio 3",
             room="Consultorio 3",
-            notes="Cita de demostración",
+            notes=appointment_note,
+            status=appointment_status,
         )
         consultation = await create_consultation(
             db,
@@ -158,7 +173,10 @@ async def main(reset: bool) -> None:
             original_name="nota-consulta-demo.pdf",
         )
 
-        requested_at = datetime.combine(target, time(12, 30), tzinfo=CLINIC_TZ)
+        request_target = clinic_today + timedelta(days=1)
+        while request_target.weekday() == 6:
+            request_target += timedelta(days=1)
+        requested_at = datetime.combine(request_target, time(12, 30), tzinfo=CLINIC_TZ)
         await create_appointment(
             db,
             patient=patient,
@@ -172,8 +190,12 @@ async def main(reset: bool) -> None:
         await db.commit()
 
         print("Demo recreada:")
+        print(f"  Modo: {'día en vivo' if live else 'histórico'}")
         print(f"  Paciente: {patient.full_name} (id {patient.id})")
-        print(f"  Cita agendada: {scheduled.isoformat(timespec='minutes')}")
+        print(
+            f"  Cita de hoy: {scheduled.isoformat(timespec='minutes')} "
+            f"({appointment_status.value}) · /portal/citas/{appointment.id}"
+        )
         print(f"  Solicitud pendiente: {requested_at.isoformat(timespec='minutes')}")
         print(f"  Consulta SOAP: id {consultation.id}")
         print("  Documento firmado: Nota de consulta demo")
@@ -182,5 +204,10 @@ async def main(reset: bool) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--reset", action="store_true", help="limpia y recrea el recorrido demo")
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help="crea la cita principal para hoy, confirmada y lista para check-in",
+    )
     args = parser.parse_args()
-    asyncio.run(main(args.reset))
+    asyncio.run(main(args.reset, args.live))
