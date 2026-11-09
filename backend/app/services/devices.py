@@ -1,7 +1,7 @@
 """Dispositivos de confianza y transferencia de sesión entre dispositivos.
 
 El servidor es solo un enrutador: nunca genera, compara ni registra el código
-de 6 dígitos. El dispositivo activo (A) lo genera localmente, lo compara con
+de 6 dígitos. Cualquier dispositivo autorizado lo genera localmente, lo compara con
 tiempo constante y aprueba con un token criptográfico. Aquí se concentran el
 registro de dispositivos, las propuestas de código y la resolución de la
 transferencia, siempre dentro de una transacción.
@@ -87,11 +87,56 @@ def matches_device(device: UserDevice | None, device_id: str | None) -> bool:
 # ── Dispositivos ──────────────────────────────────────────────────────────────
 
 
+async def _lock_user(db: AsyncSession, user_id: int) -> None:
+    """Serializa altas y bajas de dispositivos del mismo usuario.
+
+    Sin este bloqueo, dos aprobaciones simultáneas podrían contar 2 activos y
+    crear dos más, superando ``MAX_TRUSTED_DEVICES``. El bloqueo se toma antes
+    de contar y se libera al confirmar la transacción.
+    """
+    await db.execute(select(User.id).where(User.id == user_id).with_for_update())
+
+
+async def active_devices(db: AsyncSession, user_id: int) -> list[UserDevice]:
+    """Dispositivos de confianza activos, del más antiguo al más reciente."""
+    return list(
+        (
+            await db.scalars(
+                select(UserDevice)
+                .where(UserDevice.user_id == user_id, UserDevice.is_active.is_(True))
+                .order_by(UserDevice.created_at.asc(), UserDevice.id.asc())
+            )
+        ).all()
+    )
+
+
 async def active_device(db: AsyncSession, user_id: int) -> UserDevice | None:
+    """Compatibilidad: primer dispositivo activo (usar active_devices en lógica nueva)."""
+    devices = await active_devices(db, user_id)
+    return devices[0] if devices else None
+
+
+async def find_active_device(
+    db: AsyncSession, user_id: int, device_id: str | None
+) -> UserDevice | None:
+    """Busca por el identificador crudo que entrega la app (lo hashea aquí)."""
+    if not device_id:
+        return None
+    return await find_active_device_by_hash(db, user_id, hash_device_id(device_id))
+
+
+async def find_active_device_by_hash(
+    db: AsyncSession, user_id: int, device_hash: str | None
+) -> UserDevice | None:
+    """Busca por el hash ya almacenado (claim ``did`` del JWT o challenge 2FA)."""
+    if not device_hash:
+        return None
     return await db.scalar(
-        select(UserDevice)
-        .where(UserDevice.user_id == user_id, UserDevice.is_active.is_(True))
-        .limit(1)
+        select(UserDevice).where(
+            UserDevice.user_id == user_id,
+            UserDevice.device_hash == device_hash,
+            UserDevice.is_active.is_(True),
+        )
     )
 
 
@@ -113,25 +158,25 @@ async def register_or_touch(
     fcm_token: str | None = None,
     activate: bool = True,
 ) -> UserDevice:
-    """Registra o actualiza el dispositivo; si se activa, desactiva los demás."""
+    """Registra o actualiza el dispositivo sin expulsar a los ya autorizados."""
     device_hash = hash_device_id(device_id)
-    previous = await active_device(db, user.id) if activate else None
     if activate:
-        await db.execute(
-            update(UserDevice)
-            .where(
-                UserDevice.user_id == user.id,
-                UserDevice.is_active.is_(True),
-                UserDevice.device_hash != device_hash,
-            )
-            .values(is_active=False)
-        )
-
+        await _lock_user(db, user.id)
     device = await db.scalar(
         select(UserDevice)
         .where(UserDevice.user_id == user.id, UserDevice.device_hash == device_hash)
         .with_for_update()
     )
+
+    if activate and (device is None or not device.is_active):
+        active = await active_devices(db, user.id)
+        if len(active) >= settings.max_trusted_devices:
+            raise DeviceTransferError(
+                f"Ya tienes {settings.max_trusted_devices} dispositivos autorizados. "
+                "Revoca uno antes de agregar otro.",
+                status_code=409,
+            )
+
     if device is None:
         device = UserDevice(
             user_id=user.id,
@@ -147,10 +192,6 @@ async def register_or_touch(
         device.last_seen_at = _now()
         if activate:
             device.is_active = True
-    if activate and (
-        previous is None or not hmac.compare_digest(previous.device_hash, device_hash)
-    ):
-        user.device_epoch = (user.device_epoch or 0) + 1
     if fcm_token is not None:
         device.fcm_token = fcm_token.strip()[:255] or None
     await db.flush()
@@ -160,33 +201,25 @@ async def register_or_touch(
 async def activate_device_hash(
     db: AsyncSession, user: User, device_hash: str | None, name: str | None
 ) -> UserDevice | None:
-    """Activa un dispositivo a partir de su hash (login ya validado)."""
-    previous = await active_device(db, user.id)
+    """Activa un dispositivo a partir de su hash sin desconectar los demás."""
     if not device_hash:
-        await db.execute(
-            update(UserDevice)
-            .where(UserDevice.user_id == user.id, UserDevice.is_active.is_(True))
-            .values(is_active=False)
-        )
-        if previous is not None:
-            user.device_epoch = (user.device_epoch or 0) + 1
-        await db.flush()
         return None
 
-    await db.execute(
-        update(UserDevice)
-        .where(
-            UserDevice.user_id == user.id,
-            UserDevice.is_active.is_(True),
-            UserDevice.device_hash != device_hash,
-        )
-        .values(is_active=False)
-    )
+    await _lock_user(db, user.id)
     device = await db.scalar(
         select(UserDevice)
         .where(UserDevice.user_id == user.id, UserDevice.device_hash == device_hash)
         .with_for_update()
     )
+    if device is None or not device.is_active:
+        active = await active_devices(db, user.id)
+        if len(active) >= settings.max_trusted_devices:
+            raise DeviceTransferError(
+                f"Ya tienes {settings.max_trusted_devices} dispositivos autorizados. "
+                "Revoca uno antes de agregar otro.",
+                status_code=409,
+            )
+
     if device is None:
         device = UserDevice(
             user_id=user.id,
@@ -201,8 +234,6 @@ async def activate_device_hash(
         device.last_seen_at = _now()
         if name:
             device.name = normalize_name(name)
-    if previous is None or not hmac.compare_digest(previous.device_hash, device_hash):
-        user.device_epoch = (user.device_epoch or 0) + 1
     await db.flush()
     return device
 
@@ -217,7 +248,8 @@ async def clear_fcm_token(db: AsyncSession, device: UserDevice) -> None:
 
 
 async def release_device(db: AsyncSession, user: User) -> bool:
-    """Libera el dispositivo de confianza y revoca las sesiones ligadas a él."""
+    """Libera todos los dispositivos de confianza y sus sesiones renovables."""
+    await _lock_user(db, user.id)
     released = await db.scalar(
         select(func.count(UserDevice.id)).where(
             UserDevice.user_id == user.id, UserDevice.is_active.is_(True)
@@ -243,6 +275,7 @@ async def release_device_by_id(db: AsyncSession, device_id: int) -> bool:
     device = await db.get(UserDevice, device_id)
     if device is None or not device.is_active:
         return False
+    await _lock_user(db, device.user_id)
     device.is_active = False
     await db.execute(
         update(RefreshToken)
@@ -405,6 +438,7 @@ async def approve_transfer(
     transfer_id: str,
     approval_token: str,
 ) -> DeviceTransfer:
+    await _lock_user(db, user.id)
     transfer = await _lock_transfer(db, transfer_id)
     if transfer is None or transfer.user_id != user.id:
         raise DeviceTransferError("No encontramos esa solicitud.", status_code=404)
@@ -413,7 +447,7 @@ async def approve_transfer(
     if transfer.status not in _ACTIVE_STATUSES:
         raise DeviceTransferError("La solicitud ya no está disponible.")
     if not device.is_active:
-        raise DeviceTransferError("Este dispositivo ya no es el activo.", status_code=403)
+        raise DeviceTransferError("Este dispositivo ya no está autorizado.", status_code=403)
     if not verify_approval_token(transfer, approval_token):
         raise DeviceTransferError("El token de aprobación no es válido.", status_code=403)
     if not transfer.new_device_hash:
@@ -422,47 +456,42 @@ async def approve_transfer(
             status_code=409,
         )
 
+    new_device = await db.scalar(
+        select(UserDevice)
+        .where(
+            UserDevice.user_id == user.id,
+            UserDevice.device_hash == transfer.new_device_hash,
+        )
+        .with_for_update()
+    )
+    active = await active_devices(db, user.id)
+    if (new_device is None or not new_device.is_active) and len(active) >= settings.max_trusted_devices:
+        raise DeviceTransferError(
+            f"Ya tienes {settings.max_trusted_devices} dispositivos autorizados. "
+            "Revoca uno antes de agregar otro.",
+            status_code=409,
+        )
+
     transfer.status = DeviceTransferStatus.APPROVED
     transfer.resolved_at = _now()
     transfer.submitted_code_hash = None
 
-    # B pasa a ser el único dispositivo activo; A queda fuera de inmediato
-    # porque su claim ``did`` deja de coincidir con el dispositivo activo.
-    await db.execute(
-        update(UserDevice)
-        .where(UserDevice.user_id == user.id, UserDevice.is_active.is_(True))
-        .values(is_active=False)
-    )
-    if transfer.new_device_hash:
-        new_device = await db.scalar(
-            select(UserDevice)
-            .where(
-                UserDevice.user_id == user.id,
-                UserDevice.device_hash == transfer.new_device_hash,
-            )
-            .with_for_update()
+    if new_device is None:
+        new_device = UserDevice(
+            user_id=user.id,
+            device_hash=transfer.new_device_hash,
+            name=transfer.new_device_name,
+            is_active=True,
+            last_seen_at=_now(),
         )
-        if new_device is None:
-            new_device = UserDevice(
-                user_id=user.id,
-                device_hash=transfer.new_device_hash,
-                name=transfer.new_device_name,
-                is_active=True,
-                last_seen_at=_now(),
-            )
-            db.add(new_device)
-        else:
-            new_device.is_active = True
-            new_device.name = transfer.new_device_name
-            new_device.last_seen_at = _now()
+        db.add(new_device)
+    else:
+        new_device.is_active = True
+        new_device.name = transfer.new_device_name
+        new_device.last_seen_at = _now()
 
-    # Todas las sesiones renovables de A quedan revocadas.
-    await db.execute(
-        update(RefreshToken)
-        .where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))
-        .values(revoked_at=_now())
-    )
-    user.device_epoch = (user.device_epoch or 0) + 1
+    # Los dispositivos anteriores y sus refresh tokens siguen vigentes: este
+    # flujo agrega un dispositivo, no reemplaza la sesión.
     await db.flush()
     return transfer
 

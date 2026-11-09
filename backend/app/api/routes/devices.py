@@ -7,6 +7,7 @@ from app.db.session import get_db
 from app.models.enums import DeviceTransferStatus, UserRole
 from app.models.user import User
 from app.schemas.device import (
+    DeviceListItem,
     DeviceRegisterRequest,
     DeviceRegisterResponse,
     PendingTransferResponse,
@@ -22,6 +23,63 @@ router = APIRouter(prefix="/devices", tags=["Dispositivos"])
 _patient_only = require_roles(UserRole.PATIENT)
 
 
+async def _current_device(request: Request, db: AsyncSession, user: User):
+    device_hash = getattr(request.state, "device_hash", None)
+    if not device_hash:
+        return None
+    return await devices.find_active_device_by_hash(db, user.id, str(device_hash))
+
+
+@router.get("/me", response_model=list[DeviceListItem])
+async def list_my_devices(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(_patient_only),
+) -> list[DeviceListItem]:
+    """Dispositivos autorizados del paciente; marca el que hace la petición."""
+    current = await _current_device(request, db, current_user)
+    active = await devices.active_devices(db, current_user.id)
+    return [
+        DeviceListItem(
+            id=device.id,
+            name=device.name,
+            is_current=current is not None and device.id == current.id,
+            last_seen_at=device.last_seen_at,
+            created_at=device.created_at,
+        )
+        for device in active
+    ]
+
+
+@router.delete("/me/{device_id}", response_model=SimpleDetailResponse)
+async def revoke_my_device(
+    device_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(_patient_only),
+) -> SimpleDetailResponse:
+    """Revoca un dispositivo propio; sus tokens dejan de servir al instante."""
+    device = await devices.find_device_by_id(db, device_id)
+    if device is None or device.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dispositivo no encontrado.")
+    if not device.is_active:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ese dispositivo ya no estaba activo.")
+
+    name = device.name
+    await devices.release_device_by_id(db, device.id)
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="device_released",
+        entity_type="device",
+        entity_id=device.id,
+        request=request,
+        detail=f"nombre={name} origen=app",
+    )
+    await db.commit()
+    return SimpleDetailResponse(detail=f"Dispositivo «{name}» revocado.")
+
+
 @router.put("/me", response_model=DeviceRegisterResponse)
 async def register_my_device(
     payload: DeviceRegisterRequest,
@@ -29,13 +87,15 @@ async def register_my_device(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(_patient_only),
 ) -> DeviceRegisterResponse:
-    """Registra o actualiza el dispositivo activo y su token FCM."""
-    active = await devices.active_device(db, current_user.id)
-    if active is not None and not devices.matches_device(active, payload.device_id):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Este dispositivo no es el activo de tu cuenta.",
-        )
+    """Registra o actualiza este dispositivo autorizado y su token FCM."""
+    current = await devices.find_active_device(db, current_user.id, payload.device_id)
+    if current is None:
+        active = await devices.active_devices(db, current_user.id)
+        if active:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Este dispositivo no está autorizado. Inicia sesión para solicitar acceso.",
+            )
 
     device = await devices.register_or_touch(
         db,
@@ -70,6 +130,12 @@ async def pending_transfer(
     current_user: User = Depends(_patient_only),
 ) -> PendingTransferResponse | Response:
     """Solicitud que espera la aprobación de este dispositivo (A)."""
+    current = await _current_device(request, db, current_user)
+    if current is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Este dispositivo ya no está autorizado.",
+        )
     transfer = await devices.pending_transfer(db, current_user.id)
     if transfer is None:
         await db.commit()
@@ -106,18 +172,18 @@ async def approve_transfer(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(_patient_only),
 ) -> SimpleDetailResponse:
-    """Aprueba la solicitud y deja sin acceso a este dispositivo de inmediato."""
-    active = await devices.active_device(db, current_user.id)
-    if active is None:
+    """Aprueba el dispositivo nuevo; los ya autorizados siguen activos."""
+    current = await _current_device(request, db, current_user)
+    if current is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Este dispositivo ya no es el activo.",
+            detail="Este dispositivo ya no está autorizado.",
         )
     try:
         transfer = await devices.approve_transfer(
             db,
             current_user,
-            active,
+            current,
             transfer_id=transfer_id,
             approval_token=payload.approval_token,
         )
@@ -136,7 +202,7 @@ async def approve_transfer(
     )
     await db.commit()
     return SimpleDetailResponse(
-        detail="Sesión transferida. Este dispositivo ya no tiene acceso."
+        detail="Dispositivo autorizado. Los demás dispositivos siguen activos."
     )
 
 
@@ -149,11 +215,11 @@ async def reject_transfer(
     current_user: User = Depends(_patient_only),
 ) -> SimpleDetailResponse:
     """Rechaza o reporta la propuesta (código incorrecto, ``not_me`` o expiró)."""
-    active = await devices.active_device(db, current_user.id)
-    if active is None:
+    current = await _current_device(request, db, current_user)
+    if current is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Este dispositivo ya no es el activo.",
+            detail="Este dispositivo ya no está autorizado.",
         )
     existing = await devices.get_transfer(db, transfer_id)
     if existing is None or existing.user_id != current_user.id:

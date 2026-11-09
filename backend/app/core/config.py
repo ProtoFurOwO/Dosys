@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     device_transfer_ttl_seconds: int = Field(default=120, ge=60, le=600)
     device_transfer_max_code_submissions: int = Field(default=3, ge=1, le=10)
     device_transfer_max_per_hour: int = Field(default=5, ge=1, le=50)
+    max_trusted_devices: int = Field(default=3, ge=1, le=10)
     fcm_credentials_file: str = ""
 
     # Documentos clínicos.

@@ -156,8 +156,8 @@ async def login(
     await login_security.reset_failed_attempts(db, user)
 
     # ── Dispositivo de confianza (solo pacientes) ─────────────────────────────
-    # Un dispositivo activo distinto exige transferencia de sesión. Para
-    # pacientes, ``device_id`` es obligatorio: sin él no se emite ningún token.
+    # Un dispositivo desconocido exige aprobación desde uno ya autorizado.
+    # Para pacientes, ``device_id`` es obligatorio: sin él no se emite token.
     device = None
     if user.role.code == UserRole.PATIENT.value:
         if not payload.device_id:
@@ -168,8 +168,12 @@ async def login(
                     "no tiene identificador de confianza."
                 ),
             )
-        active = await devices.active_device(db, user.id)
-        if active is not None and not devices.matches_device(active, payload.device_id):
+        active_devices = await devices.active_devices(db, user.id)
+        current_device = next(
+            (item for item in active_devices if devices.matches_device(item, payload.device_id)),
+            None,
+        )
+        if active_devices and current_device is None:
             if rate_limit.exceeded("api-device-transfer", request):
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -199,9 +203,13 @@ async def login(
                 request=request,
                 detail=f"dispositivo={transfer.new_device_name}",
             )
-            sent, reason = await push.notify_device_transfer(active.fcm_token, transfer.id)
-            if not sent and reason == "token inválido" and active.fcm_token:
-                await devices.clear_fcm_token(db, active)
+            # FCM a todos los dispositivos autorizados; cualquiera puede aprobar.
+            for active in active_devices:
+                if not active.fcm_token:
+                    continue
+                sent, reason = await push.notify_device_transfer(active.fcm_token, transfer.id)
+                if not sent and reason == "token inválido" and active.fcm_token:
+                    await devices.clear_fcm_token(db, active)
             await db.commit()
             return DeviceTransferChallengeResponse(
                 transfer_id=transfer.id,
@@ -210,7 +218,7 @@ async def login(
             )
 
         # Si hay 2FA, el dispositivo se registra/activa después de verificar el
-        # segundo factor. Así una contraseña sola no puede ocupar el slot activo.
+        # segundo factor. Así una contraseña sola no puede ocupar un slot activo.
         if not (user.totp_enabled and user.totp_secret):
             device = await devices.register_or_touch(
                 db,
@@ -219,7 +227,7 @@ async def login(
                 name=payload.device_name,
                 activate=True,
             )
-            if active is None:
+            if current_device is None:
                 await write_audit_event(
                     db,
                     user=user,
@@ -323,15 +331,21 @@ async def verify_two_factor(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="La sesión cambió de dispositivo. Vuelve a iniciar sesión.",
             )
-        active = await devices.active_device(db, user.id)
-        if (
-            not fallback_transfer_id
-            and active is not None
-            and not hmac.compare_digest(active.device_hash, str(device_hash))
-        ):
+        authorized = await devices.active_devices(db, user.id)
+        active = next(
+            (
+                item
+                for item in authorized
+                if hmac.compare_digest(item.device_hash, str(device_hash))
+            ),
+            None,
+        )
+        # Sin dispositivos activos es el primer login: el 2FA puede activar
+        # este equipo. Con dispositivos activos, el equipo debe ser uno de ellos.
+        if not fallback_transfer_id and authorized and active is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Esta sesión se transfirió a otro dispositivo. Inicia sesión de nuevo.",
+                detail="Este dispositivo ya no está autorizado. Inicia sesión de nuevo.",
             )
 
     used_recovery = False
@@ -377,7 +391,10 @@ async def verify_two_factor(
                     detail="La solicitud de transferencia ya no está disponible.",
                 )
             await devices.reject_pending_for_fallback(db, transfer)
-            await accounts.revoke_user_sessions(db, user)
+            # El fallback es recuperación, no alta normal: se pierde el
+            # dispositivo anterior, así que se revocan todos los demás y sus
+            # sesiones. La aprobación normal sí conserva los ya autorizados.
+            await devices.release_device(db, user)
             await write_audit_event(
                 db,
                 user=user,
@@ -385,25 +402,33 @@ async def verify_two_factor(
                 entity_type="device_transfer",
                 entity_id=transfer.id,
                 request=request,
-                detail="2fa=correcto",
+                detail="2fa=correcto reemplazo_total",
             )
-            device = await devices.activate_device_hash(
-                db,
-                user,
-                str(device_hash),
-                device_name if isinstance(device_name, str) else None,
-            )
+            try:
+                device = await devices.activate_device_hash(
+                    db,
+                    user,
+                    str(device_hash),
+                    device_name if isinstance(device_name, str) else None,
+                )
+            except devices.DeviceTransferError as error:
+                await db.commit()
+                raise HTTPException(status_code=error.status_code, detail=error.message) from None
         elif active is not None:
             # El dispositivo sigue siendo el activo: no se reactiva nada.
             device = active
         else:
             # Primer login con 2FA: recién aquí se activa el dispositivo.
-            device = await devices.activate_device_hash(
-                db,
-                user,
-                str(device_hash),
-                device_name if isinstance(device_name, str) else None,
-            )
+            try:
+                device = await devices.activate_device_hash(
+                    db,
+                    user,
+                    str(device_hash),
+                    device_name if isinstance(device_name, str) else None,
+                )
+            except devices.DeviceTransferError as error:
+                await db.commit()
+                raise HTTPException(status_code=error.status_code, detail=error.message) from None
             if device is not None:
                 await write_audit_event(
                     db,
@@ -709,7 +734,7 @@ async def reset_password(
 
     had_device = (
         user.role.code == UserRole.PATIENT.value
-        and await devices.active_device(db, user.id) is not None
+        and bool(await devices.active_devices(db, user.id))
     )
 
     try:

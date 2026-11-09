@@ -17,7 +17,8 @@ class UserDevice(Base):
 
     Se guarda únicamente el hash SHA-256 del identificador aleatorio que genera
     la app: la base nunca almacena el ``device_id`` utilizable y la interfaz no
-    lo muestra. Solo puede haber un dispositivo activo por usuario.
+    lo muestra. Un paciente puede tener varios dispositivos autorizados (máximo
+    configurable), cada uno con su propia sesión renovable.
     """
 
     __tablename__ = "user_devices"

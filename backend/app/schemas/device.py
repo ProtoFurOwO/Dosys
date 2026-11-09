@@ -15,8 +15,16 @@ class DeviceRegisterResponse(BaseModel):
     device_name: str
 
 
+class DeviceListItem(BaseModel):
+    id: int
+    name: str
+    is_current: bool
+    last_seen_at: datetime | None = None
+    created_at: datetime
+
+
 class PendingTransferResponse(BaseModel):
-    """Solicitud pendiente que el dispositivo activo debe revisar."""
+    """Solicitud pendiente que cualquier dispositivo autorizado puede revisar."""
 
     transfer_id: str
     requested_device_name: str

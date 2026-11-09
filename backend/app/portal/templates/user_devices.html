@@ -1,0 +1,71 @@
+{% extends "panel.html" %}
+{% block title %}Dispositivos de {{ account.username }} · D.O.S.Y.S{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <a class="back-link" href="/portal/usuarios">Volver a usuarios</a>
+    <h1>Dispositivos de confianza</h1>
+    <p class="page-note">{{ account.full_name or account.username }} · {{ account.username }} · {{ account.role.name }}</p>
+  </div>
+</header>
+
+{% if aviso == 'revocado' %}
+<div class="note note-ok" role="status">Dispositivo revocado. Los demás conservan su sesión.</div>
+{% elif aviso == 'sin-dispositivo' %}
+<div class="note note-info" role="status">Ese dispositivo ya estaba inactivo.</div>
+{% elif aviso == 'no-encontrado' %}
+<div class="note note-error" role="alert">No encontramos ese dispositivo para esta cuenta.</div>
+{% endif %}
+
+{% if devices %}
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th scope="col">Dispositivo</th>
+        <th scope="col">Estado</th>
+        <th scope="col" class="hide-sm">Alta</th>
+        <th scope="col" class="hide-sm">Último acceso</th>
+        <th scope="col" class="col-action"><span class="visually-hidden">Acciones</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for device in devices %}
+      <tr>
+        <td>{{ device.name }}</td>
+        <td>
+          {% if device.is_active %}
+          <span class="chip chip-confirmed">Autorizado</span>
+          {% else %}
+          <span class="chip chip-cancelled">Revocado</span>
+          {% endif %}
+        </td>
+        <td class="hide-sm nowrap">{{ device.created_at | fecha_hora }}</td>
+        <td class="hide-sm nowrap">{{ (device.last_seen_at | fecha_hora) if device.last_seen_at else "Sin registro" }}</td>
+        <td class="col-action">
+          {% if device.is_active %}
+          <form method="post" action="/portal/usuarios/{{ account.id }}/dispositivos/{{ device.id }}/revocar"
+                data-confirm="¿Revocar este dispositivo? Su sesión dejará de funcionar.">
+            <button class="btn btn-quiet" type="submit">Revocar</button>
+          </form>
+          {% else %}
+          <span class="row-sub">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  <p class="empty-title">Sin dispositivos registrados</p>
+  <p>Este paciente podrá registrar su primer teléfono al iniciar sesión en la app.</p>
+</div>
+{% endif %}
+
+<p class="page-note">
+  El paciente puede tener hasta 3 dispositivos autorizados. Revocar uno no cierra los demás.
+  La acción queda registrada en la bitácora.
+</p>
+{% endblock %}

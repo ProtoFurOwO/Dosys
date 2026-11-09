@@ -2,7 +2,7 @@ import hmac
 from collections.abc import Callable
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +19,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
@@ -57,16 +58,20 @@ async def get_current_user(
             detail="Actualiza la app e inicia sesión de nuevo para vincular este dispositivo.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    request.state.device_hash = str(device_hash) if device_hash else None
     if device_hash:
-        active = await db.scalar(
-            select(UserDevice)
-            .where(UserDevice.user_id == user.id, UserDevice.is_active.is_(True))
-            .limit(1)
-        )
-        if active is None or not hmac.compare_digest(active.device_hash, str(device_hash)):
+        active = (
+            await db.scalars(
+                select(UserDevice).where(
+                    UserDevice.user_id == user.id,
+                    UserDevice.is_active.is_(True),
+                )
+            )
+        ).all()
+        if not any(hmac.compare_digest(device.device_hash, str(device_hash)) for device in active):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Esta sesión se transfirió a otro dispositivo. Inicia sesión de nuevo.",
+                detail="Este dispositivo ya no está autorizado. Inicia sesión de nuevo.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
     return user

@@ -19,6 +19,7 @@ from app.models.patient import Patient
 from app.models.permission import Permission
 from app.models.role import Role
 from app.models.user import User
+from app.models.user_device import UserDevice
 from app.portal import deps
 from app.portal.labels import ACTION_LABELS, ENTITY_LABELS, ROLE_LABELS, action_label
 from app.portal.routes import forbidden, portal_staff
@@ -502,6 +503,85 @@ async def user_release_device(
     )
     await db.commit()
     return users_redirect("dispositivo" if released else "sin-dispositivo")
+
+
+@router.get("/usuarios/{user_id:int}/dispositivos", response_class=HTMLResponse)
+async def user_devices_page(
+    user_id: int,
+    request: Request,
+    aviso: str = "",
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Lista los dispositivos de confianza y permite revocar uno."""
+    session = await require_staff(request, db)
+    if session is None:
+        return login_redirect()
+    current_user, doctor = session
+    if not has_permission(current_user, "users:manage"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede gestionar usuarios.")
+
+    account = await db.get(User, user_id)
+    if account is None:
+        return users_redirect("no-encontrado")
+    rows = list(
+        (
+            await db.scalars(
+                select(UserDevice)
+                .where(UserDevice.user_id == account.id)
+                .order_by(UserDevice.is_active.desc(), UserDevice.created_at.desc())
+            )
+        ).all()
+    )
+    return templates.TemplateResponse(
+        request,
+        "user_devices.html",
+        {
+            "doctor_name": doctor.full_name,
+            "active": "usuarios",
+            "account": account,
+            "devices": rows,
+            "aviso": aviso,
+        },
+    )
+
+
+@router.post("/usuarios/{user_id:int}/dispositivos/{device_id:int}/revocar")
+async def user_revoke_device(
+    user_id: int,
+    device_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Revoca un dispositivo concreto; los demás conservan su sesión."""
+    session = await require_staff(request, db)
+    if session is None:
+        return login_redirect()
+    current_user, _ = session
+    if not has_permission(current_user, "users:manage"):
+        return users_redirect("permiso")
+
+    account = await db.get(User, user_id)
+    device = await db.get(UserDevice, device_id)
+    if account is None or device is None or device.user_id != account.id:
+        return RedirectResponse(
+            f"/portal/usuarios/{user_id}/dispositivos?aviso=no-encontrado",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    released = await devices.release_device_by_id(db, device.id)
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="device_released",
+        entity_type="device",
+        entity_id=device.id,
+        request=request,
+        detail=f"username={account.username} portal=si nombre={device.name}",
+    )
+    await db.commit()
+    return RedirectResponse(
+        f"/portal/usuarios/{user_id}/dispositivos?aviso={'revocado' if released else 'sin-dispositivo'}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
 
 
 @router.post("/usuarios/{user_id:int}/reset", response_class=HTMLResponse)
