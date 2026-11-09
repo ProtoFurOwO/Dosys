@@ -1,8 +1,34 @@
-from datetime import datetime
+from datetime import date, datetime, time
 
 from pydantic import BaseModel, Field
 
 from app.models.enums import AppointmentStatus
+
+
+class DoctorOption(BaseModel):
+    id: int
+    full_name: str
+    specialty: str
+
+
+class AppointmentAvailabilitySlot(BaseModel):
+    time: str
+    scheduled_at: datetime
+    available: bool
+
+
+class AppointmentAvailabilityResponse(BaseModel):
+    doctor_id: int
+    date: date
+    slots: list[AppointmentAvailabilitySlot]
+
+
+class AppointmentRequestCreate(BaseModel):
+    doctor_id: int = Field(gt=0)
+    specialty: str = Field(min_length=3, max_length=120)
+    date: date
+    time: time
+    reason: str | None = Field(default=None, max_length=300)
 
 
 class AppointmentResponse(BaseModel):

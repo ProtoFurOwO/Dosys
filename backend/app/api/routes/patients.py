@@ -48,7 +48,12 @@ def appointment_response(appointment: Appointment, doctor: Doctor | None) -> App
         scheduled = scheduled.replace(tzinfo=timezone.utc)
     is_upcoming = (
         scheduled >= now
-        and appointment.status in (AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED)
+        and appointment.status
+        in (
+            AppointmentStatus.REQUESTED,
+            AppointmentStatus.SCHEDULED,
+            AppointmentStatus.CONFIRMED,
+        )
     )
     return AppointmentResponse(
         id=appointment.id,

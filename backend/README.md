@@ -20,8 +20,11 @@ Backend académico con **FastAPI + SQLAlchemy async + Alembic + PostgreSQL** y u
   de rangos.
 - **Línea de tiempo clínica** en el expediente: consultas, estudios, recetas y
   documentos ordenados cronológicamente.
-- **Flujo visual de cita**: agendada → confirmada → en espera → atendida, con check-in
-  QR, asignación de consultorio y actualización automática de la pantalla.
+- **Flujo visual de cita**: solicitada → agendada → confirmada → en espera → atendida,
+  con check-in QR, asignación de consultorio y actualización automática de la pantalla.
+- **Solicitud de citas desde la app**: el paciente elige médico, fecha y horario
+  disponible; la cita queda `requested` y recepción la confirma. Incluye catálogo de
+  médicos activos, disponibilidad de 30 minutos y validación de empalmes.
 - **Check-in con QR**: el portal muestra un código por cita y la app del paciente lo
   escanea con la cámara para confirmar su llegada.
 - **Registro de cuentas**: el médico da de alta pacientes y médicos; el sistema genera la

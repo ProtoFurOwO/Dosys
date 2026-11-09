@@ -3754,3 +3754,13 @@ body.login {
     break-inside: avoid;
   }
 }
+
+/* ── Solicitudes de cita desde la app ─────────────────────────────────────── */
+.status-pill-requested {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.dot-amber {
+  background: #f59e0b;
+}

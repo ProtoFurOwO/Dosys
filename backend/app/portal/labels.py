@@ -33,6 +33,8 @@ ACTION_LABELS = {
     "portal_update_consultation": "Consulta corregida (con auditoría)",
     "portal_download_consultation": "Nota de consulta descargada",
     "portal_create_appointment": "Cita agendada",
+    "portal_confirm_appointment": "Cita confirmada por recepción",
+    "patient_request_appointment": "Cita solicitada desde la app",
     "portal_create_patient": "Paciente registrado",
     "portal_update_patient": "Datos del paciente actualizados",
     "portal_create_doctor": "Médico registrado",

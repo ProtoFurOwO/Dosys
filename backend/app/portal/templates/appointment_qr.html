@@ -13,12 +13,33 @@
       <span><b>Consultorio</b> {{ appointment.room or "Sin asignar" }}</span>
     </p>
   </div>
-  <span class="chip chip-confirmed" id="cita-chip">{{ status_label }}</span>
+  <span class="chip {% if appointment.status.value == 'requested' %}chip-scheduled{% elif appointment.status.value == 'cancelled' %}chip-cancelled{% else %}chip-confirmed{% endif %}" id="cita-chip">{{ status_label }}</span>
 </header>
+
+{% if appointment.status.value == 'requested' %}
+<div class="note note-info" role="status">
+  <p>Esta es una solicitud enviada desde la app del paciente.</p>
+  <p class="note-sub">Confírmala para habilitar el check-in y generar el QR de llegada.</p>
+</div>
+{% endif %}
+
+{% if request.query_params.get('confirmada') %}
+<div class="note note-ok" role="status">Cita confirmada. El check-in quedó habilitado.</div>
+{% endif %}
+
+{% if can_confirm %}
+<section class="block">
+  <h2 class="section-title">Confirmar cita</h2>
+  <p class="page-note">Al confirmar, el paciente podrá ver su cita como confirmada y usar el QR dentro de la ventana de check-in.</p>
+  <form method="post" action="/portal/citas/{{ appointment.id }}/confirmar">
+    <button class="btn btn-primary" type="submit">Confirmar cita</button>
+  </form>
+</section>
+{% endif %}
 
 {% if appointment.status.value == 'cancelled' %}
 <div class="note note-error" role="status">Esta cita fue cancelada. No se puede hacer check-in.</div>
-{% else %}
+{% elif appointment.status.value != 'requested' %}
 <ol class="appointment-flow" aria-label="Flujo de la cita">
   <li class="{% if workflow_step >= 1 %}is-done{% endif %} {% if workflow_step == 1 %}is-current{% endif %}">
     <span>1</span> Agendada

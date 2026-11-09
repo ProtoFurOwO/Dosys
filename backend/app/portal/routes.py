@@ -81,6 +81,7 @@ SPECIALTY_MIN, SPECIALTY_MAX = 3, 120
 LOCATION_MIN, LOCATION_MAX = 3, 160
 
 STATUS_LABELS = {
+    AppointmentStatus.REQUESTED: "Solicitada",
     AppointmentStatus.SCHEDULED: "Agendada",
     AppointmentStatus.CONFIRMED: "Confirmada",
     AppointmentStatus.ATTENDED: "Atendida",
@@ -1004,6 +1005,33 @@ async def clinical_dashboard(request: Request, db: AsyncSession = Depends(get_db
             for appointment, patient, _doctor in rows
         ]
 
+    requested_appointments: list[dict] = []
+    if can_appointments:
+        rows = (
+            await db.execute(
+                select(Appointment, Patient, Doctor)
+                .join(Patient, Appointment.patient_id == Patient.id)
+                .outerjoin(Doctor, Appointment.doctor_id == Doctor.id)
+                .where(
+                    Appointment.status == AppointmentStatus.REQUESTED,
+                    Appointment.scheduled_at >= now_utc,
+                )
+                .order_by(Appointment.scheduled_at.asc())
+                .limit(8)
+            )
+        ).all()
+        requested_appointments = [
+            {
+                "id": appointment.id,
+                "patient_name": patient.full_name,
+                "patient_id": patient.id,
+                "doctor_name": doctor_row.full_name if doctor_row else "Sin médico",
+                "specialty": appointment.specialty,
+                "scheduled_at": deps.format_datetime(appointment.scheduled_at),
+            }
+            for appointment, patient, doctor_row in rows
+        ]
+
     pending_studies: list[dict] = []
     if can_studies:
         rows = (
@@ -1077,6 +1105,7 @@ async def clinical_dashboard(request: Request, db: AsyncSession = Depends(get_db
     stats = {
         "appointments": len(appointments_today),
         "waiting": len(waiting),
+        "requested": len(requested_appointments),
         "pending_studies": len(pending_studies),
         "consultations": 0,
         "patients": 0,
@@ -1123,6 +1152,7 @@ async def clinical_dashboard(request: Request, db: AsyncSession = Depends(get_db
             "role_name": request.state.role_name,
             "appointments_today": appointments_today,
             "waiting": waiting,
+            "requested_appointments": requested_appointments,
             "pending_studies": pending_studies,
             "recent_consultations": recent_consultations,
             "recent_activity": recent_activity,
@@ -1526,7 +1556,13 @@ async def appointments_page(
                 .outerjoin(Doctor, Appointment.doctor_id == Doctor.id)
                 .where(
                     Appointment.patient_id.in_([patient.id for patient in patients]),
-                    Appointment.status.in_([AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED]),
+                    Appointment.status.in_(
+                        [
+                            AppointmentStatus.REQUESTED,
+                            AppointmentStatus.SCHEDULED,
+                            AppointmentStatus.CONFIRMED,
+                        ]
+                    ),
                     Appointment.scheduled_at >= now,
                 )
                 .order_by(Appointment.scheduled_at.asc())
@@ -1703,6 +1739,7 @@ async def agenda_page(
     appointments_list = []
     status_counts = {
         "total": 0,
+        "requested": 0,
         "scheduled": 0,
         "confirmed": 0,
         "attended": 0,
@@ -2002,13 +2039,57 @@ async def appointment_qr_page(
             "status_label": STATUS_LABELS.get(appointment.status, appointment.status.value),
             "workflow_step": workflow_step,
             "checkin_code": code,
-            "qr_svg": qr_svg(f"DOSYS-CHECKIN|{appointment.id}|{code}") if code else None,
+            "qr_svg": (
+                qr_svg(f"DOSYS-CHECKIN|{appointment.id}|{code}")
+                if code and appointment.status != AppointmentStatus.REQUESTED
+                else None
+            ),
             "checkin_window": window,
             "checkin_label": window.label(),
             "checkin_error": checkin.check_in_error(appointment),
             "rooms": ROOMS,
             "can_write_appointments": has_permission(user, "appointments:write"),
+            "can_confirm": has_permission(user, "appointments:write")
+            and appointment.status in (AppointmentStatus.REQUESTED, AppointmentStatus.SCHEDULED),
+            "is_requested": appointment.status == AppointmentStatus.REQUESTED,
         },
+    )
+
+
+@router.post("/citas/{appointment_id:int}/confirmar")
+async def appointment_confirm(
+    appointment_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Recepción confirma una cita agendada o una solicitud de la app."""
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    staff = await portal_staff(db, user)
+    if not has_permission(user, "appointments:write"):
+        return forbidden(request, staff.full_name, "Tu rol no puede confirmar citas.")
+
+    appointment = await db.get(Appointment, appointment_id)
+    if appointment is None:
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": staff.full_name}, status_code=status.HTTP_404_NOT_FOUND
+        )
+    if appointment.status in (AppointmentStatus.REQUESTED, AppointmentStatus.SCHEDULED):
+        appointment.status = AppointmentStatus.CONFIRMED
+        await write_audit_event(
+            db,
+            user=user,
+            action="portal_confirm_appointment",
+            entity_type="appointment",
+            entity_id=appointment.id,
+            request=request,
+            detail=f"patient_id={appointment.patient_id}",
+        )
+        await db.commit()
+    return RedirectResponse(
+        f"/portal/citas/{appointment.id}?confirmada=1",
+        status_code=status.HTTP_303_SEE_OTHER,
     )
 
 
@@ -2939,6 +3020,22 @@ async def document_delete(
 # ── Agendar cita ──────────────────────────────────────────────────────────────
 
 
+async def active_doctor_options(db: AsyncSession) -> list[dict]:
+    """Médicos activos que recepción puede asignar a una cita."""
+    rows = (
+        await db.execute(
+            select(Doctor, User)
+            .join(User, Doctor.user_id == User.id)
+            .where(User.is_active.is_(True))
+            .order_by(Doctor.full_name.asc())
+        )
+    ).all()
+    return [
+        {"id": doctor.id, "full_name": doctor.full_name, "specialty": doctor.specialty}
+        for doctor, _user in rows
+    ]
+
+
 @router.get("/pacientes/{patient_id:int}/cita", response_class=HTMLResponse)
 async def appointment_page(
     patient_id: int,
@@ -2949,8 +3046,8 @@ async def appointment_page(
     if user is None:
         return login_redirect()
     doctor = await portal_staff(db, user)
-    if not has_permission(user, "appointments:read"):
-        return forbidden(request, doctor.full_name, "Tu rol no puede consultar la agenda.")
+    if not has_permission(user, "appointments:write"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede agendar citas.")
 
     patient = await db.get(Patient, patient_id)
     if patient is None:
@@ -2958,6 +3055,8 @@ async def appointment_page(
             request, "not_found.html", {"doctor_name": doctor.full_name}, status_code=status.HTTP_404_NOT_FOUND
         )
 
+    doctors = await active_doctor_options(db)
+    selected_doctor_id = doctor.id if isinstance(doctor, Doctor) else (doctors[0]["id"] if doctors else 0)
     return templates.TemplateResponse(
         request,
         "appointment_form.html",
@@ -2965,6 +3064,8 @@ async def appointment_page(
             "doctor_name": doctor.full_name,
             "active": "pacientes",
             "patient": patient,
+            "doctors": doctors,
+            "selected_doctor_id": selected_doctor_id,
             "errors": {},
             "values": {
                 "specialty": "Medicina General",
@@ -2981,6 +3082,7 @@ async def appointment_page(
 async def appointment_submit(
     patient_id: int,
     request: Request,
+    doctor_id: int = Form(0),
     specialty: str = Form(""),
     fecha: str = Form(""),
     hora: str = Form(""),
@@ -2991,23 +3093,38 @@ async def appointment_submit(
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
-    doctor = await portal_staff(db, user)
+    staff = await portal_staff(db, user)
     if not has_permission(user, "appointments:write"):
-        return forbidden(request, doctor.full_name, "Tu rol no puede agendar citas.")
-    if not isinstance(doctor, Doctor):
-        return forbidden(request, doctor.full_name, "Tu cuenta no tiene ficha de médico para agendar citas.")
+        return forbidden(request, staff.full_name, "Tu rol no puede agendar citas.")
 
     patient = await db.get(Patient, patient_id)
     if patient is None:
         return templates.TemplateResponse(
-            request, "not_found.html", {"doctor_name": doctor.full_name}, status_code=status.HTTP_404_NOT_FOUND
+            request, "not_found.html", {"doctor_name": staff.full_name}, status_code=status.HTTP_404_NOT_FOUND
         )
+
+    doctors = await active_doctor_options(db)
+    selected_doctor: Doctor | None = None
+    if doctor_id:
+        selected_doctor = await db.scalar(
+            select(Doctor)
+            .join(User, Doctor.user_id == User.id)
+            .where(Doctor.id == doctor_id, User.is_active.is_(True))
+        )
+    elif isinstance(staff, Doctor):
+        selected_doctor = staff
 
     specialty = specialty.strip()
     location = location.strip()
     notes = notes.strip()
     errors: dict[str, str] = {}
     scheduled_local: datetime | None = None
+    if selected_doctor is None:
+        if not doctor_id and doctors:
+            # Recepción dejó el select vacío: se usa el primer médico activo.
+            selected_doctor = await db.get(Doctor, doctors[0]["id"])
+        if selected_doctor is None:
+            errors["doctor_id"] = "Selecciona un médico activo para la cita."
 
     if not SPECIALTY_MIN <= len(specialty) <= SPECIALTY_MAX:
         errors["specialty"] = "Escribe la especialidad o el servicio."
@@ -3037,9 +3154,11 @@ async def appointment_submit(
             request,
             "appointment_form.html",
             {
-                "doctor_name": doctor.full_name,
+                "doctor_name": staff.full_name,
                 "active": "pacientes",
                 "patient": patient,
+                "doctors": doctors,
+                "selected_doctor_id": selected_doctor.id if selected_doctor else 0,
                 "errors": errors,
                 "values": {
                     "specialty": specialty,
@@ -3056,7 +3175,7 @@ async def appointment_submit(
         appointment = await create_appointment(
             db,
             patient=patient,
-            doctor=doctor,
+            doctor=selected_doctor,
             specialty=specialty,
             scheduled_at=scheduled_local.astimezone(timezone.utc),
             location=location,
@@ -3067,9 +3186,11 @@ async def appointment_submit(
             request,
             "appointment_form.html",
             {
-                "doctor_name": doctor.full_name,
+                "doctor_name": staff.full_name,
                 "active": "pacientes",
                 "patient": patient,
+                "doctors": doctors,
+                "selected_doctor_id": selected_doctor.id if selected_doctor else 0,
                 "errors": {"general": str(error)},
                 "values": {
                     "specialty": specialty,
@@ -3088,7 +3209,7 @@ async def appointment_submit(
         entity_type="appointment",
         entity_id=appointment.id,
         request=request,
-        detail=f"patient_id={patient.id}",
+        detail=f"patient_id={patient.id} doctor_id={selected_doctor.id if selected_doctor else 0}",
     )
     await db.commit()
 

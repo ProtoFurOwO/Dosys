@@ -36,6 +36,13 @@
     <strong>{{ stats.waiting }}</strong>
     <span class="stat-note">Pacientes con check-in</span>
   </a>
+  {% if can_write_appointments %}
+  <a class="stat-card" href="/portal/agenda?estado=requested">
+    <span class="stat-label">Solicitudes</span>
+    <strong>{{ stats.requested }}</strong>
+    <span class="stat-note">Citas por confirmar</span>
+  </a>
+  {% endif %}
   {% endif %}
   {% if can_consultations %}
   <a class="stat-card" href="/portal">
@@ -126,6 +133,36 @@
     <p class="empty-inline">Nadie en espera en este momento.</p>
     {% endif %}
   </section>
+
+  {% if can_write_appointments %}
+  <section class="dash-card">
+    <div class="dash-card-head">
+      <div>
+        <h2>Solicitudes de cita</h2>
+        <p class="page-note">Pendientes de confirmar por recepción.</p>
+      </div>
+      <a class="link" href="/portal/agenda?estado=requested">Ver todas</a>
+    </div>
+    {% if requested_appointments %}
+    <ul class="dash-list">
+      {% for request in requested_appointments %}
+      <li class="dash-row">
+        <div class="dash-main">
+          <a class="link" href="/portal/citas/{{ request.id }}">{{ request.patient_name }}</a>
+          <span class="row-sub">{{ request.scheduled_at }} · {{ request.specialty }} · {{ request.doctor_name }}</span>
+        </div>
+        <div class="dash-meta">
+          <span class="chip chip-scheduled">Solicitada</span>
+          <a class="btn btn-line" href="/portal/citas/{{ request.id }}">Revisar</a>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-inline">No hay solicitudes pendientes.</p>
+    {% endif %}
+  </section>
+  {% endif %}
   {% endif %}
 
   {% if can_studies %}

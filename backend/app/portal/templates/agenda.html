@@ -148,6 +148,7 @@
       <div class="filter-pill-select">
         <select name="estado" aria-label="Filtrar por estado">
           <option value="">Todos los estados</option>
+          <option value="requested" {% if selected_estado == 'requested' %}selected{% endif %}>Solicitadas</option>
           <option value="scheduled" {% if selected_estado == 'scheduled' %}selected{% endif %}>Agendadas</option>
           <option value="confirmed" {% if selected_estado == 'confirmed' %}selected{% endif %}>Confirmadas</option>
           <option value="attended" {% if selected_estado == 'attended' %}selected{% endif %}>Atendidas</option>
@@ -166,6 +167,9 @@
 
     <!-- Leyenda de colores -->
     <div class="color-legend-compact">
+      <span class="legend-badge-modern status-requested">
+        <span class="badge-dot dot-amber"></span> Solicitada
+      </span>
       <span class="legend-badge-modern status-scheduled">
         <span class="badge-dot dot-blue"></span> Agendada
       </span>
@@ -539,6 +543,7 @@
             <div class="form-group-card">
               <label for="cambio-estado" class="label-heading">Cambiar Estado</label>
               <select id="cambio-estado" name="nuevo_estado" class="modern-select">
+                <option value="requested">Solicitada (pendiente de confirmar)</option>
                 <option value="scheduled">Agendada (pendiente)</option>
                 <option value="confirmed">Confirmada por el paciente</option>
                 <option value="attended">Atendida (consulta concluida)</option>

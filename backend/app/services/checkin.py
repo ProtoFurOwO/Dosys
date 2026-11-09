@@ -27,6 +27,8 @@ class CheckInWindow:
             return "Aún no abre el check-in"
         if self.reason == "closed":
             return "El check-in ya cerró"
+        if self.reason == "requested":
+            return "Solicitud pendiente de confirmación"
         if self.reason == "already_checked_in":
             return "Llegada ya confirmada"
         if self.reason == "attended":
@@ -54,6 +56,8 @@ def window_for(appointment: Appointment, now: datetime | None = None) -> CheckIn
         reason = "cancelled"
     elif appointment.status == AppointmentStatus.ATTENDED:
         reason = "attended"
+    elif appointment.status == AppointmentStatus.REQUESTED:
+        reason = "requested"
     elif appointment.checked_in_at is not None:
         reason = "already_checked_in"
     elif moment < opens_at:
@@ -76,6 +80,8 @@ def check_in_error(appointment: Appointment, now: datetime | None = None) -> str
         return "Esta cita fue cancelada."
     if window.reason == "attended":
         return "Esta cita ya fue atendida."
+    if window.reason == "requested":
+        return "Tu cita aún no ha sido confirmada por recepción."
     if window.reason == "already_checked_in":
         return "Tu llegada ya estaba confirmada."
     if window.reason == "too_early":

@@ -9,6 +9,7 @@ class UserRole(str, Enum):
 
 
 class AppointmentStatus(str, Enum):
+    REQUESTED = "requested"
     SCHEDULED = "scheduled"
     CONFIRMED = "confirmed"
     ATTENDED = "attended"
