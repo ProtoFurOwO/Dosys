@@ -13,6 +13,15 @@ Backend académico con **FastAPI + SQLAlchemy async + Alembic + PostgreSQL** y u
 - **Portal clínico** (`/portal`) para el personal médico: acceso, listado y búsqueda de
   pacientes, expediente con historial, nueva consulta, alta y edición de pacientes,
   agenda de citas con QR, gestión de usuarios (médicos) y bitácora de actividad.
+- **Dashboard por rol** (`/portal/inicio`): citas del día, sala de espera, estudios
+  pendientes, consultas recientes y actividad, según los permisos de la cuenta.
+- **Consulta SOAP**: motivo (S), signos vitales y exploración física (O), diagnóstico
+  (A), plan, receta, estudios y próxima cita (P). Incluye IMC calculado y validación
+  de rangos.
+- **Línea de tiempo clínica** en el expediente: consultas, estudios, recetas y
+  documentos ordenados cronológicamente.
+- **Flujo visual de cita**: agendada → confirmada → en espera → atendida, con check-in
+  QR, asignación de consultorio y actualización automática de la pantalla.
 - **Check-in con QR**: el portal muestra un código por cita y la app del paciente lo
   escanea con la cámara para confirmar su llegada.
 - **Registro de cuentas**: el médico da de alta pacientes y médicos; el sistema genera la
@@ -265,14 +274,7 @@ variante `release` el dominio HTTPS. Los endpoints del paciente son:
 
 ## Despliegue en el VPS con Nginx Proxy Manager
 
-> **No copies `backend/` encima de una instalación existente sin conservar
-> `.env` y `secrets/`.** El `.env` contiene la contraseña real de PostgreSQL y
-> las claves que firman sesiones y documentos. Si se pierde, sigue
-> [`RECUPERAR_VPS.md`](RECUPERAR_VPS.md).
-
-1. Copia `backend/` al VPS y crea el `.env` de producción. Usa la **misma**
-   `POSTGRES_PASSWORD` del volumen existente; si es una instalación nueva,
-   genera una contraseña larga y única:
+1. Copia `backend/` al VPS y crea el `.env` de producción:
 
    ```dotenv
    APP_ENV=production
@@ -297,14 +299,10 @@ variante `release` el dominio HTTPS. Los endpoints del paciente son:
 2. Levanta el stack con el daemon donde vive Nginx Proxy Manager:
 
    ```bash
-   bash scripts/deploy_vps.sh
-   # equivale a:
-   # sudo docker compose -f compose.production.yaml up -d --build
+   sudo docker compose -f compose.production.yaml up -d --build
    ```
 
-   El script valida `.env`, comprueba que la contraseña coincida con la base
-   existente y espera a que `/health` responda. La API queda publicada en
-   `127.0.0.1:8000` y `172.17.0.1:8000` (nunca expuesta a internet).
+   La API queda publicada en `127.0.0.1:8000` y `172.17.0.1:8000` (nunca expuesta a internet).
 
 3. En Nginx Proxy Manager crea un **Proxy Host**:
    - Domain: `medicos.tudominio.dev`

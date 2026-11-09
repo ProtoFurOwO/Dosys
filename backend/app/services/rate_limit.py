@@ -11,17 +11,15 @@ from time import monotonic
 from fastapi import Request
 
 from app.core.config import settings
+from app.core.request_ip import resolve_client_ip
 
 _WINDOW_SECONDS = 60
 _buckets: dict[str, deque[float]] = {}
 
 
 def client_ip(request: Request) -> str:
-    """IP real del cliente respetando el proxy inverso (Nginx Proxy Manager)."""
-    forwarded = request.headers.get("x-forwarded-for", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "desconocida"
+    """IP real del cliente; misma resolución que la auditoría."""
+    return resolve_client_ip(request) or "desconocida"
 
 
 def exceeded(scope: str, request: Request, limit: int | None = None) -> bool:

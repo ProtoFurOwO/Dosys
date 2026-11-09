@@ -58,6 +58,7 @@
 </div>
 {% endif %}
 
+{% if can_read_consultations %}
 <section class="chart">
   <h2 class="section-title">Alertas clínicas</h2>
   <div class="clinical-alerts">
@@ -75,6 +76,41 @@
     </div>
   </div>
 </section>
+{% else %}
+<section class="chart">
+  <h2 class="section-title">Datos clínicos</h2>
+  <p class="page-note">Restringidos al personal médico. Tu rol puede consultar identificación, contacto, citas y documentos.</p>
+</section>
+{% endif %}
+
+{% if timeline %}
+{% set kind_labels = {'consulta': 'Consulta', 'estudio': 'Estudio', 'receta': 'Receta', 'documento': 'Documento'} %}
+<section class="chart">
+  <h2 class="section-title">Línea de tiempo clínica</h2>
+  <ol class="clinical-timeline">
+    {% for event in timeline %}
+    <li class="timeline-item timeline-{{ event.kind }}">
+      <span class="timeline-dot" aria-hidden="true"></span>
+      <div class="timeline-body">
+        <p class="timeline-when">
+          {{ event.at | fecha_hora }}
+          <span class="timeline-kind">{{ kind_labels.get(event.kind, event.kind) }}</span>
+        </p>
+        <p class="timeline-title">
+          {% if event.url %}
+          <a class="link" href="{{ event.url }}">{{ event.title }}</a>
+          {% else %}
+          {{ event.title }}
+          {% endif %}
+        </p>
+        <p class="timeline-detail">{{ event.detail }}</p>
+        <p class="row-sub">{{ event.meta }}</p>
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+{% endif %}
 
 {% if documento %}
 <div class="note note-ok" role="status">
@@ -312,18 +348,43 @@
           <dt>Diagnóstico</dt>
           <dd>{{ consultation.diagnosis }}</dd>
         </div>
+        {% if consultation.blood_pressure or consultation.heart_rate or consultation.respiratory_rate
+              or consultation.temperature_c or consultation.oxygen_saturation
+              or consultation.weight_kg or consultation.height_cm %}
+        <div class="chart-wide">
+          <dt>Signos vitales</dt>
+          <dd>
+            <div class="vitals-summary">
+              {% if consultation.blood_pressure %}<span><b>TA</b> {{ consultation.blood_pressure }} mmHg</span>{% endif %}
+              {% if consultation.heart_rate %}<span><b>FC</b> {{ consultation.heart_rate }} lpm</span>{% endif %}
+              {% if consultation.respiratory_rate %}<span><b>FR</b> {{ consultation.respiratory_rate }} rpm</span>{% endif %}
+              {% if consultation.temperature_c %}<span><b>T°</b> {{ consultation.temperature_c }} °C</span>{% endif %}
+              {% if consultation.oxygen_saturation %}<span><b>SpO₂</b> {{ consultation.oxygen_saturation }}%</span>{% endif %}
+              {% if consultation.weight_kg %}<span><b>Peso</b> {{ consultation.weight_kg }} kg</span>{% endif %}
+              {% if consultation.height_cm %}<span><b>Talla</b> {{ consultation.height_cm }} cm</span>{% endif %}
+            </div>
+          </dd>
+        </div>
+        {% endif %}
+        {% if consultation.physical_exam %}
+        <div class="chart-wide">
+          <dt>Exploración física</dt>
+          <dd>{{ consultation.physical_exam }}</dd>
+        </div>
+        {% endif %}
         {% if consultation.notes %}
         <div>
-          <dt>Notas</dt>
+          <dt>Plan</dt>
           <dd>{{ consultation.notes }}</dd>
         </div>
         {% endif %}
       </dl>
-      {% if can_edit_consultations %}
       <div class="row-actions">
+        <a class="btn btn-quiet" href="/portal/pacientes/{{ patient.id }}/consulta/{{ consultation.id }}/pdf" target="_blank" rel="noopener">Nota PDF</a>
+        {% if can_edit_consultations %}
         <a class="btn btn-quiet" href="/portal/pacientes/{{ patient.id }}/consulta/{{ consultation.id }}/editar">Corregir diagnóstico</a>
+        {% endif %}
       </div>
-      {% endif %}
     </li>
     {% endfor %}
   </ol>

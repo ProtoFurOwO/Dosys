@@ -105,6 +105,14 @@ async def get_my_consultations(
             reason=consultation.reason,
             diagnosis=consultation.diagnosis,
             notes=consultation.notes,
+            blood_pressure=consultation.blood_pressure,
+            heart_rate=consultation.heart_rate,
+            respiratory_rate=consultation.respiratory_rate,
+            temperature_c=consultation.temperature_c,
+            oxygen_saturation=consultation.oxygen_saturation,
+            weight_kg=consultation.weight_kg,
+            height_cm=consultation.height_cm,
+            physical_exam=consultation.physical_exam,
             created_at=consultation.created_at,
         )
         for consultation, doctor in result.all()

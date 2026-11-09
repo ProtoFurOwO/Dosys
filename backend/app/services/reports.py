@@ -117,6 +117,90 @@ def build_study_result_pdf(
     return buffer.getvalue()
 
 
+def build_consultation_pdf(
+    *,
+    patient_name: str,
+    patient_curp: str,
+    doctor_name: str,
+    specialty: str,
+    created_at: datetime | None,
+    reason: str,
+    diagnosis: str,
+    notes: str | None,
+    blood_pressure: str | None,
+    heart_rate: int | None,
+    respiratory_rate: int | None,
+    temperature_c: float | None,
+    oxygen_saturation: int | None,
+    weight_kg: float | None,
+    height_cm: float | None,
+    physical_exam: str | None,
+) -> bytes:
+    """Nota clínica SOAP imprimible, con signos vitales y plan."""
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=letter)
+    y = _header(pdf, "Nota de consulta")
+    y = _field(pdf, y, "Paciente", patient_name)
+    y = _field(pdf, y, "CURP", patient_curp or "No registrada")
+    y = _field(pdf, y, "Médico", f"{doctor_name} · {specialty}")
+    y = _field(pdf, y, "Fecha", _local(created_at))
+
+    vitals = []
+    if blood_pressure:
+        vitals.append(f"TA {blood_pressure} mmHg")
+    if heart_rate:
+        vitals.append(f"FC {heart_rate} lpm")
+    if respiratory_rate:
+        vitals.append(f"FR {respiratory_rate} rpm")
+    if temperature_c:
+        vitals.append(f"T {temperature_c} °C")
+    if oxygen_saturation:
+        vitals.append(f"SpO2 {oxygen_saturation}%")
+    if weight_kg:
+        vitals.append(f"Peso {weight_kg} kg")
+    if height_cm:
+        vitals.append(f"Talla {height_cm} cm")
+    if weight_kg and height_cm:
+        bmi = weight_kg / ((height_cm / 100) ** 2)
+        vitals.append(f"IMC {bmi:.1f}")
+
+    y -= 0.2 * cm
+    pdf.setFont("Helvetica-Bold", 12)
+    pdf.drawString(1.5 * cm, y, "S · Subjetivo")
+    y -= 0.55 * cm
+    y = _paragraph(pdf, y, reason)
+
+    pdf.setFont("Helvetica-Bold", 12)
+    pdf.drawString(1.5 * cm, y, "O · Objetivo")
+    y -= 0.55 * cm
+    y = _paragraph(pdf, y, " · ".join(vitals) if vitals else "Signos vitales no registrados.")
+    if physical_exam:
+        y = _paragraph(pdf, y, f"Exploración física: {physical_exam}")
+
+    pdf.setFont("Helvetica-Bold", 12)
+    pdf.drawString(1.5 * cm, y, "A · Análisis")
+    y -= 0.55 * cm
+    y = _paragraph(pdf, y, diagnosis)
+
+    pdf.setFont("Helvetica-Bold", 12)
+    pdf.drawString(1.5 * cm, y, "P · Plan")
+    y -= 0.55 * cm
+    y = _paragraph(pdf, y, notes or "Sin indicaciones adicionales.")
+
+    if y < 4 * cm:
+        pdf.showPage()
+        y = _header(pdf, "Nota de consulta (continuación)")
+
+    y -= 1.2 * cm
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(1.5 * cm, y, "_______________________________")
+    pdf.drawString(1.5 * cm, y - 0.45 * cm, doctor_name)
+    _footer(pdf)
+    pdf.showPage()
+    pdf.save()
+    return buffer.getvalue()
+
+
 def build_prescription_pdf(
     *,
     patient_name: str,

@@ -1,19 +1,21 @@
 {% extends "base.html" %}
 {% block body_class %}console{% endblock %}
 {% block body %}
+{% set perms = request.state.permissions or [] %}
+{% set in_gear = active in ['seguridad', 'actividad', 'roles'] %}
+{% set can_admin = 'roles:manage' in perms or 'audit:read' in perms %}
 <div class="shell">
   <aside class="rail">
-    <div>
-      <a class="brand" href="/portal">
-        <span class="brand-mark" aria-hidden="true"></span>
-        <span class="brand-text">
-          <strong>D.O.S.Y.S</strong>
-          <small>Portal clínico</small>
-        </span>
+    <div class="rail-top">
+      <a class="brand" href="/portal/inicio" aria-label="D.O.S.Y.S Portal clínico, ir al inicio">
+        <img class="brand-logo" src="/portal/static/img/LogoDOSYS.png?v=1"
+             alt="D.O.S.Y.S Portal clínico" width="3664" height="1092">
       </a>
       <nav class="nav" aria-label="Secciones">
-        {% set perms = request.state.permissions or [] %}
+        <a class="nav-link {% if active == 'inicio' %}is-active{% endif %}" href="/portal/inicio">Inicio</a>
+        {% if 'patients:read' in perms %}
         <a class="nav-link {% if active == 'pacientes' %}is-active{% endif %}" href="/portal">Pacientes</a>
+        {% endif %}
         {% if 'appointments:read' in perms %}
         <a class="nav-link {% if active == 'citas' %}is-active{% endif %}" href="/portal/citas">Citas</a>
         <a class="nav-link {% if active == 'agenda' %}is-active{% endif %}" href="/portal/agenda">Agenda</a>
@@ -25,24 +27,49 @@
         {% if 'users:manage' in perms %}
         <a class="nav-link {% if active == 'usuarios' %}is-active{% endif %}" href="/portal/usuarios">Usuarios</a>
         {% endif %}
-        {% if 'roles:manage' in perms %}
-        <a class="nav-link {% if active == 'roles' %}is-active{% endif %}" href="/portal/roles">Roles</a>
-        {% endif %}
-        {% if 'audit:read' in perms %}
-        <a class="nav-link {% if active == 'actividad' %}is-active{% endif %}" href="/portal/actividad">Actividad</a>
-        {% endif %}
-        <a class="nav-link {% if active == 'seguridad' %}is-active{% endif %}" href="/portal/seguridad">Mi seguridad</a>
       </nav>
     </div>
+
     <div class="rail-bottom">
-      <p class="who">En sesión<br><strong>{{ doctor_name }}</strong></p>
-      <form method="post" action="/portal/salir">
-        <button class="btn btn-quiet" type="submit">Cerrar sesión</button>
-      </form>
+      <p class="who">En sesión<br><strong>{{ doctor_name }}</strong><span class="who-role">{{ request.state.role_name }}</span></p>
+
+      <details class="gear" data-gear>
+        <summary class="gear-button {% if in_gear %}is-active{% endif %}" aria-label="Ajustes de la cuenta">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </summary>
+
+        <div class="gear-menu">
+          <nav aria-label="Cuenta y administración">
+            <p class="gear-title">Cuenta</p>
+            <a class="gear-item {% if active == 'seguridad' %}is-active{% endif %}"
+               href="/portal/seguridad" {% if active == 'seguridad' %}aria-current="page"{% endif %}>Mi seguridad</a>
+
+            {% if can_admin %}
+            <p class="gear-title">Administración</p>
+            {% if 'roles:manage' in perms %}
+            <a class="gear-item {% if active == 'roles' %}is-active{% endif %}"
+               href="/portal/roles" {% if active == 'roles' %}aria-current="page"{% endif %}>Roles</a>
+            {% endif %}
+            {% if 'audit:read' in perms %}
+            <a class="gear-item {% if active == 'actividad' %}is-active{% endif %}"
+               href="/portal/actividad" {% if active == 'actividad' %}aria-current="page"{% endif %}>Actividad</a>
+            {% endif %}
+            {% endif %}
+          </nav>
+
+          <form class="gear-logout" method="post" action="/portal/salir">
+            <button class="gear-item gear-item-danger" type="submit">Cerrar sesión</button>
+          </form>
+        </div>
+      </details>
     </div>
   </aside>
   <main class="main">
-    <div class="content">
+    <div class="content {% block content_class %}{% endblock %}">
       {% block content %}{% endblock %}
     </div>
   </main>

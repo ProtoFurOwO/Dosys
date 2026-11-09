@@ -16,6 +16,25 @@
   <span class="chip chip-confirmed" id="cita-chip">{{ status_label }}</span>
 </header>
 
+{% if appointment.status.value == 'cancelled' %}
+<div class="note note-error" role="status">Esta cita fue cancelada. No se puede hacer check-in.</div>
+{% else %}
+<ol class="appointment-flow" aria-label="Flujo de la cita">
+  <li class="{% if workflow_step >= 1 %}is-done{% endif %} {% if workflow_step == 1 %}is-current{% endif %}">
+    <span>1</span> Agendada
+  </li>
+  <li class="{% if workflow_step >= 2 %}is-done{% endif %} {% if workflow_step == 2 %}is-current{% endif %}">
+    <span>2</span> Confirmada
+  </li>
+  <li class="{% if workflow_step >= 3 %}is-done{% endif %} {% if workflow_step == 3 %}is-current{% endif %}">
+    <span>3</span> En espera
+  </li>
+  <li class="{% if workflow_step >= 4 %}is-done{% endif %} {% if workflow_step == 4 %}is-current{% endif %}">
+    <span>4</span> Atendida
+  </li>
+</ol>
+{% endif %}
+
 <div id="checkin-aviso"></div>
 
 <section class="block">

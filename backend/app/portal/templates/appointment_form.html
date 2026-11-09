@@ -16,7 +16,7 @@
 <div class="note note-error" role="alert">{{ errors.general }}</div>
 {% endif %}
 
-<form class="form" method="post" action="/portal/pacientes/{{ patient.id }}/cita" novalidate>
+<form class="form" method="post" action="/portal/pacientes/{{ patient.id }}/cita" data-demo-appointment novalidate>
   <div class="field {% if errors.specialty %}has-error{% endif %}">
     <label for="specialty">Especialidad o servicio</label>
     <input id="specialty" name="specialty" maxlength="120" value="{{ values.specialty }}" required>
@@ -51,6 +51,8 @@
 
   <div class="form-actions">
     <button class="btn btn-primary" type="submit">Agendar cita</button>
+    <button class="btn btn-quiet" type="button" data-demo-fill-appointment title="Atajo: Alt+Shift+A">Llenar ejemplo</button>
+    <span class="help" data-demo-status role="status" aria-live="polite"></span>
     <a class="btn btn-quiet" href="/portal/pacientes/{{ patient.id }}">Cancelar</a>
   </div>
 </form>

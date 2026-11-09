@@ -21,6 +21,7 @@
 
 <form class="form" method="post"
       action="{% if mode == 'create' %}/portal/usuarios/nuevo{% else %}/portal/usuarios/{{ user.id }}/editar{% endif %}"
+      {% if mode == 'create' %}data-demo-user{% endif %}
       novalidate>
 
   <div class="field {% if errors.full_name %}has-error{% endif %}">
@@ -92,6 +93,10 @@
     <button class="btn btn-primary" type="submit">
       {% if mode == 'create' %}Registrar usuario{% else %}Guardar cambios{% endif %}
     </button>
+    {% if mode == 'create' %}
+    <button class="btn btn-quiet" type="button" data-demo-random-user title="Atajo: Alt+Shift+R">Llenar aleatorio</button>
+    <span class="help" data-demo-status role="status" aria-live="polite"></span>
+    {% endif %}
     <a class="btn btn-quiet" href="/portal/usuarios">Cancelar</a>
   </div>
 </form>

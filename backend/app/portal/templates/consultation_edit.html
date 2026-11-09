@@ -30,23 +30,115 @@
 {% endif %}
 
 <form class="form" method="post" action="/portal/pacientes/{{ patient.id }}/consulta/{{ consultation.id }}/editar" novalidate>
-  <div class="field {% if errors.reason %}has-error{% endif %}">
-    <label for="reason">Motivo de la consulta</label>
-    <input id="reason" name="reason" maxlength="300" value="{{ values.reason }}" required>
-    {% if errors.reason %}<p class="error">{{ errors.reason }}</p>{% endif %}
-  </div>
+  <section class="soap-block">
+    <div class="soap-heading">
+      <span class="soap-letter">S</span>
+      <div><h2 class="section-title">Subjetivo</h2></div>
+    </div>
+    <div class="field {% if errors.reason %}has-error{% endif %}">
+      <label for="reason">Motivo de la consulta</label>
+      <input id="reason" name="reason" maxlength="300" value="{{ values.reason }}" required>
+      {% if errors.reason %}<p class="error">{{ errors.reason }}</p>{% endif %}
+    </div>
+  </section>
 
-  <div class="field {% if errors.diagnosis %}has-error{% endif %}">
-    <label for="diagnosis">Diagnóstico</label>
-    <textarea id="diagnosis" name="diagnosis" rows="3" maxlength="500" required>{{ values.diagnosis }}</textarea>
-    {% if errors.diagnosis %}<p class="error">{{ errors.diagnosis }}</p>{% endif %}
-  </div>
+  <section class="soap-block">
+    <div class="soap-heading">
+      <span class="soap-letter">O</span>
+      <div><h2 class="section-title">Objetivo</h2></div>
+    </div>
+    <div class="vitals-grid">
+      <div class="field {% if errors.blood_pressure %}has-error{% endif %}">
+        <label for="blood_pressure">Presión arterial</label>
+        <div class="input-unit">
+          <input id="blood_pressure" name="blood_pressure" maxlength="20" value="{{ values.blood_pressure }}" placeholder="120/80" inputmode="numeric">
+          <span>mmHg</span>
+        </div>
+        {% if errors.blood_pressure %}<p class="error">{{ errors.blood_pressure }}</p>{% endif %}
+      </div>
+      <div class="field {% if errors.heart_rate %}has-error{% endif %}">
+        <label for="heart_rate">Frecuencia cardiaca</label>
+        <div class="input-unit">
+          <input id="heart_rate" name="heart_rate" type="number" min="30" max="220" value="{{ values.heart_rate }}" placeholder="72" inputmode="numeric">
+          <span>lpm</span>
+        </div>
+        {% if errors.heart_rate %}<p class="error">{{ errors.heart_rate }}</p>{% endif %}
+      </div>
+      <div class="field {% if errors.respiratory_rate %}has-error{% endif %}">
+        <label for="respiratory_rate">Frecuencia respiratoria</label>
+        <div class="input-unit">
+          <input id="respiratory_rate" name="respiratory_rate" type="number" min="5" max="80" value="{{ values.respiratory_rate }}" placeholder="16" inputmode="numeric">
+          <span>rpm</span>
+        </div>
+        {% if errors.respiratory_rate %}<p class="error">{{ errors.respiratory_rate }}</p>{% endif %}
+      </div>
+      <div class="field {% if errors.temperature_c %}has-error{% endif %}">
+        <label for="temperature_c">Temperatura</label>
+        <div class="input-unit">
+          <input id="temperature_c" name="temperature_c" type="number" step="0.1" min="30" max="45" value="{{ values.temperature_c }}" placeholder="36.5" inputmode="decimal">
+          <span>°C</span>
+        </div>
+        {% if errors.temperature_c %}<p class="error">{{ errors.temperature_c }}</p>{% endif %}
+      </div>
+      <div class="field {% if errors.oxygen_saturation %}has-error{% endif %}">
+        <label for="oxygen_saturation">Saturación O₂</label>
+        <div class="input-unit">
+          <input id="oxygen_saturation" name="oxygen_saturation" type="number" min="50" max="100" value="{{ values.oxygen_saturation }}" placeholder="98" inputmode="numeric">
+          <span>%</span>
+        </div>
+        {% if errors.oxygen_saturation %}<p class="error">{{ errors.oxygen_saturation }}</p>{% endif %}
+      </div>
+      <div class="field {% if errors.weight_kg %}has-error{% endif %}">
+        <label for="weight_kg">Peso</label>
+        <div class="input-unit">
+          <input id="weight_kg" name="weight_kg" type="number" step="0.1" min="1" max="400" value="{{ values.weight_kg }}" placeholder="70.0" inputmode="decimal">
+          <span>kg</span>
+        </div>
+        {% if errors.weight_kg %}<p class="error">{{ errors.weight_kg }}</p>{% endif %}
+      </div>
+      <div class="field {% if errors.height_cm %}has-error{% endif %}">
+        <label for="height_cm">Talla</label>
+        <div class="input-unit">
+          <input id="height_cm" name="height_cm" type="number" step="0.1" min="30" max="250" value="{{ values.height_cm }}" placeholder="170" inputmode="decimal">
+          <span>cm</span>
+        </div>
+        {% if errors.height_cm %}<p class="error">{{ errors.height_cm }}</p>{% endif %}
+      </div>
+      <div class="field bmi-field">
+        <label>IMC calculado</label>
+        <output id="bmi-output" class="bmi-output" aria-live="polite">—</output>
+      </div>
+    </div>
+    <div class="field {% if errors.physical_exam %}has-error{% endif %}">
+      <label for="physical_exam">Exploración física</label>
+      <textarea id="physical_exam" name="physical_exam" rows="3" maxlength="4000">{{ values.physical_exam }}</textarea>
+      {% if errors.physical_exam %}<p class="error">{{ errors.physical_exam }}</p>{% endif %}
+    </div>
+  </section>
 
-  <div class="field {% if errors.notes %}has-error{% endif %}">
-    <label for="notes">Notas para el seguimiento</label>
-    <textarea id="notes" name="notes" rows="3" maxlength="4000">{{ values.notes }}</textarea>
-    {% if errors.notes %}<p class="error">{{ errors.notes }}</p>{% endif %}
-  </div>
+  <section class="soap-block">
+    <div class="soap-heading">
+      <span class="soap-letter">A</span>
+      <div><h2 class="section-title">Análisis</h2></div>
+    </div>
+    <div class="field {% if errors.diagnosis %}has-error{% endif %}">
+      <label for="diagnosis">Diagnóstico</label>
+      <textarea id="diagnosis" name="diagnosis" rows="3" maxlength="500" required>{{ values.diagnosis }}</textarea>
+      {% if errors.diagnosis %}<p class="error">{{ errors.diagnosis }}</p>{% endif %}
+    </div>
+  </section>
+
+  <section class="soap-block">
+    <div class="soap-heading">
+      <span class="soap-letter">P</span>
+      <div><h2 class="section-title">Plan</h2></div>
+    </div>
+    <div class="field {% if errors.notes %}has-error{% endif %}">
+      <label for="notes">Plan e indicaciones</label>
+      <textarea id="notes" name="notes" rows="3" maxlength="4000">{{ values.notes }}</textarea>
+      {% if errors.notes %}<p class="error">{{ errors.notes }}</p>{% endif %}
+    </div>
+  </section>
 
   <div class="form-actions">
     <button class="btn btn-primary" type="submit">Guardar corrección</button>
