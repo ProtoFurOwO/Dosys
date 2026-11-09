@@ -59,12 +59,12 @@ class RemoteSecurityRepository(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: SessionExpiredException) {
-            session.clear()
-            ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
+            session.expire("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.")
+            ClinicalResult.Error("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.")
         } catch (error: HttpException) {
             when (error.code()) {
                 400, 401, 409 -> {
-                    if (error.code() == 401) session.clear()
+                    if (error.code() == 401) session.expire("Este dispositivo ya no está autorizado. Inicia sesión de nuevo.")
                     ClinicalResult.Error(error.serverDetail() ?: "No se pudo completar la operación")
                 }
                 else -> ClinicalResult.Error("No se pudo completar la operación. Intenta más tarde")

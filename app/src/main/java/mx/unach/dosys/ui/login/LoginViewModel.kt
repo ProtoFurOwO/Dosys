@@ -29,7 +29,7 @@ data class LoginUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val loggedIn: Boolean = false,
-    // Transferencia de sesión entre dispositivos
+    // Alta de dispositivo de confianza entre teléfonos
     val transferId: String? = null,
     val transferSecondsLeft: Int = 0,
     val transferSubmissionsLeft: Int = 0,
@@ -143,7 +143,7 @@ class LoginViewModel : ViewModel() {
                     it.copy(
                         isLoading = false,
                         transferSubmissionsLeft = result.submissionsLeft,
-                        transferHint = "Código enviado. Espera a que tu otro teléfono lo apruebe.",
+                        transferHint = "Código enviado. Espera a que uno de tus dispositivos de confianza lo apruebe.",
                         error = null,
                     )
                 }
@@ -154,7 +154,7 @@ class LoginViewModel : ViewModel() {
         }
     }
 
-    /** Alternativa si ya no tiene el teléfono anterior: pasa al 2FA existente. */
+    /** Alternativa si no puede acceder a sus dispositivos: pasa al 2FA existente. */
     fun useTransferFallback() {
         val current = _state.value
         val transferId = current.transferId ?: return

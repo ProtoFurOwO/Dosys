@@ -1,5 +1,6 @@
 package mx.unach.dosys.ui.login
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,7 +15,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Shield
@@ -38,6 +38,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -46,11 +48,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import mx.unach.dosys.R
 
 /**
  * Pantalla de acceso en pasos:
  * 1) usuario y contraseña; 2) código del segundo factor si la cuenta lo tiene
- * activo; o transferencia de sesión si la cuenta ya vive en otro teléfono.
+ * activo; o alta de un nuevo dispositivo de confianza si la cuenta ya tiene otros.
  * El paciente recibe sus credenciales en el hospital (no hay autorregistro).
  */
 @Composable
@@ -108,19 +111,15 @@ fun LoginScreen(
 
 @Composable
 private fun CredentialsStep(state: LoginUiState, viewModel: LoginViewModel) {
-    Icon(
-        imageVector = Icons.Filled.LocalHospital,
-        contentDescription = null,
-        modifier = Modifier.size(72.dp),
-        tint = MaterialTheme.colorScheme.primary,
+    Image(
+        painter = painterResource(R.drawable.logo_dosys),
+        contentDescription = "D.O.S.Y.S. Historial Clínico Digital",
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(100.dp),
+        contentScale = ContentScale.Fit,
     )
     Spacer(Modifier.height(12.dp))
-    Text(
-        text = "D.O.S.Y.S",
-        fontSize = 34.sp,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-    )
     Text(
         text = "Tu expediente clínico, en tus manos",
         style = MaterialTheme.typography.bodyMedium,
@@ -302,15 +301,15 @@ private fun DeviceTransferStep(state: LoginUiState, viewModel: LoginViewModel) {
     )
     Spacer(Modifier.height(12.dp))
     Text(
-        text = "Autoriza este dispositivo",
+        text = "Agrega este dispositivo",
         fontSize = 26.sp,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary,
         textAlign = TextAlign.Center,
     )
     Text(
-        text = "Tu cuenta ya está activa en tu teléfono de confianza. Ahí verás un código de " +
-            "6 dígitos: escríbelo aquí para transferir la sesión.",
+        text = "Tu cuenta ya tiene dispositivos de confianza. Pide en cualquiera de ellos el " +
+            "código de 6 dígitos y escríbelo aquí para agregar este teléfono. Los demás seguirán activos.",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
@@ -410,14 +409,14 @@ private fun DeviceTransferStep(state: LoginUiState, viewModel: LoginViewModel) {
 
     Spacer(Modifier.height(10.dp))
     Text(
-        text = "Si no ves el código en tu otro teléfono, revisa que tenga la app abierta o espera la notificación.",
+        text = "Si no ves el código en tus otros dispositivos, revisa que alguno tenga la app abierta o espera la notificación.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
     )
 
     TextButton(onClick = viewModel::useTransferFallback) {
-        Text("No tengo mi dispositivo anterior")
+        Text("No puedo acceder a mis otros dispositivos")
     }
     TextButton(onClick = viewModel::cancelTransfer) {
         Text("Cancelar")

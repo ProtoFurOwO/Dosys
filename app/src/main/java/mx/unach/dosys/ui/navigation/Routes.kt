@@ -12,8 +12,13 @@ object Routes {
     const val STUDIES = "studies"
     const val PRESCRIPTIONS = "prescriptions"
     const val APPOINTMENTS = "appointments"
+    const val APPOINTMENT_REQUEST = "appointment_request"
     const val CHECKIN = "checkin"
     const val SECURITY = "security"
+    const val TRUSTED_DEVICES = "trusted_devices"
     const val DOCUMENTS = "documents"
+    const val DOCUMENT_DETAIL = "document/{id}"
     const val TRANSFER_APPROVAL = "transfer_approval"
+
+    fun document(id: Int): String = "document/$id"
 }

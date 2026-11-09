@@ -14,7 +14,7 @@ import java.util.UUID
 private val Context.deviceDataStore by preferencesDataStore(name = "dosys_device")
 
 /**
- * Identidad estable del teléfono para la transferencia de sesión.
+ * Identidad estable del teléfono para agregar dispositivos de confianza.
  *
  * El identificador es un UUID aleatorio que nunca se muestra; el servidor solo
  * guarda su hash SHA-256. El token FCM también vive aquí, no en la sesión.

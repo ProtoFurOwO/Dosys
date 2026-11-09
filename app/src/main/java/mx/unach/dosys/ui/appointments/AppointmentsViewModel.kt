@@ -26,10 +26,6 @@ class AppointmentsViewModel : ViewModel() {
     private val _state = MutableStateFlow(AppointmentsUiState())
     val state: StateFlow<AppointmentsUiState> = _state.asStateFlow()
 
-    init {
-        refresh()
-    }
-
     fun refresh() {
         if (_state.value.isLoading) return
         _state.update { it.copy(isLoading = true, error = null) }

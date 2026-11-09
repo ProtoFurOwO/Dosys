@@ -19,6 +19,7 @@ data class PatientConsultation(
 
 @Serializable
 enum class AppointmentStatus {
+    @SerialName("requested") REQUESTED,
     @SerialName("scheduled") SCHEDULED,
     @SerialName("confirmed") CONFIRMED,
     @SerialName("attended") ATTENDED,
@@ -43,6 +44,38 @@ data class PatientAppointment(
     @SerialName("checkin_reason") val checkinReason: String? = null,
 )
 
+// ── Solicitud de citas ──────────────────────────────────────────────────────
+
+@Serializable
+data class DoctorOption(
+    val id: Int,
+    @SerialName("full_name") val fullName: String,
+    val specialty: String,
+)
+
+@Serializable
+data class AppointmentAvailabilitySlot(
+    val time: String,
+    @SerialName("scheduled_at") val scheduledAt: String,
+    val available: Boolean,
+)
+
+@Serializable
+data class AppointmentAvailabilityResponse(
+    @SerialName("doctor_id") val doctorId: Int,
+    val date: String,
+    val slots: List<AppointmentAvailabilitySlot> = emptyList(),
+)
+
+@Serializable
+data class AppointmentRequest(
+    @SerialName("doctor_id") val doctorId: Int,
+    val specialty: String,
+    val date: String,
+    val time: String,
+    val reason: String,
+)
+
 /** Código del QR de recepción para confirmar la llegada. */
 @Serializable
 data class CheckInRequest(
@@ -60,6 +93,16 @@ data class PatientDocument(
     @SerialName("size_bytes") val sizeBytes: Long,
     val sha256: String,
     @SerialName("created_at") val createdAt: String,
+)
+
+/** Resultado de comparar la firma registrada con la del archivo actual. */
+@Serializable
+data class DocumentIntegrityResponse(
+    val id: Int,
+    val intact: Boolean,
+    @SerialName("registered_signature") val registeredSignature: String,
+    @SerialName("current_signature") val currentSignature: String,
+    val message: String,
 )
 
 /** Estudio de laboratorio o imagen solicitado al paciente. */

@@ -40,4 +40,9 @@ object AppointmentFilters {
         appointments: List<PatientAppointment>,
         now: OffsetDateTime = OffsetDateTime.now(),
     ): PatientAppointment? = split(appointments, now).first.firstOrNull()
+
+    /** El check-in solo aplica a citas ya agendadas/confirmadas, no a solicitudes. */
+    fun canCheckIn(appointments: List<PatientAppointment>): Boolean = appointments.any {
+        it.status == AppointmentStatus.SCHEDULED || it.status == AppointmentStatus.CONFIRMED
+    }
 }

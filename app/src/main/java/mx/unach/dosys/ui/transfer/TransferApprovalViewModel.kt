@@ -23,12 +23,13 @@ data class TransferApprovalUiState(
     val message: String? = null,
     val finished: Boolean = false,
     val failed: Boolean = false,
-    val sessionTransferred: Boolean = false,
+    val maxDevices: Boolean = false,
 )
 
 /**
- * Lado A: muestra un código local de 60 s, sondea la propuesta del dispositivo
- * nuevo cada 2 s y la compara localmente. El servidor nunca compara el código.
+ * Lado A: cualquier dispositivo activo puede autorizar el alta de otro.
+ * Muestra un código local de 60 s, sondea la propuesta cada 2 s y la compara
+ * localmente. Aprobar suma el teléfono nuevo; este dispositivo sigue activo.
  */
 class TransferApprovalViewModel : ViewModel() {
 
@@ -57,6 +58,7 @@ class TransferApprovalViewModel : ViewModel() {
             it.copy(
                 finished = false,
                 failed = false,
+                maxDevices = false,
                 error = null,
                 message = null,
                 transfer = null,
@@ -85,13 +87,12 @@ class TransferApprovalViewModel : ViewModel() {
                     }
                 }
                 is DeviceResult.Error -> {
-                    if (result.message.contains("sesión", ignoreCase = true)) {
-                        session.clear()
+                    if (result.code == 401) {
+                        session.expire(result.message)
                         _state.update {
                             it.copy(
                                 loading = false,
                                 finished = true,
-                                sessionTransferred = true,
                                 message = result.message,
                             )
                         }
@@ -115,6 +116,7 @@ class TransferApprovalViewModel : ViewModel() {
                 code = codeSession.displayCode(),
                 secondsLeft = codeSession.remainingSeconds(),
                 error = null,
+                maxDevices = false,
             )
         }
         startCountdown()
@@ -149,7 +151,7 @@ class TransferApprovalViewModel : ViewModel() {
             while (true) {
                 delay(2_000)
                 val current = _state.value
-                if (current.finished || current.sessionTransferred || approving) break
+                if (current.finished || approving) break
 
                 when (val result = repository.pendingTransfer()) {
                     is DeviceResult.Success -> {
@@ -196,12 +198,9 @@ class TransferApprovalViewModel : ViewModel() {
                         }
                     }
                     is DeviceResult.Error -> {
-                        if (result.message.contains("sesión", ignoreCase = true)) {
-                            session.clear()
-                            finishWith(
-                                "Tu sesión se transfirió a otro dispositivo.",
-                                transferred = true,
-                            )
+                        if (result.code == 401) {
+                            session.expire(result.message)
+                            finishWith(result.message)
                             break
                         }
                     }
@@ -215,15 +214,16 @@ class TransferApprovalViewModel : ViewModel() {
         viewModelScope.launch {
             when (val result = repository.approve(transfer.transferId, transfer.approvalToken)) {
                 is DeviceResult.Success -> {
-                    session.clear()
-                    finishWith(
-                        "Tu sesión se transfirió al nuevo dispositivo. Este teléfono ya no tiene acceso.",
-                        transferred = true,
-                    )
+                    approving = false
+                    finishWith(result.value, failed = false)
                 }
                 is DeviceResult.Error -> {
                     approving = false
-                    finishWith(result.message, failed = true)
+                    finishWith(
+                        message = result.message,
+                        failed = true,
+                        maxDevices = result.code == 409,
+                    )
                 }
             }
         }
@@ -250,7 +250,7 @@ class TransferApprovalViewModel : ViewModel() {
      */
     fun onBackground() {
         val current = _state.value
-        if (!current.unlocked || current.finished || current.sessionTransferred) return
+        if (!current.unlocked || current.finished) return
         val transfer = current.transfer ?: return
         codeSession.destroy()
         viewModelScope.launch {
@@ -263,8 +263,8 @@ class TransferApprovalViewModel : ViewModel() {
 
     private fun finishWith(
         message: String,
-        transferred: Boolean = false,
         failed: Boolean = false,
+        maxDevices: Boolean = false,
     ) {
         countdownJob?.cancel()
         pollingJob?.cancel()
@@ -279,7 +279,7 @@ class TransferApprovalViewModel : ViewModel() {
                 message = message,
                 finished = true,
                 failed = failed,
-                sessionTransferred = transferred,
+                maxDevices = maxDevices,
             )
         }
     }

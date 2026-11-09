@@ -13,14 +13,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -28,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import mx.unach.dosys.data.model.AppointmentStatus
 import mx.unach.dosys.data.model.PatientAppointment
 import mx.unach.dosys.ui.components.ScreenScaffold
 import mx.unach.dosys.ui.components.StatusChip
@@ -38,20 +42,32 @@ import mx.unach.dosys.ui.format.formatClinicalDateTime
 @Composable
 fun AppointmentsScreen(
     onBack: () -> Unit,
+    onRequestAppointment: () -> Unit,
     onOpenCheckIn: () -> Unit,
     viewModel: AppointmentsViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
 
-    AppointmentsContent(state = state, onBack = onBack, onOpenCheckIn = onOpenCheckIn)
+    LaunchedEffect(Unit) {
+        viewModel.refresh()
+    }
+
+    AppointmentsContent(
+        state = state,
+        onBack = onBack,
+        onRequestAppointment = onRequestAppointment,
+        onOpenCheckIn = onOpenCheckIn,
+    )
 }
 
 @Composable
 private fun AppointmentsContent(
     state: AppointmentsUiState,
     onBack: () -> Unit,
+    onRequestAppointment: () -> Unit,
     onOpenCheckIn: () -> Unit,
 ) {
+    val canCheckIn = AppointmentFilters.canCheckIn(state.upcoming)
     ScreenScaffold(title = "Mis citas", onBack = onBack) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -61,15 +77,30 @@ private fun AppointmentsContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                Button(onClick = onOpenCheckIn, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Filled.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(8.dp))
-                    Text("Confirmar llegada con QR")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = onRequestAppointment,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("Solicitar cita")
+                    }
+                    if (canCheckIn) {
+                        OutlinedButton(
+                            onClick = onOpenCheckIn,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(Icons.Filled.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.size(8.dp))
+                            Text("Check-in")
+                        }
+                    }
                 }
             }
             item {
                 Text(
-                    text = "El médico o recepción agenda la cita. Solo puedes confirmar tu llegada dentro de la ventana de la cita.",
+                    text = "Puedes solicitar una cita; recepción la confirma. El check-in se habilita cuando la cita está confirmada.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -155,6 +186,15 @@ private fun AppointmentCard(appointment: PatientAppointment) {
                 Text(it, style = MaterialTheme.typography.bodySmall)
             }
             when {
+                appointment.status == AppointmentStatus.REQUESTED -> {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Pendiente de confirmación por recepción.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = appointmentStatusColor(AppointmentStatus.REQUESTED),
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
                 appointment.checkedInAt != null -> {
                     Spacer(Modifier.height(8.dp))
                     Text(
@@ -185,6 +225,7 @@ private fun AppointmentCard(appointment: PatientAppointment) {
 }
 
 private fun checkinHint(appointment: PatientAppointment): String = when (appointment.checkinReason) {
+    "requested" -> "Pendiente de confirmación por recepción."
     "too_early" -> "El check-in abre 2 horas antes de la cita."
     "closed" -> "El check-in de esta cita ya cerró."
     "already_checked_in" -> "Tu llegada ya estaba confirmada."

@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -48,13 +49,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
+import mx.unach.dosys.R
 import mx.unach.dosys.core.di.ServiceLocator
+import mx.unach.dosys.data.model.AppointmentStatus
 import mx.unach.dosys.data.model.PatientAppointment
 import mx.unach.dosys.data.model.PatientPrescription
 import mx.unach.dosys.ui.format.formatClinicalDateTime
@@ -98,6 +103,16 @@ fun HomeScreen(
                             fontWeight = FontWeight.Bold,
                         )
                     }
+                },
+                navigationIcon = {
+                    Image(
+                        painter = painterResource(R.drawable.logo_dosys_mark),
+                        contentDescription = "D.O.S.Y.S.",
+                        modifier = Modifier
+                            .padding(start = 12.dp)
+                            .size(36.dp),
+                        contentScale = ContentScale.Fit,
+                    )
                 },
                 actions = {
                     IconButton(onClick = { viewModel.logout(onLogout) }) {
@@ -179,7 +194,7 @@ fun HomeScreen(
 
 /**
  * Permiso de notificaciones (Android 13+) en un momento natural: tras entrar.
- * Si se niega, la transferencia sigue funcionando con el sondeo en primer plano.
+ * Si se niega, el alta de dispositivos sigue funcionando con el sondeo en primer plano.
  */
 @Composable
 private fun NotificationPermissionPrompt() {
@@ -218,7 +233,7 @@ private fun NotificationPermissionPrompt() {
         text = {
             Text(
                 "Activa las notificaciones para enterarte al instante cuando alguien intente " +
-                    "entrar a tu cuenta desde otro teléfono. Si no las activas, la app revisará " +
+                    "agregar un dispositivo de confianza. Si no las activas, la app revisará " +
                     "la solicitud al abrirse."
             )
         },
@@ -287,6 +302,12 @@ private fun NextAppointmentCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     when {
+                        appointment.status == AppointmentStatus.REQUESTED -> Text(
+                            text = "Solicitada · Pendiente de confirmación por recepción",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
                         appointment.checkedInAt != null -> Text(
                             text = "Llegada confirmada",
                             style = MaterialTheme.typography.labelMedium,

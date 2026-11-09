@@ -38,5 +38,9 @@ object CheckInAppointments {
         appointments: List<PatientAppointment>,
         now: OffsetDateTime = OffsetDateTime.now(),
     ): List<PatientAppointment> = AppointmentFilters.split(appointments, now).first
-        .filter { it.status != AppointmentStatus.CANCELLED && it.status != AppointmentStatus.ATTENDED }
+        .filter {
+            it.status != AppointmentStatus.REQUESTED &&
+                it.status != AppointmentStatus.CANCELLED &&
+                it.status != AppointmentStatus.ATTENDED
+        }
 }

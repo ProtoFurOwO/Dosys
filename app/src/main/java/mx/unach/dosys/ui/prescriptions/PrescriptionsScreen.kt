@@ -31,7 +31,7 @@ import mx.unach.dosys.ui.format.formatClinicalDateTime
 
 /**
  * Recetas emitidas por el médico con sus medicamentos y el PDF firmado
- * (huella SHA-256 verificable en el portal clínico).
+ * (firma electrónica verificable en el portal clínico).
  */
 @Composable
 fun PrescriptionsScreen(

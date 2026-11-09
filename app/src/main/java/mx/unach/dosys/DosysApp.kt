@@ -23,7 +23,7 @@ class DosysApp : Application() {
             "Seguridad",
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
-            description = "Solicitudes de acceso y transferencia de sesión"
+            description = "Solicitudes para agregar dispositivos de confianza"
             setShowBadge(true)
         }
         manager.createNotificationChannel(channel)
