@@ -3764,3 +3764,44 @@ body.login {
 .dot-amber {
   background: #f59e0b;
 }
+
+/* ── Gráfica de actividad clínica ─────────────────────────────────────────── */
+.chart-card {
+  margin-bottom: 16px;
+}
+
+.chart-total {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bar-chart {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  margin-top: 4px;
+}
+
+.bar {
+  fill: var(--accent);
+  opacity: 0.85;
+}
+
+.bar:hover {
+  opacity: 1;
+}
+
+.bar-label {
+  fill: var(--ink-muted);
+  font-size: 8px;
+  font-family: inherit;
+}
+
+.bar-value {
+  fill: var(--accent-deep);
+  font-size: 9px;
+  font-weight: 700;
+  font-family: inherit;
+}

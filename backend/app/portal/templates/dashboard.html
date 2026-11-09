@@ -74,6 +74,29 @@
   {% endif %}
 </section>
 
+{% if can_consultations %}
+<section class="dash-card chart-card">
+  <div class="dash-card-head">
+    <div>
+      <h2>Consultas · últimos 7 días</h2>
+      <p class="page-note">Actividad clínica registrada por día.</p>
+    </div>
+    <span class="chart-total">{{ chart_total }} en total</span>
+  </div>
+  {% if chart_total %}
+  <svg class="bar-chart" viewBox="0 0 360 100" role="img" aria-label="Consultas de los últimos siete días">
+    {% for point in consultation_chart %}
+    <rect class="bar" x="{{ loop.index0 * 48 + 18 }}" y="{{ point.y }}" width="30" height="{{ point.height }}" rx="5"></rect>
+    <text class="bar-value" x="{{ loop.index0 * 48 + 33 }}" y="{{ point.y - 5 }}" text-anchor="middle">{{ point.count }}</text>
+    <text class="bar-label" x="{{ loop.index0 * 48 + 33 }}" y="94" text-anchor="middle">{{ point.label }}</text>
+    {% endfor %}
+  </svg>
+  {% else %}
+  <p class="empty-inline">Aún no hay consultas en este periodo.</p>
+  {% endif %}
+</section>
+{% endif %}
+
 <div class="dashboard-grid">
   {% if can_appointments %}
   <section class="dash-card">
@@ -124,7 +147,11 @@
           <span class="row-sub">{{ item.specialty }} · {{ item.room }} · llegó {{ item.checked_in }}</span>
         </div>
         <div class="dash-meta">
-          <a class="btn btn-line" href="/portal/citas/{{ item.id }}">Atender</a>
+          {% if can_start_consultations %}
+          <a class="btn btn-primary" href="/portal/pacientes/{{ item.patient_id }}/consulta?cita={{ item.id }}">Iniciar consulta</a>
+          {% else %}
+          <a class="btn btn-line" href="/portal/citas/{{ item.id }}">Ver cita</a>
+          {% endif %}
         </div>
       </li>
       {% endfor %}

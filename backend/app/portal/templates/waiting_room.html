@@ -31,8 +31,10 @@
         <td class="nowrap">{{ item.checked_in_label }}</td>
         <td>{{ item.specialty }}{% if item.doctor_name %}<span class="row-sub">{{ item.doctor_name }}</span>{% endif %}</td>
         <td class="col-action">
-          {% if can_write_consultations %}
-          <a class="btn btn-primary" href="/portal/pacientes/{{ item.patient_id }}/consulta?cita={{ item.appointment_id }}">Atender</a>
+          {% if can_start_consultation %}
+          <a class="btn btn-primary" href="/portal/pacientes/{{ item.patient_id }}/consulta?cita={{ item.appointment_id }}">Iniciar consulta</a>
+          {% elif can_write_appointments %}
+          <a class="btn btn-line" href="/portal/citas/{{ item.appointment_id }}">Ver cita</a>
           {% endif %}
         </td>
       </tr>

@@ -25,6 +25,10 @@ Backend académico con **FastAPI + SQLAlchemy async + Alembic + PostgreSQL** y u
 - **Solicitud de citas desde la app**: el paciente elige médico, fecha y horario
   disponible; la cita queda `requested` y recepción la confirma. Incluye catálogo de
   médicos activos, disponibilidad de 30 minutos y validación de empalmes.
+- **Landing pública** en `/` con el recorrido del paciente, arquitectura, seguridad y
+  QR de acceso al portal; el dashboard clínico incluye gráfica de consultas de 7 días.
+- **Modo demo**: `python scripts/demo_reset.py --reset` dentro del contenedor recrea
+  cita, solicitud, consulta SOAP, estudio y nota firmada del paciente demo.
 - **Check-in con QR**: el portal muestra un código por cita y la app del paciente lo
   escanea con la cámara para confirmar su llegada.
 - **Registro de cuentas**: el médico da de alta pacientes y médicos; el sistema genera la

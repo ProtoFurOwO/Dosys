@@ -391,7 +391,7 @@
   {% else %}
   <div class="empty">
     <p class="empty-title">Este paciente aún no tiene consultas</p>
-    {% if can_write_consultations %}
+    {% if can_edit_consultations %}
     <p>Registra la primera consulta para que aparezca también en la app del paciente.</p>
     <a class="btn btn-line" href="/portal/pacientes/{{ patient.id }}/consulta">Registrar consulta</a>
     {% else %}

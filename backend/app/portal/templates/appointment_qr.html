@@ -27,6 +27,12 @@
 <div class="note note-ok" role="status">Cita confirmada. El check-in quedó habilitado.</div>
 {% endif %}
 
+{% if can_start_consultation %}
+<div class="form-actions">
+  <a class="btn btn-primary" href="/portal/pacientes/{{ patient.id }}/consulta?cita={{ appointment.id }}">Iniciar consulta</a>
+</div>
+{% endif %}
+
 {% if can_confirm %}
 <section class="block">
   <h2 class="section-title">Confirmar cita</h2>

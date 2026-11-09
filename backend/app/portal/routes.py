@@ -4,6 +4,7 @@ Seguridad: cookie de sesión HttpOnly con el mismo JWT de la API, rol médico
 validado en el servidor en cada petición, y bitácora de todos los accesos.
 """
 
+from collections import Counter
 from datetime import date, datetime, time, timedelta, timezone
 import re
 from urllib.parse import quote
@@ -1103,6 +1104,33 @@ async def clinical_dashboard(request: Request, db: AsyncSession = Depends(get_db
             for log, actor in rows
         ]
 
+    can_start_consultations = has_permission(user, "consultations:write") and isinstance(doctor, Doctor)
+
+    consultation_chart = []
+    chart_total = 0
+    if can_consultations:
+        chart_start = day_start - timedelta(days=6)
+        timestamps = (
+            await db.scalars(
+                select(Consultation.created_at).where(Consultation.created_at >= chart_start)
+            )
+        ).all()
+        counts = Counter(deps._local(moment).date() for moment in timestamps)
+        chart_total = sum(counts.values())
+        max_count = max(counts.values(), default=0)
+        for offset in range(6, -1, -1):
+            chart_day = clinic_today - timedelta(days=offset)
+            count = counts.get(chart_day, 0)
+            height = (count / max_count * 64) if max_count else 0
+            consultation_chart.append(
+                {
+                    "label": f"{chart_day.day} {deps.MESES[chart_day.month - 1]}",
+                    "count": count,
+                    "height": round(height, 1),
+                    "y": round(74 - height, 1),
+                }
+            )
+
     stats = {
         "appointments": len(appointments_today),
         "waiting": len(waiting),
@@ -1157,6 +1185,8 @@ async def clinical_dashboard(request: Request, db: AsyncSession = Depends(get_db
             "pending_studies": pending_studies,
             "recent_consultations": recent_consultations,
             "recent_activity": recent_activity,
+            "consultation_chart": consultation_chart,
+            "chart_total": chart_total,
             "stats": stats,
             "can_patients": can_patients,
             "can_appointments": can_appointments,
@@ -1166,6 +1196,7 @@ async def clinical_dashboard(request: Request, db: AsyncSession = Depends(get_db
             "can_users": can_users,
             "can_write_patients": "patients:write" in perms,
             "can_write_appointments": "appointments:write" in perms,
+            "can_start_consultations": can_start_consultations,
             "can_perform_studies": "studies:perform" in perms,
         },
     )
@@ -1230,6 +1261,7 @@ async def dashboard(
             "latest_by_patient": latest_by_patient,
             "search": search,
             "stats": stats,
+            "can_start_consultations": has_permission(user, "consultations:write") and isinstance(doctor, Doctor),
         },
     )
 
@@ -2052,6 +2084,11 @@ async def appointment_qr_page(
             "can_write_appointments": has_permission(user, "appointments:write"),
             "can_confirm": has_permission(user, "appointments:write")
             and appointment.status in (AppointmentStatus.REQUESTED, AppointmentStatus.SCHEDULED),
+            "can_start_consultation": (
+                has_permission(user, "consultations:write")
+                and isinstance(doctor, Doctor)
+                and appointment.status in (AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED)
+            ),
             "is_requested": appointment.status == AppointmentStatus.REQUESTED,
         },
     )
@@ -2076,8 +2113,23 @@ async def appointment_confirm(
         return templates.TemplateResponse(
             request, "not_found.html", {"doctor_name": staff.full_name}, status_code=status.HTTP_404_NOT_FOUND
         )
+    email_status = "sin_cambio"
     if appointment.status in (AppointmentStatus.REQUESTED, AppointmentStatus.SCHEDULED):
         appointment.status = AppointmentStatus.CONFIRMED
+        patient = await db.get(Patient, appointment.patient_id)
+        doctor_row = await db.get(Doctor, appointment.doctor_id) if appointment.doctor_id else None
+        recipient = (patient.email if patient and patient.email else None) if patient else None
+        if recipient:
+            sent, reason = await email.send_appointment_confirmation(
+                to=recipient,
+                patient_name=patient.full_name,
+                doctor_name=doctor_row.full_name if doctor_row else "Por asignar",
+                when=deps.format_datetime(appointment.scheduled_at),
+                location=appointment.room or appointment.location,
+            )
+            email_status = "enviado" if sent else f"no_enviado:{reason}"
+        else:
+            email_status = "sin_destinatario"
         await write_audit_event(
             db,
             user=user,
@@ -2085,7 +2137,7 @@ async def appointment_confirm(
             entity_type="appointment",
             entity_id=appointment.id,
             request=request,
-            detail=f"patient_id={appointment.patient_id}",
+            detail=f"patient_id={appointment.patient_id} email={email_status}",
         )
         await db.commit()
     return RedirectResponse(
@@ -2240,6 +2292,8 @@ async def waiting_room_page(request: Request, db: AsyncSession = Depends(get_db)
             "waiting": _waiting_rows(rows),
             "rooms": ROOMS,
             "can_write_consultations": has_permission(user, "consultations:write"),
+            "can_start_consultation": has_permission(user, "consultations:write") and isinstance(doctor, Doctor),
+            "can_write_appointments": has_permission(user, "appointments:write"),
         },
     )
 

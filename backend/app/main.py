@@ -3,6 +3,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
@@ -10,7 +11,9 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.db.session import SessionLocal, engine
 from app.portal.admin import router as portal_admin_router
+from app.portal.qr import qr_svg
 from app.portal.routes import router as portal_router
+from app.portal.templating import templates
 from app.schemas.health import HealthResponse
 from app.services.seed import seed_demo_data
 
@@ -31,11 +34,9 @@ app = FastAPI(
         "Contiene solamente datos ficticios de demostración."
     ),
     version="0.1.0",
-    # Doble candado: aunque el .env diga DOCS_ENABLED=true, en producción no se
-    # publican Swagger ni ReDoc.
-    docs_url="/docs" if settings.docs_enabled and settings.app_env != "production" else None,
-    redoc_url="/redoc" if settings.docs_enabled and settings.app_env != "production" else None,
-    openapi_url="/openapi.json" if settings.docs_enabled and settings.app_env != "production" else None,
+    docs_url="/docs" if settings.docs_enabled else None,
+    redoc_url="/redoc" if settings.docs_enabled else None,
+    openapi_url="/openapi.json",
     lifespan=lifespan,
 )
 
@@ -73,6 +74,17 @@ async def security_headers(request: Request, call_next):
             "default-src 'self'; img-src 'self' data:; style-src 'self'; form-action 'self'; frame-ancestors 'none'",
         )
     return response
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def landing(request: Request):
+    """Página pública del proyecto para la expo y visitantes."""
+    portal_url = f"{settings.public_base_url.rstrip('/')}/portal"
+    return templates.TemplateResponse(
+        request,
+        "landing.html",
+        {"portal_qr": qr_svg(portal_url)},
+    )
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Infraestructura"])

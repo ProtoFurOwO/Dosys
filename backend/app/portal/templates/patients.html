@@ -1,6 +1,7 @@
 {% extends "panel.html" %}
 {% block title %}Pacientes · D.O.S.Y.S Portal clínico{% endblock %}
 {% block content %}
+{% set perms = request.state.permissions or [] %}
 <header class="page-head">
   <div>
     <h1>Pacientes</h1>
@@ -11,7 +12,9 @@
       Personas registradas en el hospital.
       {% endif %}
     </p>
+    {% if 'patients:write' in perms %}
     <a class="btn btn-primary page-cta" href="/portal/pacientes/nuevo">Nuevo paciente</a>
+    {% endif %}
   </div>
   <form class="search" method="get" action="/portal">
     <label class="field-label" for="buscar">Buscar por nombre o CURP</label>
@@ -57,7 +60,13 @@
         <td class="hide-sm">{{ patient.blood_type or "No registrado" }}</td>
         <td class="nowrap">{{ latest_by_patient.get(patient.id) | ultima_visita }}</td>
         <td class="col-action">
+          {% if can_start_consultations %}
           <a class="btn btn-line" href="/portal/pacientes/{{ patient.id }}/consulta">Registrar consulta</a>
+          {% elif 'appointments:write' in perms %}
+          <a class="btn btn-line" href="/portal/pacientes/{{ patient.id }}/cita">Agendar cita</a>
+          {% else %}
+          <a class="btn btn-quiet" href="/portal/pacientes/{{ patient.id }}">Ver expediente</a>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}
