@@ -91,7 +91,10 @@ ACTION_LABELS = {
     "download_document": "Documento descargado (app del paciente)",
     "portal_upload_document": "Documento agregado al expediente",
     "portal_download_document": "Documento descargado del expediente",
-    "portal_verify_document": "Integridad de documento verificada",
+    "portal_verify_document": "Firma electrónica verificada",
+    "portal_view_document_verify": "Pantalla de firma electrónica consultada",
+    "portal_replace_document": "Documento reemplazado y firmado de nuevo",
+    "verify_document": "Firma electrónica verificada desde la app",
     "portal_delete_document": "Documento eliminado del expediente",
 }
 
@@ -119,7 +122,7 @@ DETAIL_KEYS = {
     "username": "usuario",
     "role": "rol",
     "patient_id": "paciente",
-    "sha256": "huella",
+    "sha256": "firma electrónica",
     "resultado": "verificación",
     "intentos": "intentos",
     "bloqueo_min": "bloqueo (min)",

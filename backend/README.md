@@ -78,7 +78,7 @@ Abre `http://127.0.0.1:8000/portal` e inicia sesión con `medico` / `Medico123!`
 5. **Citas**: solo las citas futuras aparecen como próximas; las pasadas quedan en el
    historial. El QR muestra su ventana de validez (2 h antes a 4 h después).
 6. **En espera y laboratorio**: cola de estudios con filtros, inicio, captura de resultado
-   y PDF con huella SHA-256.
+   y PDF con firma electrónica.
 7. **Usuarios**: alta y edición de médicos, activar/desactivar cuentas y restablecer
    contraseñas (siempre mostrando la credencial una vez).
 8. **Actividad**: bitácora con filtros por acción, usuario, entidad, texto y fechas,
@@ -139,7 +139,7 @@ dejar rastro.
 - `POST /portal/pacientes/{id}/estudio-demo` crea una **orden real** sin consulta previa,
   pensada para demostrar la cola en clase. Requiere ficha de médico y `studies:request`.
 - La cola tiene filtros por paciente/CURP/estudio y por estado; `Iniciar` pasa a
-  `in_progress`; `Capturar resultado` genera el PDF con SHA-256.
+  `in_progress`; `Capturar resultado` genera el PDF con firma electrónica.
 - Todo queda auditado: `portal_create_demo_study_order`, `portal_start_study_order`,
   `portal_complete_study_order` y `portal_cancel_study_order`.
 
@@ -389,14 +389,13 @@ GET/PUT/DELETE** y gestión de usuarios restringida al rol médico.
 | CORS restringido a orígenes autorizados | ✅ |
 | Principio de mínimo privilegio | ✅ permisos por rol; el paciente solo ve sus propios datos |
 | Errores sin fuga de información | ✅ mensajes genéricos, sin trazas ni detalles internos |
-| Documentos clínicos íntegros | ✅ huella SHA-256 + sello HMAC y verificación en el portal |
+| Documentos clínicos íntegros | ✅ firma electrónica (SHA-256 + sello HMAC) y verificación en el portal |
 
 ## Documentos clínicos
 
 - El médico sube PDF o imágenes (≤10 MB) al expediente desde el portal; el paciente los
   consulta y descarga desde la app.
-- Cada archivo se guarda en un volumen Docker y se registra con su **huella SHA-256** y un
-  **sello HMAC** del servidor.
-- La pantalla **Verificar** recalcula la huella y valida el sello: si el contenido cambió,
+- Cada archivo se guarda en un volumen Docker y se registra con su **firma electrónica** (SHA-256 + sello HMAC del servidor).
+- La pantalla **Verificar** recalcula la firma y valida el sello: si el contenido cambió,
   lo advierte en lugar de mostrarlo como válido.
 - Toda subida, descarga, verificación y eliminación queda en la bitácora.

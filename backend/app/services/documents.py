@@ -133,6 +133,49 @@ async def store_document_bytes(
     return document
 
 
+async def replace_document(
+    db: AsyncSession,
+    *,
+    document: Document,
+    uploader: User | None,
+    upload: UploadFile,
+) -> Document:
+    """Corrige un documento conservando su identidad y recalculando la firma.
+
+    El archivo anterior se elimina y la bitácora guarda la firma anterior y la
+    nueva. No se reutiliza el nombre de archivo anterior.
+    """
+    content_type = (upload.content_type or "").lower()
+    if content_type not in ALLOWED_TYPES:
+        raise DocumentError("Solo se aceptan PDF, JPG, PNG o WEBP.")
+
+    data = await upload.read()
+    if not data:
+        raise DocumentError("El archivo llegó vacío.")
+    limit = settings.documents_max_mb * 1024 * 1024
+    if len(data) > limit:
+        raise DocumentError(f"El archivo supera el límite de {settings.documents_max_mb} MB.")
+
+    sha256 = compute_sha256(data)
+    stored_name = f"{secrets.token_hex(16)}{ALLOWED_TYPES[content_type]}"
+    new_path = documents_dir() / stored_name
+    new_path.write_bytes(data)
+    old_path = document_path(document)
+
+    document.uploaded_by_user_id = uploader.id if uploader else None
+    document.original_name = Path(upload.filename or "documento").name[:255]
+    document.content_type = content_type
+    document.size_bytes = len(data)
+    document.sha256 = sha256
+    document.stored_name = stored_name
+    document.seal = compute_seal(document_id=document.id, patient_id=document.patient_id, sha256=sha256)
+    await db.flush()
+
+    if old_path != new_path:
+        old_path.unlink(missing_ok=True)
+    return document
+
+
 def document_path(document: Document) -> Path:
     return documents_dir() / document.stored_name
 

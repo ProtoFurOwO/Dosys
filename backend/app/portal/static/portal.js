@@ -543,6 +543,15 @@ if (bmiWeight && bmiHeight && bmiOutput) {
   updateBmi();
 }
 
+// Confirmaciones sin usar onclick inline (la CSP del portal no permite scripts inline).
+document.addEventListener("submit", (event) => {
+  const form = event.target.closest("form[data-confirm]");
+  if (!form) return;
+  if (!window.confirm(form.getAttribute("data-confirm") || "¿Continuar?")) {
+    event.preventDefault();
+  }
+});
+
 // Feedback inmediato: evita dobles envíos en formularios clínicos.
 document.querySelectorAll("form.form").forEach((form) => {
   form.addEventListener("submit", () => {

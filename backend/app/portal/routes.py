@@ -52,6 +52,7 @@ from app.services.documents import (
     check_integrity,
     document_path,
     human_size,
+    replace_document,
     store_document,
     store_document_bytes,
 )
@@ -1384,7 +1385,7 @@ async def patient_detail(
                     "at": prescription.created_at,
                     "title": "Receta médica",
                     "detail": f"{len(prescription.items)} medicamento(s)",
-                    "meta": "Documento firmado con SHA-256",
+                    "meta": "Documento firmado electrónicamente",
                     "url": (
                         f"/portal/documentos/{prescription.document_id}/archivo"
                         if prescription.document_id
@@ -2380,7 +2381,7 @@ async def laboratory_page(
         return forbidden(request, doctor.full_name, "Tu rol no puede consultar el laboratorio.")
 
     messages = {
-        "resultado": "Resultado guardado y protegido con su huella SHA-256.",
+        "resultado": "Resultado guardado y protegido con su firma electrónica.",
         "cancelada": "Orden cancelada.",
         "iniciada": "Orden marcada como en proceso.",
     }
@@ -2935,11 +2936,12 @@ async def document_download(
     return FileResponse(path, media_type=document.content_type, filename=document.original_name)
 
 
-@router.post("/documentos/{document_id:int}/verificar", response_class=HTMLResponse)
-async def document_verify(
+async def _document_verify_page(
     document_id: int,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession,
+    *,
+    audit_action: str | None,
 ) -> HTMLResponse:
     user = await deps.current_doctor(request, db)
     if user is None:
@@ -2957,22 +2959,23 @@ async def document_verify(
     patient = await db.get(Patient, document.patient_id)
     uploader = await db.get(User, document.uploaded_by_user_id) if document.uploaded_by_user_id else None
 
-    await write_audit_event(
-        db,
-        user=user,
-        action="portal_verify_document",
-        entity_type="document",
-        entity_id=document.id,
-        request=request,
-        detail="resultado=intacto" if intact else "resultado=alterado",
-    )
-    await db.commit()
+    if audit_action:
+        await write_audit_event(
+            db,
+            user=user,
+            action=audit_action,
+            entity_type="document",
+            entity_id=document.id,
+            request=request,
+            detail="resultado=intacto" if intact else "resultado=alterado",
+        )
+        await db.commit()
 
     return templates.TemplateResponse(
         request,
         "document_verify.html",
         {
-            "doctor_name": user.username,
+            "doctor_name": user.full_name or user.username,
             "active": "pacientes",
             "document": document,
             "patient": patient,
@@ -2981,7 +2984,81 @@ async def document_verify(
             "current_hash": current_hash,
             "size": human_size(document.size_bytes),
             "category_label": dict(CATEGORIES).get(document.category, document.category),
+            "can_replace": has_permission(user, "documents:write"),
+            "can_delete": has_permission(user, "documents:delete"),
+            "error": request.query_params.get("error"),
+            "reemplazado": request.query_params.get("reemplazado"),
         },
+    )
+
+
+@router.get("/documentos/{document_id:int}/verificar", response_class=HTMLResponse)
+async def document_verify_page(
+    document_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    return await _document_verify_page(
+        document_id, request, db, audit_action="portal_view_document_verify"
+    )
+
+
+@router.post("/documentos/{document_id:int}/verificar", response_class=HTMLResponse)
+async def document_verify(
+    document_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    return await _document_verify_page(
+        document_id, request, db, audit_action="portal_verify_document"
+    )
+
+
+@router.post("/documentos/{document_id:int}/reemplazar")
+async def document_replace(
+    document_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Corrige el archivo de un documento y vuelve a firmarlo."""
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    if not has_permission(user, "documents:write"):
+        return RedirectResponse(
+            f"/portal/documentos/{document_id}/verificar?error=Sin+permiso+para+reemplazar",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    document = await db.get(Document, document_id)
+    if document is None:
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": user.username}, status_code=status.HTTP_404_NOT_FOUND
+        )
+
+    previous_sha = document.sha256
+    try:
+        await replace_document(db, document=document, uploader=user, upload=file)
+    except DocumentError as error:
+        return RedirectResponse(
+            f"/portal/documentos/{document_id}/verificar?error={quote(str(error))}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    await write_audit_event(
+        db,
+        user=user,
+        action="portal_replace_document",
+        entity_type="document",
+        entity_id=document.id,
+        request=request,
+        detail=f"patient_id={document.patient_id} old_sha256={previous_sha[:16]} new_sha256={document.sha256[:16]}",
+    )
+    await db.commit()
+    return RedirectResponse(
+        f"/portal/documentos/{document.id}/verificar?reemplazado=1",
+        status_code=status.HTTP_303_SEE_OTHER,
     )
 
 

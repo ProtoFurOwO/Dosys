@@ -22,12 +22,12 @@ from app.schemas.appointment import (
     AppointmentResponse,
 )
 from app.schemas.consultation import ConsultationResponse
-from app.schemas.document import DocumentResponse
+from app.schemas.document import DocumentIntegrityResponse, DocumentResponse
 from app.schemas.laboratory import PrescriptionItemResponse, PrescriptionResponse, StudyOrderResponse
 from app.schemas.patient import PatientProfileResponse
 from app.services import checkin, rate_limit
 from app.services.audit import write_audit_event
-from app.services.documents import document_path
+from app.services.documents import check_integrity, document_path
 
 
 router = APIRouter(prefix="/patients", tags=["Paciente"])
@@ -299,6 +299,45 @@ async def download_my_document(
     )
     await db.commit()
     return FileResponse(path, media_type=document.content_type, filename=document.original_name)
+
+
+@router.get("/me/documents/{document_id}/verify", response_model=DocumentIntegrityResponse)
+async def verify_my_document(
+    document_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.PATIENT)),
+) -> DocumentIntegrityResponse:
+    """Verifica la firma electrónica del documento sin exponer otros archivos."""
+    patient = await get_patient_for_user(db, current_user)
+    document = await db.scalar(
+        select(Document).where(Document.id == document_id, Document.patient_id == patient.id)
+    )
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado")
+
+    intact, current_signature = check_integrity(document)
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="verify_document",
+        entity_type="document",
+        entity_id=document.id,
+        request=request,
+        detail="resultado=intacto" if intact else "resultado=alterado",
+    )
+    await db.commit()
+    return DocumentIntegrityResponse(
+        id=document.id,
+        intact=intact,
+        registered_signature=document.sha256,
+        current_signature=current_signature,
+        message=(
+            "Firma electrónica válida. El archivo no ha cambiado."
+            if intact
+            else "Documento alterado. La firma electrónica no coincide."
+        ),
+    )
 
 
 async def _confirm_checkin(
