@@ -215,7 +215,9 @@ a {
 }
 
 .nav-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 9px 10px;
   border-radius: var(--radius-sm);
   color: var(--ink-soft);
@@ -3804,4 +3806,11 @@ body.login {
   font-size: 9px;
   font-weight: 700;
   font-family: inherit;
+}
+
+.nav-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  opacity: 0.75;
 }
