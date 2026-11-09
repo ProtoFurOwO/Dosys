@@ -93,22 +93,55 @@ a {
   min-height: 100dvh;
 }
 
+/* Menú lateral fijo: usuario y engranaje siempre a la altura de la ventana. */
 .rail {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  height: 100dvh;
+  box-sizing: border-box;
+  z-index: 20;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 24px;
   padding: 22px 18px;
   background: var(--surface);
-  border-right: 1px solid var(--line);
+  border-right: 0;
+}
+
+/* Si la ventana es baja, solo se desplaza la navegación; el pie del menú no se mueve. */
+.rail-top {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: -6px;
+  padding: 6px;
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  max-width: 100%;
+  border-radius: var(--radius-sm);
   text-decoration: none;
   color: inherit;
+}
+
+.brand-logo {
+  display: block;
+  height: 56px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.brand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
 }
 
 .brand-text strong {
@@ -182,7 +215,9 @@ a {
 }
 
 .nav-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 9px 10px;
   border-radius: var(--radius-sm);
   color: var(--ink-soft);
@@ -202,8 +237,14 @@ a {
 }
 
 .rail-bottom {
-  display: grid;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+  background: var(--surface);
 }
 
 .who {
@@ -217,13 +258,134 @@ a {
   font-weight: 500;
 }
 
+.who-role {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.6875rem;
+  color: var(--ink-muted);
+}
+
+/* ── Engranaje de cuenta ───────────────────────────────────────────────────── */
+
+.gear {
+  position: relative;
+}
+
+.gear-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  cursor: pointer;
+  list-style: none;
+}
+
+.gear-button::-webkit-details-marker {
+  display: none;
+}
+
+.gear-button:hover {
+  background: var(--line-soft);
+  color: var(--ink);
+}
+
+.gear-button.is-active,
+.gear[open] .gear-button {
+  background: var(--accent-tint);
+  color: var(--accent-deep);
+}
+
+.gear-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.gear-menu {
+  position: absolute;
+  left: calc(100% + 12px);
+  bottom: 0;
+  width: 232px;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(23, 33, 27, 0.12);
+}
+
+.gear-title {
+  margin: 8px 10px 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.gear-title:first-child {
+  margin-top: 4px;
+}
+
+.gear-item {
+  display: block;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: 0.9375rem;
+  text-align: left;
+  text-decoration: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.gear-item:hover {
+  background: var(--line-soft);
+  color: var(--ink);
+}
+
+.gear-item.is-active {
+  background: var(--accent-tint);
+  color: var(--accent-deep);
+  font-weight: 500;
+}
+
+.gear-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.gear-logout {
+  margin: 6px 0 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.gear-item-danger {
+  color: var(--error-ink);
+}
+
+.gear-item-danger:hover {
+  background: var(--error-bg);
+  color: var(--error-ink);
+}
+
 .main {
   min-width: 0;
+  border-left: 1px solid var(--line);
 }
 
 .content {
   max-width: 1080px;
   padding: 36px 40px 72px;
+}
+
+.content-wide {
+  max-width: 1400px;
 }
 
 /* ── Encabezado de página ──────────────────────────────────────────────────── */
@@ -595,6 +757,37 @@ a {
   display: inline;
 }
 
+.table-users .col-name { min-width: 200px; }
+.table-users .col-role { min-width: 250px; width: auto; }
+.table-users .role-form { flex-wrap: nowrap; white-space: nowrap; }
+.table-users .col-action { width: 1%; white-space: nowrap; }
+.table-users .row-actions { flex-wrap: nowrap; }
+
+/* El menú emergente no puede quedar dentro de un contenedor con scroll */
+.table-wrap-open { overflow: visible; }
+
+.more { position: relative; }
+.more-button { display: inline-flex; align-items: center; gap: 4px; list-style: none; cursor: pointer; }
+.more-button::-webkit-details-marker { display: none; }
+.more[open] .more-button { background: var(--accent-tint); color: var(--accent-deep); }
+.more-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.more-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 15;
+  min-width: 220px;
+  padding: 6px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(23, 33, 27, 0.12);
+}
+.more-menu form { display: block; margin: 0; }
+.more-menu .more-sep { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line-soft); }
+
 .filters {
   display: flex;
   align-items: flex-end;
@@ -902,12 +1095,45 @@ body.login {
 }
 
 .login-intro {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: center;
   padding: 48px clamp(28px, 6vw, 72px);
   background: var(--canvas);
   border-right: 1px solid var(--line);
+}
+
+/* Imagen de fondo en capa propia: la opacidad no afecta al logo ni al texto. */
+.login-intro::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url("img/FondoLogin.jpg") center / cover no-repeat;
+  opacity: 0.75;
+}
+
+/* Velo de legibilidad: la foto tiene sillones oscuros justo detrás del texto. */
+.login-intro::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(243, 245, 243, 0.84) 0%,
+    rgba(243, 245, 243, 0.8) 70%,
+    rgba(243, 245, 243, 0.45) 100%
+  );
+}
+
+/* La nota inferior necesita algo más de peso para pasar 4.5:1 sobre la foto. */
+.login-intro .login-caption {
+  color: var(--ink-soft) !important;
 }
 
 .login-intro h1 {
@@ -939,6 +1165,17 @@ body.login {
   align-items: center;
   justify-content: center;
   padding: 48px clamp(28px, 6vw, 80px);
+}
+
+/* En el acceso el logo sustituye al antiguo bloque de texto y se muestra grande. */
+.login-brand .brand-logo {
+  height: 104px;
+}
+
+@media (max-width: 920px) {
+  .login-brand .brand-logo {
+    height: 84px;
+  }
 }
 
 .login-form {
@@ -1263,6 +1500,9 @@ body.login {
   }
 
   .rail {
+    position: static;
+    height: auto;
+    align-self: stretch;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
@@ -1273,12 +1513,27 @@ body.login {
     padding: 14px 18px;
   }
 
+  .rail-top {
+    overflow: visible;
+    margin: 0;
+    padding: 0;
+  }
+
+  .main {
+    border-left: 0;
+  }
+
   .brand {
     margin-right: auto;
   }
 
+  .brand-logo {
+    height: 44px;
+  }
+
   .nav {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
     margin-top: 0;
   }
@@ -1287,11 +1542,30 @@ body.login {
     display: flex;
     align-items: center;
     gap: 12px;
+    border-top: 0;
+    padding-top: 0;
   }
 
   .who {
     display: none;
   }
+
+  .gear {
+    position: static;
+  }
+
+  .gear-menu {
+    left: 18px;
+    right: 18px;
+    bottom: auto;
+    top: calc(100% + 8px);
+    width: auto;
+    max-width: none;
+  }
+
+  .table-wrap-open { overflow-x: auto; }
+  .more-menu { position: static; margin-top: 6px; min-width: 0; box-shadow: none; }
+  .table-users .row-actions { flex-wrap: wrap; }
 
   .content {
     padding: 26px 20px 60px;
@@ -1336,6 +1610,11 @@ body.login {
     padding: 36px 24px;
   }
 
+  /* En una columna el texto ocupa casi todo el panel: el velo ya no se aclara. */
+  .login-intro::after {
+    background: linear-gradient(180deg, rgba(243, 245, 243, 0.88), rgba(243, 245, 243, 0.84));
+  }
+
   .login-panel {
     padding: 36px 24px 64px;
   }
@@ -1373,6 +1652,10 @@ body.login {
 
   .login-intro h1 {
     font-size: 1.625rem;
+  }
+
+  .login-brand .brand-logo {
+    height: 72px;
   }
 
   .field-row {
@@ -2823,3 +3106,711 @@ body.login {
   }
 }
 
+
+/* ── Expediente clínico y nuevas herramientas ─────────────────────────────── */
+
+.error-list {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.error-list li {
+  margin: 2px 0;
+}
+
+.clinical-alerts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.clinical-alert {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  background: #fbfcfb;
+}
+
+.clinical-alert.is-warning {
+  border-color: #e4c98f;
+  background: #fffaf0;
+}
+
+.clinical-alert-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 4px;
+}
+
+.clinical-alert p {
+  margin: 0;
+  white-space: pre-line;
+}
+
+.demo-study {
+  margin-top: 14px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px 14px;
+  background: #fbfcfb;
+}
+
+.demo-study > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent-deep);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.demo-study > summary::marker {
+  color: var(--accent);
+}
+
+.demo-study .form {
+  margin-top: 12px;
+}
+
+.lab-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.lab-stat {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  background: #fbfcfb;
+}
+
+.lab-stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.lab-stat-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  margin-top: 2px;
+}
+
+.result-details > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.result-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.result-form {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  min-width: 280px;
+}
+
+.checkin-window {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+  .clinical-alerts {
+    grid-template-columns: 1fr;
+  }
+  .lab-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── Inicio clínico: jerarquía visual y lectura rápida ─────────────────────── */
+.eyebrow {
+  margin: 0 0 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-deep);
+}
+
+.dashboard-head {
+  align-items: flex-start;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 12px;
+  margin: 18px 0 20px;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 104px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.stat-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.stat-card-accent {
+  border-color: #c9d9cd;
+  background: #f3f8f4;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.stat-card strong {
+  font-size: 1.9rem;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.stat-note {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.dash-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 16px 18px;
+}
+
+.dash-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.dash-card-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.dash-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.dash-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.dash-row:first-child {
+  border-top: 0;
+}
+
+.dash-time {
+  flex: none;
+  width: 62px;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  color: var(--accent-deep);
+}
+
+.dash-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dash-main .link {
+  font-weight: 600;
+}
+
+.dash-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.wait-badge {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #fff7e6;
+  color: #8a5a00;
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.wait-badge small {
+  font-size: 0.58rem;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.empty-inline {
+  margin: 4px 0 0;
+  padding: 18px 4px;
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+}
+
+.dash-activity .dash-row {
+  padding: 8px 0;
+}
+
+/* ── Nota clínica SOAP y signos vitales ───────────────────────────────────── */
+.soap-guide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.soap-guide span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  background: var(--surface);
+}
+
+.soap-guide b {
+  color: var(--accent-deep);
+}
+
+.soap-block {
+  margin: 0 0 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.soap-heading {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.soap-letter {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--accent-tint);
+  color: var(--accent-deep);
+  font-weight: 800;
+}
+
+.soap-heading .section-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.soap-heading .page-note {
+  margin: 2px 0 0;
+}
+
+.soap-subblock {
+  margin-top: 14px;
+}
+
+.vitals-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.input-unit {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  overflow: hidden;
+}
+
+.input-unit input {
+  border: 0;
+  border-radius: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.input-unit span {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  background: #f4f7f5;
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bmi-output {
+  display: block;
+  min-height: 40px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #f7faf8;
+  font-weight: 700;
+  color: var(--accent-deep);
+}
+
+.vitals-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.vitals-summary span {
+  font-size: 0.875rem;
+}
+
+.vitals-summary b {
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+.chart-wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1100px) {
+  .vitals-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 920px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dash-row {
+    align-items: flex-start;
+  }
+  .dash-meta {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 620px) {
+  .stats-grid,
+  .vitals-grid {
+    grid-template-columns: 1fr;
+  }
+  .dash-row {
+    flex-wrap: wrap;
+  }
+  .dash-time {
+    width: auto;
+  }
+}
+
+/* ── Línea de tiempo clínica ───────────────────────────────────────────────── */
+.clinical-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 6px;
+  position: relative;
+}
+
+.clinical-timeline::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 13px;
+  width: 2px;
+  background: var(--line);
+}
+
+.timeline-item {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  padding: 0 0 18px;
+}
+
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-dot {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  border: 3px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.timeline-estudio .timeline-dot {
+  background: #2563eb;
+}
+
+.timeline-receta .timeline-dot {
+  background: #7c3aed;
+}
+
+.timeline-documento .timeline-dot {
+  background: #6b7280;
+}
+
+.timeline-body {
+  min-width: 0;
+}
+
+.timeline-when {
+  margin: 0 0 2px;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+.timeline-kind {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #f1f5f2;
+  color: var(--ink-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.timeline-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.timeline-detail {
+  margin: 2px 0 0;
+  font-size: 0.875rem;
+}
+
+/* ── Flujo visual de la cita ───────────────────────────────────────────────── */
+.appointment-flow {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.appointment-flow li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+
+.appointment-flow li span {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.appointment-flow li.is-done {
+  color: var(--ink);
+}
+
+.appointment-flow li.is-done span {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  color: var(--accent-deep);
+}
+
+.appointment-flow li.is-current {
+  font-weight: 700;
+}
+
+.appointment-flow li.is-current span {
+  background: var(--accent);
+  color: #fff;
+}
+
+@media (max-width: 700px) {
+  .appointment-flow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media print {
+  .rail,
+  .page-actions,
+  .btn,
+  .form-actions,
+  .gear,
+  .soap-guide,
+  .back-link {
+    display: none !important;
+  }
+  .shell {
+    display: block;
+  }
+  .main {
+    padding: 0;
+  }
+  .content {
+    max-width: none;
+    padding: 0;
+  }
+  body {
+    background: #fff;
+  }
+  .chart,
+  .soap-block,
+  .dash-card {
+    break-inside: avoid;
+  }
+}
+
+/* ── Solicitudes de cita desde la app ─────────────────────────────────────── */
+.status-pill-requested {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.dot-amber {
+  background: #f59e0b;
+}
+
+/* ── Gráfica de actividad clínica ─────────────────────────────────────────── */
+.chart-card {
+  margin-bottom: 16px;
+}
+
+.chart-total {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bar-chart {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  margin-top: 4px;
+}
+
+.bar {
+  fill: var(--accent);
+  opacity: 0.85;
+}
+
+.bar:hover {
+  opacity: 1;
+}
+
+.bar-label {
+  fill: var(--ink-muted);
+  font-size: 8px;
+  font-family: inherit;
+}
+
+.bar-value {
+  fill: var(--accent-deep);
+  font-size: 9px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.nav-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  opacity: 0.75;
+}

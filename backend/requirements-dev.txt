@@ -1,0 +1,3 @@
+# Dependencias solo para ejecutar los scripts de aceptación desde la PC.
+-r requirements.txt
+requests>=2.31

@@ -1,5 +1,6 @@
 {% extends "panel.html" %}
 {% block title %}Usuarios · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content_class %}content-wide{% endblock %}
 {% block content %}
 <header class="page-head">
   <div>
@@ -18,15 +19,21 @@
 {% if aviso == 'no-encontrado' %}
 <div class="note note-error" role="alert">No encontramos ese usuario o ese rol.</div>
 {% endif %}
+{% if aviso == 'dispositivo' %}
+<div class="note note-ok" role="status">Dispositivo de confianza liberado. El paciente podrá entrar desde un teléfono nuevo y volverá a registrarlo.</div>
+{% endif %}
+{% if aviso == 'sin-dispositivo' %}
+<div class="note note-info" role="status">Ese usuario no tenía un dispositivo de confianza activo.</div>
+{% endif %}
 
 {% if staff %}
-<div class="table-wrap">
-  <table class="table">
+<div class="table-wrap table-wrap-open">
+  <table class="table table-users">
     <thead>
       <tr>
-        <th scope="col">Nombre</th>
+        <th scope="col" class="col-name">Nombre</th>
         <th scope="col">Usuario</th>
-        <th scope="col">Rol</th>
+        <th scope="col" class="col-role">Rol</th>
         <th scope="col">Estado</th>
         <th scope="col" class="hide-sm">Último acceso</th>
         <th scope="col" class="col-action"><span class="visually-hidden">Acciones</span></th>
@@ -70,25 +77,41 @@
         <td class="hide-sm nowrap">{{ person.last_access | fecha_hora }}</td>
         <td class="col-action">
           <div class="row-actions">
-            {% if person.totp_enabled %}
-            <form method="post" action="/portal/usuarios/{{ person.id }}/reset-2fa">
-              <button class="btn btn-quiet" type="submit" title="Para quien perdió el teléfono y sus códigos">Reiniciar 2FA</button>
-            </form>
-            {% endif %}
-            {% if person.locked %}
-            <form method="post" action="/portal/usuarios/{{ person.id }}/desbloquear">
-              <button class="btn btn-line" type="submit">Desbloquear</button>
-            </form>
-            {% endif %}
             <a class="btn btn-line" href="/portal/usuarios/{{ person.id }}/editar">Editar</a>
-            <form method="post" action="/portal/usuarios/{{ person.id }}/reset">
-              <button class="btn btn-quiet" type="submit">Restablecer</button>
-            </form>
-            <form method="post" action="/portal/usuarios/{{ person.id }}/estado">
-              <button class="btn btn-quiet" type="submit" {% if person.is_self %}disabled title="Es tu propia cuenta"{% endif %}>
-                {% if person.active %}Desactivar{% else %}Activar{% endif %}
-              </button>
-            </form>
+            <details class="more" data-more>
+              <summary class="btn btn-quiet more-button" aria-label="Más acciones de {{ person.username }}">
+                Más
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </summary>
+              <div class="more-menu">
+                {% if person.locked %}
+                <form method="post" action="/portal/usuarios/{{ person.id }}/desbloquear">
+                  <button class="gear-item" type="submit">Desbloquear</button>
+                </form>
+                {% endif %}
+                {% if person.role_code == 'patient' %}
+                <a class="gear-item" href="/portal/usuarios/{{ person.id }}/dispositivos">Dispositivos de confianza</a>
+                <form method="post" action="/portal/usuarios/{{ person.id }}/liberar-dispositivo">
+                  <button class="gear-item" type="submit" title="Permite que el paciente vuelva a entrar desde otro teléfono">Restablecer todos los dispositivos</button>
+                </form>
+                {% endif %}
+                <form method="post" action="/portal/usuarios/{{ person.id }}/reset">
+                  <button class="gear-item" type="submit">Restablecer contraseña</button>
+                </form>
+                {% if person.totp_enabled %}
+                <form method="post" action="/portal/usuarios/{{ person.id }}/reset-2fa">
+                  <button class="gear-item" type="submit" title="Para quien perdió el teléfono y sus códigos">Reiniciar 2FA</button>
+                </form>
+                {% endif %}
+                <form class="more-sep" method="post" action="/portal/usuarios/{{ person.id }}/estado">
+                  <button class="gear-item {% if person.active %}gear-item-danger{% endif %}" type="submit"
+                          {% if person.is_self %}disabled title="Es tu propia cuenta"{% endif %}>
+                    {% if person.active %}Desactivar{% else %}Activar{% endif %}
+                  </button>
+                </form>
+              </div>
+            </details>
           </div>
         </td>
       </tr>

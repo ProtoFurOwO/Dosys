@@ -4,12 +4,13 @@ Seguridad: cookie de sesión HttpOnly con el mismo JWT de la API, rol médico
 validado en el servidor en cada petición, y bitácora de todos los accesos.
 """
 
+from collections import Counter
 from datetime import date, datetime, time, timedelta, timezone
 import re
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,6 +24,7 @@ from app.core.security import (
 )
 from app.db.session import get_db
 from app.models.appointment import Appointment
+from app.models.audit_log import AuditLog
 from app.models.consultation import Consultation
 from app.models.doctor import Doctor
 from app.models.document import Document
@@ -33,11 +35,16 @@ from app.models.prescription import Prescription, PrescriptionItem
 from app.models.study_order import StudyOrder
 from app.models.user import User
 from app.portal import deps
-from app.portal.labels import ROLE_LABELS
+from app.portal.labels import ROLE_LABELS, action_label
 from app.portal.qr import qr_svg
 from app.portal.templating import credential_context, templates
-from app.services import accounts, email, login_security, rate_limit, two_factor
-from app.services.appointments import AppointmentError, create_appointment, ensure_available
+from app.services import accounts, checkin, email, login_security, rate_limit, two_factor
+from app.services.appointments import (
+    AppointmentError,
+    create_appointment,
+    ensure_available,
+    generate_checkin_code,
+)
 from app.services.audit import write_audit_event
 from app.services.consultations import create_consultation
 from app.services.documents import (
@@ -46,12 +53,13 @@ from app.services.documents import (
     check_integrity,
     document_path,
     human_size,
+    replace_document,
     store_document,
     store_document_bytes,
 )
 from app.services.lab import LabError, complete_order, create_orders
 from app.services.permissions import has_permission, permission_codes
-from app.services.reports import build_prescription_pdf
+from app.services.reports import build_consultation_pdf, build_prescription_pdf
 from app.services.users import (
     CURP_PATTERN,
     EMAIL_PATTERN,
@@ -70,10 +78,12 @@ REFRESH_COOKIE = "dosys_portal_refresh"
 REASON_MIN, REASON_MAX = 3, 300
 DIAGNOSIS_MIN, DIAGNOSIS_MAX = 3, 500
 NOTES_MAX = 4000
+CLINICAL_MAX = 2000
 SPECIALTY_MIN, SPECIALTY_MAX = 3, 120
 LOCATION_MIN, LOCATION_MAX = 3, 160
 
 STATUS_LABELS = {
+    AppointmentStatus.REQUESTED: "Solicitada",
     AppointmentStatus.SCHEDULED: "Agendada",
     AppointmentStatus.CONFIRMED: "Confirmada",
     AppointmentStatus.ATTENDED: "Atendida",
@@ -81,6 +91,89 @@ STATUS_LABELS = {
 }
 
 BLOOD_TYPES = ("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")
+
+BP_PATTERN = re.compile(r"^\d{2,3}/\d{2,3}$")
+
+
+def _optional_int(
+    raw: str, *, key: str, label: str, minimum: int, maximum: int, errors: dict[str, str]
+) -> int | None:
+    clean = raw.strip()
+    if not clean:
+        return None
+    try:
+        value = int(clean)
+    except ValueError:
+        errors[key] = f"{label}: usa un número entero."
+        return None
+    if not minimum <= value <= maximum:
+        errors[key] = f"{label}: debe estar entre {minimum} y {maximum}."
+        return None
+    return value
+
+
+def _optional_float(
+    raw: str, *, key: str, label: str, minimum: float, maximum: float, errors: dict[str, str]
+) -> float | None:
+    clean = raw.strip()
+    if not clean:
+        return None
+    try:
+        value = float(clean)
+    except ValueError:
+        errors[key] = f"{label}: usa un número válido."
+        return None
+    if not minimum <= value <= maximum:
+        errors[key] = f"{label}: debe estar entre {minimum:g} y {maximum:g}."
+        return None
+    return round(value, 2)
+
+
+def _parse_vitals(values: dict[str, str], errors: dict[str, str]) -> dict:
+    """Valida y convierte el bloque objetivo del SOAP."""
+    blood_pressure = values["blood_pressure"].strip()
+    if blood_pressure and not BP_PATTERN.match(blood_pressure):
+        errors["blood_pressure"] = "Presión arterial: usa el formato 120/80."
+    physical_exam = values["physical_exam"].strip()
+    if len(physical_exam) > NOTES_MAX:
+        errors["physical_exam"] = f"La exploración física no debe pasar de {NOTES_MAX} caracteres."
+    return {
+        "blood_pressure": blood_pressure or None,
+        "heart_rate": _optional_int(
+            values["heart_rate"], key="heart_rate", label="Frecuencia cardiaca", minimum=30, maximum=220, errors=errors
+        ),
+        "respiratory_rate": _optional_int(
+            values["respiratory_rate"],
+            key="respiratory_rate",
+            label="Frecuencia respiratoria",
+            minimum=5,
+            maximum=80,
+            errors=errors,
+        ),
+        "temperature_c": _optional_float(
+            values["temperature_c"],
+            key="temperature_c",
+            label="Temperatura",
+            minimum=30,
+            maximum=45,
+            errors=errors,
+        ),
+        "oxygen_saturation": _optional_int(
+            values["oxygen_saturation"],
+            key="oxygen_saturation",
+            label="Saturación de oxígeno",
+            minimum=50,
+            maximum=100,
+            errors=errors,
+        ),
+        "weight_kg": _optional_float(
+            values["weight_kg"], key="weight_kg", label="Peso", minimum=1, maximum=400, errors=errors
+        ),
+        "height_cm": _optional_float(
+            values["height_cm"], key="height_cm", label="Talla", minimum=30, maximum=250, errors=errors
+        ),
+        "physical_exam": physical_exam or None,
+    }
 
 ROOMS = ("Consultorio 1", "Consultorio 2", "Consultorio 3", "Consultorio 4")
 
@@ -194,7 +287,7 @@ async def login_page(
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     if await deps.current_doctor(request, db) is not None:
-        return RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse("/portal/inicio", status_code=status.HTTP_303_SEE_OTHER)
 
     # Sesión renovable: si el acceso expiró pero el token de renovación sigue
     # vivo, se emite un acceso nuevo sin pedir credenciales otra vez.
@@ -202,10 +295,10 @@ async def login_page(
     if refresh_token:
         rotated = await accounts.rotate_refresh_token(db, refresh_token)
         if rotated is not None:
-            user, new_refresh = rotated
+            user, new_refresh, _device_hash = rotated
             await db.commit()
             token, expires_in = create_access_token(user.id, user.role.code, sorted(permission_codes(user)))
-            response = RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER)
+            response = RedirectResponse("/portal/inicio", status_code=status.HTTP_303_SEE_OTHER)
             return set_session_cookie(response, token, expires_in, new_refresh)
 
     notice = "Tu contraseña quedó actualizada. Inicia sesión con la nueva." if restablecida else None
@@ -247,7 +340,7 @@ async def login_submit(
                 f"Intenta de nuevo en {login_security.lock_minutes_left(user)} minutos."
             ),
             username=username.strip(),
-            code=status.HTTP_423_LOCKED,
+            code=status.HTTP_429_TOO_MANY_REQUESTS,
         )
 
     if user is None or not user.is_active or not verify_password(password, user.password_hash):
@@ -336,7 +429,7 @@ async def login_submit(
     await db.commit()
 
     return set_session_cookie(
-        RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER), token, expires_in, refresh_token
+        RedirectResponse("/portal/inicio", status_code=status.HTTP_303_SEE_OTHER), token, expires_in, refresh_token
     )
 
 
@@ -425,7 +518,7 @@ async def two_factor_submit(
     )
     await db.commit()
 
-    response = RedirectResponse("/portal", status_code=status.HTTP_303_SEE_OTHER)
+    response = RedirectResponse("/portal/inicio", status_code=status.HTTP_303_SEE_OTHER)
     response.delete_cookie(TWO_FACTOR_COOKIE, path="/portal")
     return set_session_cookie(response, token, expires_in, refresh_token)
 
@@ -838,6 +931,277 @@ async def reset_submit(
     return RedirectResponse("/portal/login?restablecida=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
+# ── Inicio clínico (dashboard por rol) ────────────────────────────────────────
+
+
+@router.get("/inicio", response_class=HTMLResponse)
+async def clinical_dashboard(request: Request, db: AsyncSession = Depends(get_db)) -> HTMLResponse:
+    """Vista de inicio distinta por rol: agenda, espera, laboratorio y actividad."""
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await portal_staff(db, user)
+
+    perms = request.state.permissions or set()
+    can_patients = "patients:read" in perms
+    can_appointments = "appointments:read" in perms
+    can_consultations = "consultations:read" in perms
+    can_studies = "studies:read" in perms
+    can_audit = "audit:read" in perms
+    can_users = "users:manage" in perms
+
+    clinic_today = deps.clinic_now().date()
+    day_start = datetime.combine(clinic_today, time.min, tzinfo=deps.CLINIC_TIMEZONE).astimezone(timezone.utc)
+    day_end = datetime.combine(clinic_today, time.max, tzinfo=deps.CLINIC_TIMEZONE).astimezone(timezone.utc)
+    now_utc = datetime.now(timezone.utc)
+
+    appointments_today: list[dict] = []
+    if can_appointments:
+        rows = (
+            await db.execute(
+                select(Appointment, Patient, Doctor)
+                .join(Patient, Appointment.patient_id == Patient.id)
+                .outerjoin(Doctor, Appointment.doctor_id == Doctor.id)
+                .where(Appointment.scheduled_at >= day_start, Appointment.scheduled_at <= day_end)
+                .order_by(Appointment.scheduled_at.asc())
+                .limit(30)
+            )
+        ).all()
+        appointments_today = [
+            {
+                "id": appointment.id,
+                "time": deps.format_time(appointment.scheduled_at),
+                "patient_name": patient.full_name,
+                "patient_id": patient.id,
+                "specialty": appointment.specialty,
+                "status": appointment.status.value,
+                "status_label": STATUS_LABELS.get(appointment.status, appointment.status.value),
+                "room": appointment.room or appointment.location,
+                "checked_in": appointment.checked_in_at is not None,
+            }
+            for appointment, patient, _doctor in rows
+        ]
+
+    waiting: list[dict] = []
+    if can_appointments:
+        rows = (
+            await db.execute(
+                select(Appointment, Patient, Doctor)
+                .join(Patient, Appointment.patient_id == Patient.id)
+                .outerjoin(Doctor, Appointment.doctor_id == Doctor.id)
+                .where(Appointment.checked_in_at.is_not(None), Appointment.status != AppointmentStatus.ATTENDED)
+                .order_by(Appointment.checked_in_at.asc())
+                .limit(20)
+            )
+        ).all()
+        waiting = [
+            {
+                "id": appointment.id,
+                "patient_name": patient.full_name,
+                "patient_id": patient.id,
+                "room": appointment.room or "Sin asignar",
+                "specialty": appointment.specialty,
+                "waited": max(0, int((now_utc - appointment.checked_in_at).total_seconds() // 60)),
+                "checked_in": deps.format_time(appointment.checked_in_at),
+            }
+            for appointment, patient, _doctor in rows
+        ]
+
+    requested_appointments: list[dict] = []
+    if can_appointments:
+        rows = (
+            await db.execute(
+                select(Appointment, Patient, Doctor)
+                .join(Patient, Appointment.patient_id == Patient.id)
+                .outerjoin(Doctor, Appointment.doctor_id == Doctor.id)
+                .where(
+                    Appointment.status == AppointmentStatus.REQUESTED,
+                    Appointment.scheduled_at >= now_utc,
+                )
+                .order_by(Appointment.scheduled_at.asc())
+                .limit(8)
+            )
+        ).all()
+        requested_appointments = [
+            {
+                "id": appointment.id,
+                "patient_name": patient.full_name,
+                "patient_id": patient.id,
+                "doctor_name": doctor_row.full_name if doctor_row else "Sin médico",
+                "specialty": appointment.specialty,
+                "scheduled_at": deps.format_datetime(appointment.scheduled_at),
+            }
+            for appointment, patient, doctor_row in rows
+        ]
+
+    pending_studies: list[dict] = []
+    if can_studies:
+        rows = (
+            await db.execute(
+                select(StudyOrder, Patient, LabStudy)
+                .join(Patient, StudyOrder.patient_id == Patient.id)
+                .join(LabStudy, StudyOrder.study_id == LabStudy.id)
+                .where(
+                    StudyOrder.status.in_([StudyOrderStatus.REQUESTED, StudyOrderStatus.IN_PROGRESS])
+                )
+                .order_by(StudyOrder.requested_at.asc())
+                .limit(12)
+            )
+        ).all()
+        pending_studies = [
+            {
+                "id": order.id,
+                "patient_name": patient.full_name,
+                "patient_id": patient.id,
+                "study": study.name,
+                "status": order.status.value,
+                "status_label": STUDY_STATUS_LABELS.get(order.status, order.status.value),
+                "requested": deps.format_time(order.requested_at),
+            }
+            for order, patient, study in rows
+        ]
+
+    recent_consultations: list[dict] = []
+    if can_consultations:
+        rows = (
+            await db.execute(
+                select(Consultation, Patient, Doctor)
+                .join(Patient, Consultation.patient_id == Patient.id)
+                .join(Doctor, Consultation.doctor_id == Doctor.id)
+                .order_by(Consultation.created_at.desc())
+                .limit(6)
+            )
+        ).all()
+        recent_consultations = [
+            {
+                "id": consultation.id,
+                "patient_name": patient.full_name,
+                "patient_id": patient.id,
+                "diagnosis": consultation.diagnosis,
+                "doctor_name": doctor_row.full_name,
+                "at": deps.format_time(consultation.created_at),
+            }
+            for consultation, patient, doctor_row in rows
+        ]
+
+    recent_activity: list[dict] = []
+    if can_audit:
+        rows = (
+            await db.execute(
+                select(AuditLog, User)
+                .outerjoin(User, AuditLog.user_id == User.id)
+                .order_by(AuditLog.id.desc())
+                .limit(8)
+            )
+        ).all()
+        recent_activity = [
+            {
+                "label": action_label(log.action),
+                "actor": actor.username if actor else "Sistema",
+                "at": deps.format_time(log.created_at),
+                "entity": log.entity_type,
+            }
+            for log, actor in rows
+        ]
+
+    can_start_consultations = has_permission(user, "consultations:write") and isinstance(doctor, Doctor)
+
+    consultation_chart = []
+    chart_total = 0
+    if can_consultations:
+        chart_start = day_start - timedelta(days=6)
+        timestamps = (
+            await db.scalars(
+                select(Consultation.created_at).where(Consultation.created_at >= chart_start)
+            )
+        ).all()
+        counts = Counter(deps._local(moment).date() for moment in timestamps)
+        chart_total = sum(counts.values())
+        max_count = max(counts.values(), default=0)
+        for offset in range(6, -1, -1):
+            chart_day = clinic_today - timedelta(days=offset)
+            count = counts.get(chart_day, 0)
+            height = (count / max_count * 64) if max_count else 0
+            consultation_chart.append(
+                {
+                    "label": f"{chart_day.day} {deps.MESES[chart_day.month - 1]}",
+                    "count": count,
+                    "height": round(height, 1),
+                    "y": round(74 - height, 1),
+                }
+            )
+
+    stats = {
+        "appointments": len(appointments_today),
+        "waiting": len(waiting),
+        "requested": len(requested_appointments),
+        "pending_studies": len(pending_studies),
+        "consultations": 0,
+        "patients": 0,
+        "users": 0,
+    }
+    if can_consultations:
+        stats["consultations"] = (
+            await db.scalar(
+                select(func.count(Consultation.id)).where(Consultation.created_at >= day_start)
+            )
+            or 0
+        )
+    if can_patients:
+        stats["patients"] = await db.scalar(select(func.count(Patient.id))) or 0
+    if can_users:
+        stats["users"] = await db.scalar(select(func.count(User.id))) or 0
+
+    hour = deps.clinic_now().hour
+    if hour < 12:
+        greeting = "Buenos días"
+    elif hour < 19:
+        greeting = "Buenas tardes"
+    else:
+        greeting = "Buenas noches"
+
+    await write_audit_event(
+        db,
+        user=user,
+        action="portal_read_dashboard",
+        entity_type="system",
+        entity_id=None,
+        request=request,
+    )
+    await db.commit()
+
+    return templates.TemplateResponse(
+        request,
+        "dashboard.html",
+        {
+            "doctor_name": doctor.full_name,
+            "active": "inicio",
+            "greeting": greeting,
+            "today_label": deps.format_date(deps.clinic_now()),
+            "role_name": request.state.role_name,
+            "appointments_today": appointments_today,
+            "waiting": waiting,
+            "requested_appointments": requested_appointments,
+            "pending_studies": pending_studies,
+            "recent_consultations": recent_consultations,
+            "recent_activity": recent_activity,
+            "consultation_chart": consultation_chart,
+            "chart_total": chart_total,
+            "stats": stats,
+            "can_patients": can_patients,
+            "can_appointments": can_appointments,
+            "can_consultations": can_consultations,
+            "can_studies": can_studies,
+            "can_audit": can_audit,
+            "can_users": can_users,
+            "can_write_patients": "patients:write" in perms,
+            "can_write_appointments": "appointments:write" in perms,
+            "can_start_consultations": can_start_consultations,
+            "can_perform_studies": "studies:perform" in perms,
+        },
+    )
+
+
 # ── Pacientes ─────────────────────────────────────────────────────────────────
 
 
@@ -897,6 +1261,7 @@ async def dashboard(
             "latest_by_patient": latest_by_patient,
             "search": search,
             "stats": stats,
+            "can_start_consultations": has_permission(user, "consultations:write") and isinstance(doctor, Doctor),
         },
     )
 
@@ -906,6 +1271,10 @@ async def patient_detail(
     patient_id: int,
     request: Request,
     creada: int | None = None,
+    actualizado: int = 0,
+    editada: int | None = None,
+    estudio: int | None = None,
+    estudio_error: str | None = None,
     documento: int | None = None,
     documento_error: str | None = None,
     db: AsyncSession = Depends(get_db),
@@ -941,20 +1310,33 @@ async def patient_detail(
             "reason": consultation.reason,
             "diagnosis": consultation.diagnosis,
             "notes": consultation.notes,
+            "blood_pressure": consultation.blood_pressure,
+            "heart_rate": consultation.heart_rate,
+            "respiratory_rate": consultation.respiratory_rate,
+            "temperature_c": consultation.temperature_c,
+            "oxygen_saturation": consultation.oxygen_saturation,
+            "weight_kg": consultation.weight_kg,
+            "height_cm": consultation.height_cm,
+            "physical_exam": consultation.physical_exam,
+            "updated_at": consultation.updated_at,
         }
         for consultation, doctor_row in rows
     ]
     created = next((item for item in consultations if item["id"] == creada), None)
+    edited = next((item for item in consultations if item["id"] == editada), None)
 
     # Separación de funciones: Recepción y Laboratorio ven los datos del paciente
     # y sus documentos, pero no el historial clínico salvo que tengan el permiso.
     can_read_consultations = has_permission(user, "consultations:read")
     can_write_consultations = has_permission(user, "consultations:write")
+    is_doctor = isinstance(doctor, Doctor)
     can_write_patients = has_permission(user, "patients:write")
     can_write_appointments = has_permission(user, "appointments:write")
+    can_request_studies = has_permission(user, "studies:request") and is_doctor
     if not can_read_consultations:
         consultations = []
         created = None
+        edited = None
 
     documents = (
         await db.scalars(
@@ -987,6 +1369,82 @@ async def patient_detail(
             ).all()
         )
 
+    studies_catalog: list[LabStudy] = []
+    if can_request_studies:
+        studies_catalog = list(
+            (
+                await db.scalars(
+                    select(LabStudy)
+                    .where(LabStudy.is_active.is_(True))
+                    .order_by(LabStudy.name.asc())
+                )
+            ).all()
+        )
+
+    # Línea de tiempo clínica: solo roles con acceso al historial.
+    timeline: list[dict] = []
+    if can_read_consultations:
+        for consultation in consultations:
+            timeline.append(
+                {
+                    "kind": "consulta",
+                    "at": consultation["created_at"],
+                    "title": "Consulta médica",
+                    "detail": consultation["diagnosis"],
+                    "meta": f"{consultation['doctor_name']} · {consultation['specialty']}",
+                    "url": f"/portal/pacientes/{patient.id}",
+                }
+            )
+        for order in study_orders:
+            timeline.append(
+                {
+                    "kind": "estudio",
+                    "at": order.performed_at or order.requested_at,
+                    "title": order.study.name if order.study else "Estudio",
+                    "detail": STUDY_STATUS_LABELS.get(order.status, order.status.value),
+                    "meta": "Resultado de laboratorio" if order.performed_at else "Orden solicitada",
+                    "url": (
+                        f"/portal/documentos/{order.document_id}/archivo"
+                        if order.document_id
+                        else "/portal/laboratorio"
+                    ),
+                }
+            )
+        for prescription in prescriptions:
+            timeline.append(
+                {
+                    "kind": "receta",
+                    "at": prescription.created_at,
+                    "title": "Receta médica",
+                    "detail": f"{len(prescription.items)} medicamento(s)",
+                    "meta": "Documento firmado electrónicamente",
+                    "url": (
+                        f"/portal/documentos/{prescription.document_id}/archivo"
+                        if prescription.document_id
+                        else None
+                    ),
+                }
+            )
+        linked_documents = {order.document_id for order in study_orders if order.document_id}
+        linked_documents |= {
+            prescription.document_id for prescription in prescriptions if prescription.document_id
+        }
+        category_labels = dict(CATEGORIES)
+        for document in documents:
+            if document.id in linked_documents:
+                continue
+            timeline.append(
+                {
+                    "kind": "documento",
+                    "at": document.created_at,
+                    "title": document.title,
+                    "detail": category_labels.get(document.category, document.category),
+                    "meta": "Documento del expediente",
+                    "url": f"/portal/documentos/{document.id}/archivo",
+                }
+            )
+        timeline.sort(key=lambda item: item["at"], reverse=True)
+
     await write_audit_event(
         db,
         user=user,
@@ -1006,18 +1464,27 @@ async def patient_detail(
             "patient": patient,
             "consultations": consultations,
             "created": created,
+            "edited": edited,
+            "actualizado": actualizado,
+            "estudio": estudio,
+            "estudio_error": estudio_error,
             "can_read_consultations": can_read_consultations,
             "can_write_consultations": can_write_consultations,
+            "can_edit_consultations": can_write_consultations and is_doctor,
+            "is_doctor": is_doctor,
+            "can_request_studies": can_request_studies,
             "can_write_patients": can_write_patients,
             "can_write_appointments": can_write_appointments,
             "locked": login_security.is_locked(account) if account else False,
             "lock_minutes": login_security.lock_minutes_left(account) if account else 0,
             "totp_enabled": bool(account.totp_enabled) if account else False,
+            "timeline": timeline,
             "documents": documents,
             "categories": CATEGORIES,
             "documento": documento,
             "documento_error": documento_error,
             "study_orders": study_orders,
+            "studies_catalog": studies_catalog,
             "study_status_labels": STUDY_STATUS_LABELS,
             "prescriptions": prescriptions,
         },
@@ -1113,14 +1580,23 @@ async def appointments_page(
     patients = list((await db.scalars(query)).all())
 
     pending_by_patient: dict[int, dict] = {}
+    past_by_patient: dict[int, dict] = {}
     if patients:
+        now = datetime.now(timezone.utc)
         rows = (
             await db.execute(
                 select(Appointment, Doctor)
                 .outerjoin(Doctor, Appointment.doctor_id == Doctor.id)
                 .where(
                     Appointment.patient_id.in_([patient.id for patient in patients]),
-                    Appointment.status.in_([AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED]),
+                    Appointment.status.in_(
+                        [
+                            AppointmentStatus.REQUESTED,
+                            AppointmentStatus.SCHEDULED,
+                            AppointmentStatus.CONFIRMED,
+                        ]
+                    ),
+                    Appointment.scheduled_at >= now,
                 )
                 .order_by(Appointment.scheduled_at.asc())
             )
@@ -1136,6 +1612,34 @@ async def appointments_page(
                     "location": appointment.location,
                     "status_label": STATUS_LABELS.get(appointment.status, appointment.status.value),
                     "checked_in_at": appointment.checked_in_at,
+                },
+            )
+
+        # Historial: la última cita que ya pasó, para no confundirla con la próxima.
+        past_rows = (
+            await db.execute(
+                select(Appointment, Doctor)
+                .outerjoin(Doctor, Appointment.doctor_id == Doctor.id)
+                .where(
+                    Appointment.patient_id.in_([patient.id for patient in patients]),
+                    or_(
+                        Appointment.scheduled_at < now,
+                        Appointment.status.in_([AppointmentStatus.ATTENDED, AppointmentStatus.CANCELLED]),
+                    ),
+                )
+                .order_by(Appointment.scheduled_at.desc())
+            )
+        ).all()
+        for appointment, doctor_row in past_rows:
+            past_by_patient.setdefault(
+                appointment.patient_id,
+                {
+                    "id": appointment.id,
+                    "specialty": appointment.specialty,
+                    "doctor_name": doctor_row.full_name if doctor_row else None,
+                    "scheduled_at": appointment.scheduled_at,
+                    "location": appointment.location,
+                    "status_label": STATUS_LABELS.get(appointment.status, appointment.status.value),
                 },
             )
 
@@ -1157,6 +1661,7 @@ async def appointments_page(
             "active": "citas",
             "patients": patients,
             "pending": pending_by_patient,
+            "past": past_by_patient,
             "search": search,
             "created_id": creada,
         },
@@ -1267,6 +1772,7 @@ async def agenda_page(
     appointments_list = []
     status_counts = {
         "total": 0,
+        "requested": 0,
         "scheduled": 0,
         "confirmed": 0,
         "attended": 0,
@@ -1526,15 +2032,31 @@ async def appointment_qr_page(
 
     appointment, patient, doctor_row = row
     code = appointment.checkin_code
+    if not code:
+        # Citas antiguas creadas antes del check-in: se habilita al abrir el QR.
+        appointment.checkin_code = generate_checkin_code()
+        await db.flush()
+        code = appointment.checkin_code
 
+    window = checkin.window_for(appointment)
+    if appointment.status == AppointmentStatus.CANCELLED:
+        workflow_step = 0
+    elif appointment.status == AppointmentStatus.ATTENDED:
+        workflow_step = 4
+    elif appointment.checked_in_at is not None:
+        workflow_step = 3
+    elif appointment.status == AppointmentStatus.CONFIRMED:
+        workflow_step = 2
+    else:
+        workflow_step = 1
     await write_audit_event(
         db,
         user=user,
-        action="portal_read_appointments",
+        action="portal_read_checkin_qr",
         entity_type="appointment",
         entity_id=appointment.id,
         request=request,
-        detail="pantalla=qr",
+        detail=f"patient_id={patient.id}",
     )
     await db.commit()
 
@@ -1548,11 +2070,79 @@ async def appointment_qr_page(
             "patient": patient,
             "attending": doctor_row,
             "status_label": STATUS_LABELS.get(appointment.status, appointment.status.value),
+            "workflow_step": workflow_step,
             "checkin_code": code,
-            "qr_svg": qr_svg(f"DOSYS-CHECKIN|{appointment.id}|{code}") if code else None,
+            "qr_svg": (
+                qr_svg(f"DOSYS-CHECKIN|{appointment.id}|{code}")
+                if code and appointment.status != AppointmentStatus.REQUESTED
+                else None
+            ),
+            "checkin_window": window,
+            "checkin_label": window.label(),
+            "checkin_error": checkin.check_in_error(appointment),
             "rooms": ROOMS,
             "can_write_appointments": has_permission(user, "appointments:write"),
+            "can_confirm": has_permission(user, "appointments:write")
+            and appointment.status in (AppointmentStatus.REQUESTED, AppointmentStatus.SCHEDULED),
+            "can_start_consultation": (
+                has_permission(user, "consultations:write")
+                and isinstance(doctor, Doctor)
+                and appointment.status in (AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED)
+            ),
+            "is_requested": appointment.status == AppointmentStatus.REQUESTED,
         },
+    )
+
+
+@router.post("/citas/{appointment_id:int}/confirmar")
+async def appointment_confirm(
+    appointment_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Recepción confirma una cita agendada o una solicitud de la app."""
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    staff = await portal_staff(db, user)
+    if not has_permission(user, "appointments:write"):
+        return forbidden(request, staff.full_name, "Tu rol no puede confirmar citas.")
+
+    appointment = await db.get(Appointment, appointment_id)
+    if appointment is None:
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": staff.full_name}, status_code=status.HTTP_404_NOT_FOUND
+        )
+    email_status = "sin_cambio"
+    if appointment.status in (AppointmentStatus.REQUESTED, AppointmentStatus.SCHEDULED):
+        appointment.status = AppointmentStatus.CONFIRMED
+        patient = await db.get(Patient, appointment.patient_id)
+        doctor_row = await db.get(Doctor, appointment.doctor_id) if appointment.doctor_id else None
+        recipient = (patient.email if patient and patient.email else None) if patient else None
+        if recipient:
+            sent, reason = await email.send_appointment_confirmation(
+                to=recipient,
+                patient_name=patient.full_name,
+                doctor_name=doctor_row.full_name if doctor_row else "Por asignar",
+                when=deps.format_datetime(appointment.scheduled_at),
+                location=appointment.room or appointment.location,
+            )
+            email_status = "enviado" if sent else f"no_enviado:{reason}"
+        else:
+            email_status = "sin_destinatario"
+        await write_audit_event(
+            db,
+            user=user,
+            action="portal_confirm_appointment",
+            entity_type="appointment",
+            entity_id=appointment.id,
+            request=request,
+            detail=f"patient_id={appointment.patient_id} email={email_status}",
+        )
+        await db.commit()
+    return RedirectResponse(
+        f"/portal/citas/{appointment.id}?confirmada=1",
+        status_code=status.HTTP_303_SEE_OTHER,
     )
 
 
@@ -1573,13 +2163,51 @@ async def appointment_checkin_state(
     if appointment is None:
         return JSONResponse({"detail": "Cita no encontrada"}, status_code=status.HTTP_404_NOT_FOUND)
 
+    window = checkin.window_for(appointment)
     return JSONResponse(
         {
             "checked_in": appointment.checked_in_at is not None,
             "checked_in_label": deps.format_time(appointment.checked_in_at) if appointment.checked_in_at else None,
             "status": appointment.status.value,
+            "checkin_available": window.available,
+            "checkin_label": window.label(),
+            "checkin_reason": window.reason,
         }
     )
+
+
+@router.post("/citas/{appointment_id:int}/check-in/revertir")
+async def appointment_revert_checkin(
+    appointment_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Reabre el check-in si recepción confirmó al paciente equivocado."""
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await portal_staff(db, user)
+    if not has_permission(user, "appointments:write"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede modificar el check-in.")
+
+    appointment = await db.get(Appointment, appointment_id)
+    if appointment is None:
+        return RedirectResponse("/portal/citas", status_code=status.HTTP_303_SEE_OTHER)
+    if appointment.checked_in_at is not None:
+        appointment.checked_in_at = None
+        if appointment.status == AppointmentStatus.CONFIRMED:
+            appointment.status = AppointmentStatus.SCHEDULED
+        await write_audit_event(
+            db,
+            user=user,
+            action="portal_revert_checkin",
+            entity_type="appointment",
+            entity_id=appointment.id,
+            request=request,
+            detail=f"patient_id={appointment.patient_id}",
+        )
+        await db.commit()
+    return RedirectResponse(f"/portal/citas/{appointment.id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/citas/{appointment_id:int}/consultorio")
@@ -1664,6 +2292,8 @@ async def waiting_room_page(request: Request, db: AsyncSession = Depends(get_db)
             "waiting": _waiting_rows(rows),
             "rooms": ROOMS,
             "can_write_consultations": has_permission(user, "consultations:write"),
+            "can_start_consultation": has_permission(user, "consultations:write") and isinstance(doctor, Doctor),
+            "can_write_appointments": has_permission(user, "appointments:write"),
         },
     )
 
@@ -1684,37 +2314,104 @@ async def waiting_room_state(request: Request, db: AsyncSession = Depends(get_db
 # ── Laboratorio (cola de órdenes y captura de resultados) ─────────────────────
 
 
-async def _lab_context(db: AsyncSession, user: User, doctor_name: str, *, error: str | None = None, aviso: str | None = None) -> dict:
-    pending_rows = (
-        await db.execute(
-            select(StudyOrder, Patient, Doctor)
+LAB_PAGE_SIZE = 50
+
+
+def _lab_search(query, search: str):
+    if not search:
+        return query
+    pattern = f"%{search}%"
+    return query.where(
+        or_(
+            Patient.full_name.ilike(pattern),
+            Patient.curp.ilike(pattern),
+            LabStudy.name.ilike(pattern),
+        )
+    )
+
+
+async def _lab_context(
+    db: AsyncSession,
+    user: User,
+    doctor_name: str,
+    *,
+    error: str | None = None,
+    aviso: str | None = None,
+    search: str = "",
+    status_filter: str = "",
+) -> dict:
+    clean = search.strip()
+    requested_statuses = {
+        "": [StudyOrderStatus.REQUESTED, StudyOrderStatus.IN_PROGRESS],
+        "pendientes": [StudyOrderStatus.REQUESTED, StudyOrderStatus.IN_PROGRESS],
+        "solicitados": [StudyOrderStatus.REQUESTED],
+        "en_proceso": [StudyOrderStatus.IN_PROGRESS],
+    }
+    done_statuses = {
+        "": [StudyOrderStatus.COMPLETED, StudyOrderStatus.CANCELLED],
+        "completados": [StudyOrderStatus.COMPLETED],
+        "cancelados": [StudyOrderStatus.CANCELLED],
+    }
+
+    pending: list[dict] = []
+    statuses = requested_statuses.get(status_filter)
+    if statuses:
+        query = _lab_search(
+            select(StudyOrder, Patient, Doctor, LabStudy)
             .join(Patient, StudyOrder.patient_id == Patient.id)
             .join(Doctor, StudyOrder.doctor_id == Doctor.id)
-            .where(StudyOrder.status.in_([StudyOrderStatus.REQUESTED, StudyOrderStatus.IN_PROGRESS]))
-            .order_by(StudyOrder.requested_at.asc())
-        )
-    ).all()
-    done_rows = (
-        await db.execute(
-            select(StudyOrder, Patient, Doctor)
+            .join(LabStudy, StudyOrder.study_id == LabStudy.id)
+            .where(StudyOrder.status.in_(statuses)),
+            clean,
+        ).order_by(StudyOrder.requested_at.asc()).limit(LAB_PAGE_SIZE)
+        pending = [
+            {
+                "order": order,
+                "patient": patient,
+                "doctor": doctor_row,
+                "study": study,
+                "label": STUDY_STATUS_LABELS.get(order.status, order.status.value),
+            }
+            for order, patient, doctor_row, study in (await db.execute(query)).all()
+        ]
+
+    done: list[dict] = []
+    statuses = done_statuses.get(status_filter)
+    if statuses:
+        query = _lab_search(
+            select(StudyOrder, Patient, Doctor, LabStudy)
             .join(Patient, StudyOrder.patient_id == Patient.id)
             .join(Doctor, StudyOrder.doctor_id == Doctor.id)
-            .where(StudyOrder.status == StudyOrderStatus.COMPLETED)
-            .order_by(StudyOrder.performed_at.desc())
-            .limit(15)
-        )
-    ).all()
+            .join(LabStudy, StudyOrder.study_id == LabStudy.id)
+            .where(StudyOrder.status.in_(statuses)),
+            clean,
+        ).order_by(StudyOrder.performed_at.desc().nullslast(), StudyOrder.requested_at.desc()).limit(LAB_PAGE_SIZE)
+        done = [
+            {
+                "order": order,
+                "patient": patient,
+                "doctor": doctor_row,
+                "study": study,
+                "label": STUDY_STATUS_LABELS.get(order.status, order.status.value),
+            }
+            for order, patient, doctor_row, study in (await db.execute(query)).all()
+        ]
+
+    counts = {
+        status.value: total
+        for status, total in (
+            await db.execute(select(StudyOrder.status, func.count(StudyOrder.id)).group_by(StudyOrder.status))
+        ).all()
+    }
+
     return {
         "doctor_name": doctor_name,
         "active": "laboratorio",
-        "pending": [
-            {"order": order, "patient": patient, "doctor": doctor_row, "label": STUDY_STATUS_LABELS.get(order.status, order.status.value)}
-            for order, patient, doctor_row in pending_rows
-        ],
-        "done": [
-            {"order": order, "patient": patient, "doctor": doctor_row, "label": STUDY_STATUS_LABELS.get(order.status, order.status.value)}
-            for order, patient, doctor_row in done_rows
-        ],
+        "pending": pending,
+        "done": done,
+        "counts": counts,
+        "search": clean,
+        "status_filter": status_filter,
         "can_perform": has_permission(user, "studies:perform"),
         "can_view_patients": has_permission(user, "patients:read"),
         "error": error,
@@ -1726,6 +2423,8 @@ async def _lab_context(db: AsyncSession, user: User, doctor_name: str, *, error:
 async def laboratory_page(
     request: Request,
     aviso: str = "",
+    q: str = "",
+    estado: str = "",
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     user = await deps.current_doctor(request, db)
@@ -1735,9 +2434,51 @@ async def laboratory_page(
     if not has_permission(user, "studies:read"):
         return forbidden(request, doctor.full_name, "Tu rol no puede consultar el laboratorio.")
 
-    messages = {"resultado": "Resultado guardado y protegido con su huella SHA-256.", "cancelada": "Orden cancelada."}
-    context = await _lab_context(db, user, doctor.full_name, aviso=messages.get(aviso))
+    messages = {
+        "resultado": "Resultado guardado y protegido con su firma electrónica.",
+        "cancelada": "Orden cancelada.",
+        "iniciada": "Orden marcada como en proceso.",
+    }
+    context = await _lab_context(
+        db,
+        user,
+        doctor.full_name,
+        aviso=messages.get(aviso),
+        search=q,
+        status_filter=estado,
+    )
     return templates.TemplateResponse(request, "laboratory.html", context)
+
+
+@router.post("/laboratorio/{order_id:int}/iniciar")
+async def laboratory_start(
+    order_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await portal_staff(db, user)
+    if not has_permission(user, "studies:perform"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede iniciar estudios.")
+
+    order = await db.get(StudyOrder, order_id)
+    if order is None:
+        return RedirectResponse("/portal/laboratorio", status_code=status.HTTP_303_SEE_OTHER)
+    if order.status == StudyOrderStatus.REQUESTED:
+        order.status = StudyOrderStatus.IN_PROGRESS
+        await write_audit_event(
+            db,
+            user=user,
+            action="portal_start_study_order",
+            entity_type="study_order",
+            entity_id=order.id,
+            request=request,
+            detail=f"patient_id={order.patient_id}",
+        )
+        await db.commit()
+    return RedirectResponse("/portal/laboratorio?aviso=iniciada", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/laboratorio/{order_id:int}/completar", response_class=HTMLResponse)
@@ -1775,7 +2516,7 @@ async def laboratory_complete(
         entity_type="study_order",
         entity_id=order.id,
         request=request,
-        detail=f"document_id={document.id} sha256={document.sha256}",
+        detail=f"patient_id={order.patient_id} document_id={document.id} sha256={document.sha256}",
     )
     await db.commit()
     return RedirectResponse("/portal/laboratorio?aviso=resultado", status_code=status.HTTP_303_SEE_OTHER)
@@ -1790,8 +2531,9 @@ async def laboratory_cancel(
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
+    doctor = await portal_staff(db, user)
     if not has_permission(user, "studies:perform"):
-        return login_redirect()
+        return forbidden(request, doctor.full_name, "Tu rol no puede cancelar estudios.")
 
     order = await db.get(StudyOrder, order_id)
     if order is not None and order.status != StudyOrderStatus.COMPLETED:
@@ -1803,12 +2545,13 @@ async def laboratory_cancel(
             entity_type="study_order",
             entity_id=order.id,
             request=request,
+            detail=f"patient_id={order.patient_id}",
         )
         await db.commit()
     return RedirectResponse("/portal/laboratorio?aviso=cancelada", status_code=status.HTTP_303_SEE_OTHER)
 
 
-# ── Registro y edición de pacientes ──────────────────────────────────────────
+# ── Registro y edición de pacientes ───────────────────────────────────────────
 
 
 def patient_form_context(
@@ -1854,6 +2597,9 @@ async def patient_new_page(request: Request, db: AsyncSession = Depends(get_db))
                 "emergency_contact": "",
                 "email": "",
                 "username": "",
+                "allergies": "",
+                "medical_history": "",
+                "chronic_conditions": "",
             },
             errors={},
         ),
@@ -1872,12 +2618,17 @@ async def patient_new_submit(
     username: str = Form(""),
     password: str = Form(""),
     password_confirm: str = Form(""),
+    allergies: str = Form(""),
+    medical_history: str = Form(""),
+    chronic_conditions: str = Form(""),
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
     doctor = await portal_staff(db, user)
+    if not has_permission(user, "patients:write"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede registrar pacientes.")
 
     values = {
         "full_name": full_name.strip(),
@@ -1887,6 +2638,9 @@ async def patient_new_submit(
         "emergency_contact": emergency_contact.strip(),
         "email": email.strip().lower(),
         "username": username.strip().lower(),
+        "allergies": allergies.strip(),
+        "medical_history": medical_history.strip(),
+        "chronic_conditions": chronic_conditions.strip(),
     }
     errors: dict[str, str] = {}
     parsed_birth = None
@@ -1908,6 +2662,12 @@ async def patient_new_submit(
         errors["emergency_contact"] = "El contacto de emergencia es demasiado largo."
     if values["email"] and not EMAIL_PATTERN.match(values["email"]):
         errors["email"] = "Escribe un correo válido."
+    if len(values["allergies"]) > CLINICAL_MAX:
+        errors["allergies"] = f"Las alergias no deben pasar de {CLINICAL_MAX} caracteres."
+    if len(values["medical_history"]) > CLINICAL_MAX:
+        errors["medical_history"] = f"Los antecedentes no deben pasar de {CLINICAL_MAX} caracteres."
+    if len(values["chronic_conditions"]) > CLINICAL_MAX:
+        errors["chronic_conditions"] = f"Los diagnósticos crónicos no deben pasar de {CLINICAL_MAX} caracteres."
     if not USERNAME_PATTERN.match(values["username"]):
         errors["username"] = (
             "El usuario debe tener entre 3 y 64 caracteres: letras minúsculas, números, punto, guion o guion bajo."
@@ -1935,6 +2695,9 @@ async def patient_new_submit(
             email=values["email"] or None,
             username=values["username"],
             password=password,
+            allergies=values["allergies"] or None,
+            medical_history=values["medical_history"] or None,
+            chronic_conditions=values["chronic_conditions"] or None,
         )
     except AccountError as error:
         errors["general"] = str(error)
@@ -2009,6 +2772,9 @@ async def patient_edit_page(
                 "emergency_contact": patient.emergency_contact or "",
                 "email": patient.email or "",
                 "username": account.username if account else "",
+                "allergies": patient.allergies or "",
+                "medical_history": patient.medical_history or "",
+                "chronic_conditions": patient.chronic_conditions or "",
             },
             errors={},
         ),
@@ -2024,14 +2790,17 @@ async def patient_edit_submit(
     blood_type: str = Form(""),
     emergency_contact: str = Form(""),
     email: str = Form(""),
+    allergies: str = Form(""),
+    medical_history: str = Form(""),
+    chronic_conditions: str = Form(""),
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
     doctor = await portal_staff(db, user)
-    if not has_permission(user, "patients:read"):
-        return forbidden(request, doctor.full_name, "Tu rol no puede consultar expedientes.")
+    if not has_permission(user, "patients:write"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede editar pacientes.")
 
     patient = await db.get(Patient, patient_id)
     if patient is None:
@@ -2048,6 +2817,9 @@ async def patient_edit_submit(
         "emergency_contact": emergency_contact.strip(),
         "email": email.strip().lower(),
         "username": account.username if account else "",
+        "allergies": allergies.strip(),
+        "medical_history": medical_history.strip(),
+        "chronic_conditions": chronic_conditions.strip(),
     }
     errors: dict[str, str] = {}
     parsed_birth = None
@@ -2067,6 +2839,12 @@ async def patient_edit_submit(
         errors["emergency_contact"] = "El contacto de emergencia es demasiado largo."
     if values["email"] and not EMAIL_PATTERN.match(values["email"]):
         errors["email"] = "Escribe un correo válido."
+    if len(values["allergies"]) > CLINICAL_MAX:
+        errors["allergies"] = f"Las alergias no deben pasar de {CLINICAL_MAX} caracteres."
+    if len(values["medical_history"]) > CLINICAL_MAX:
+        errors["medical_history"] = f"Los antecedentes no deben pasar de {CLINICAL_MAX} caracteres."
+    if len(values["chronic_conditions"]) > CLINICAL_MAX:
+        errors["chronic_conditions"] = f"Los diagnósticos crónicos no deben pasar de {CLINICAL_MAX} caracteres."
 
     if errors:
         return templates.TemplateResponse(
@@ -2076,11 +2854,32 @@ async def patient_edit_submit(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
 
+    changes = []
+    if patient.full_name != values["full_name"]:
+        changes.append("full_name")
+    if patient.birth_date != parsed_birth:
+        changes.append("birth_date")
+    if (patient.blood_type or "") != (values["blood_type"] or ""):
+        changes.append("blood_type")
+    if (patient.emergency_contact or "") != (values["emergency_contact"] or ""):
+        changes.append("emergency_contact")
+    if (patient.email or "") != (values["email"] or ""):
+        changes.append("email")
+    if (patient.allergies or "") != (values["allergies"] or ""):
+        changes.append("allergies")
+    if (patient.medical_history or "") != (values["medical_history"] or ""):
+        changes.append("medical_history")
+    if (patient.chronic_conditions or "") != (values["chronic_conditions"] or ""):
+        changes.append("chronic_conditions")
+
     patient.full_name = values["full_name"]
     patient.birth_date = parsed_birth
     patient.blood_type = values["blood_type"] or None
     patient.emergency_contact = values["emergency_contact"] or None
     patient.email = values["email"] or None
+    patient.allergies = values["allergies"] or None
+    patient.medical_history = values["medical_history"] or None
+    patient.chronic_conditions = values["chronic_conditions"] or None
     await db.flush()
 
     await write_audit_event(
@@ -2090,11 +2889,12 @@ async def patient_edit_submit(
         entity_type="patient",
         entity_id=patient.id,
         request=request,
+        detail=f"campos={','.join(changes) if changes else 'sin_cambios'}",
     )
     await db.commit()
 
     return RedirectResponse(
-        f"/portal/pacientes/{patient.id}",
+        f"/portal/pacientes/{patient.id}?actualizado=1",
         status_code=status.HTTP_303_SEE_OTHER,
     )
 
@@ -2190,11 +2990,12 @@ async def document_download(
     return FileResponse(path, media_type=document.content_type, filename=document.original_name)
 
 
-@router.post("/documentos/{document_id:int}/verificar", response_class=HTMLResponse)
-async def document_verify(
+async def _document_verify_page(
     document_id: int,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession,
+    *,
+    audit_action: str | None,
 ) -> HTMLResponse:
     user = await deps.current_doctor(request, db)
     if user is None:
@@ -2212,22 +3013,23 @@ async def document_verify(
     patient = await db.get(Patient, document.patient_id)
     uploader = await db.get(User, document.uploaded_by_user_id) if document.uploaded_by_user_id else None
 
-    await write_audit_event(
-        db,
-        user=user,
-        action="portal_verify_document",
-        entity_type="document",
-        entity_id=document.id,
-        request=request,
-        detail="resultado=intacto" if intact else "resultado=alterado",
-    )
-    await db.commit()
+    if audit_action:
+        await write_audit_event(
+            db,
+            user=user,
+            action=audit_action,
+            entity_type="document",
+            entity_id=document.id,
+            request=request,
+            detail="resultado=intacto" if intact else "resultado=alterado",
+        )
+        await db.commit()
 
     return templates.TemplateResponse(
         request,
         "document_verify.html",
         {
-            "doctor_name": user.username,
+            "doctor_name": user.full_name or user.username,
             "active": "pacientes",
             "document": document,
             "patient": patient,
@@ -2236,7 +3038,81 @@ async def document_verify(
             "current_hash": current_hash,
             "size": human_size(document.size_bytes),
             "category_label": dict(CATEGORIES).get(document.category, document.category),
+            "can_replace": has_permission(user, "documents:write"),
+            "can_delete": has_permission(user, "documents:delete"),
+            "error": request.query_params.get("error"),
+            "reemplazado": request.query_params.get("reemplazado"),
         },
+    )
+
+
+@router.get("/documentos/{document_id:int}/verificar", response_class=HTMLResponse)
+async def document_verify_page(
+    document_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    return await _document_verify_page(
+        document_id, request, db, audit_action="portal_view_document_verify"
+    )
+
+
+@router.post("/documentos/{document_id:int}/verificar", response_class=HTMLResponse)
+async def document_verify(
+    document_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    return await _document_verify_page(
+        document_id, request, db, audit_action="portal_verify_document"
+    )
+
+
+@router.post("/documentos/{document_id:int}/reemplazar")
+async def document_replace(
+    document_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Corrige el archivo de un documento y vuelve a firmarlo."""
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    if not has_permission(user, "documents:write"):
+        return RedirectResponse(
+            f"/portal/documentos/{document_id}/verificar?error=Sin+permiso+para+reemplazar",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    document = await db.get(Document, document_id)
+    if document is None:
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": user.username}, status_code=status.HTTP_404_NOT_FOUND
+        )
+
+    previous_sha = document.sha256
+    try:
+        await replace_document(db, document=document, uploader=user, upload=file)
+    except DocumentError as error:
+        return RedirectResponse(
+            f"/portal/documentos/{document_id}/verificar?error={quote(str(error))}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    await write_audit_event(
+        db,
+        user=user,
+        action="portal_replace_document",
+        entity_type="document",
+        entity_id=document.id,
+        request=request,
+        detail=f"patient_id={document.patient_id} old_sha256={previous_sha[:16]} new_sha256={document.sha256[:16]}",
+    )
+    await db.commit()
+    return RedirectResponse(
+        f"/portal/documentos/{document.id}/verificar?reemplazado=1",
+        status_code=status.HTTP_303_SEE_OTHER,
     )
 
 
@@ -2275,6 +3151,22 @@ async def document_delete(
 # ── Agendar cita ──────────────────────────────────────────────────────────────
 
 
+async def active_doctor_options(db: AsyncSession) -> list[dict]:
+    """Médicos activos que recepción puede asignar a una cita."""
+    rows = (
+        await db.execute(
+            select(Doctor, User)
+            .join(User, Doctor.user_id == User.id)
+            .where(User.is_active.is_(True))
+            .order_by(Doctor.full_name.asc())
+        )
+    ).all()
+    return [
+        {"id": doctor.id, "full_name": doctor.full_name, "specialty": doctor.specialty}
+        for doctor, _user in rows
+    ]
+
+
 @router.get("/pacientes/{patient_id:int}/cita", response_class=HTMLResponse)
 async def appointment_page(
     patient_id: int,
@@ -2285,6 +3177,8 @@ async def appointment_page(
     if user is None:
         return login_redirect()
     doctor = await portal_staff(db, user)
+    if not has_permission(user, "appointments:write"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede agendar citas.")
 
     patient = await db.get(Patient, patient_id)
     if patient is None:
@@ -2292,6 +3186,8 @@ async def appointment_page(
             request, "not_found.html", {"doctor_name": doctor.full_name}, status_code=status.HTTP_404_NOT_FOUND
         )
 
+    doctors = await active_doctor_options(db)
+    selected_doctor_id = doctor.id if isinstance(doctor, Doctor) else (doctors[0]["id"] if doctors else 0)
     return templates.TemplateResponse(
         request,
         "appointment_form.html",
@@ -2299,6 +3195,8 @@ async def appointment_page(
             "doctor_name": doctor.full_name,
             "active": "pacientes",
             "patient": patient,
+            "doctors": doctors,
+            "selected_doctor_id": selected_doctor_id,
             "errors": {},
             "values": {
                 "specialty": "Medicina General",
@@ -2315,6 +3213,7 @@ async def appointment_page(
 async def appointment_submit(
     patient_id: int,
     request: Request,
+    doctor_id: int = Form(0),
     specialty: str = Form(""),
     fecha: str = Form(""),
     hora: str = Form(""),
@@ -2325,21 +3224,38 @@ async def appointment_submit(
     user = await deps.current_doctor(request, db)
     if user is None:
         return login_redirect()
-    doctor = await portal_staff(db, user)
-    if not isinstance(doctor, Doctor):
-        return forbidden(request, doctor.full_name, "Tu cuenta no tiene ficha de médico para agendar citas.")
+    staff = await portal_staff(db, user)
+    if not has_permission(user, "appointments:write"):
+        return forbidden(request, staff.full_name, "Tu rol no puede agendar citas.")
 
     patient = await db.get(Patient, patient_id)
     if patient is None:
         return templates.TemplateResponse(
-            request, "not_found.html", {"doctor_name": doctor.full_name}, status_code=status.HTTP_404_NOT_FOUND
+            request, "not_found.html", {"doctor_name": staff.full_name}, status_code=status.HTTP_404_NOT_FOUND
         )
+
+    doctors = await active_doctor_options(db)
+    selected_doctor: Doctor | None = None
+    if doctor_id:
+        selected_doctor = await db.scalar(
+            select(Doctor)
+            .join(User, Doctor.user_id == User.id)
+            .where(Doctor.id == doctor_id, User.is_active.is_(True))
+        )
+    elif isinstance(staff, Doctor):
+        selected_doctor = staff
 
     specialty = specialty.strip()
     location = location.strip()
     notes = notes.strip()
     errors: dict[str, str] = {}
     scheduled_local: datetime | None = None
+    if selected_doctor is None:
+        if not doctor_id and doctors:
+            # Recepción dejó el select vacío: se usa el primer médico activo.
+            selected_doctor = await db.get(Doctor, doctors[0]["id"])
+        if selected_doctor is None:
+            errors["doctor_id"] = "Selecciona un médico activo para la cita."
 
     if not SPECIALTY_MIN <= len(specialty) <= SPECIALTY_MAX:
         errors["specialty"] = "Escribe la especialidad o el servicio."
@@ -2369,9 +3285,11 @@ async def appointment_submit(
             request,
             "appointment_form.html",
             {
-                "doctor_name": doctor.full_name,
+                "doctor_name": staff.full_name,
                 "active": "pacientes",
                 "patient": patient,
+                "doctors": doctors,
+                "selected_doctor_id": selected_doctor.id if selected_doctor else 0,
                 "errors": errors,
                 "values": {
                     "specialty": specialty,
@@ -2384,15 +3302,37 @@ async def appointment_submit(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
 
-    appointment = await create_appointment(
-        db,
-        patient=patient,
-        doctor=doctor,
-        specialty=specialty,
-        scheduled_at=scheduled_local.astimezone(timezone.utc),
-        location=location,
-        notes=notes or None,
-    )
+    try:
+        appointment = await create_appointment(
+            db,
+            patient=patient,
+            doctor=selected_doctor,
+            specialty=specialty,
+            scheduled_at=scheduled_local.astimezone(timezone.utc),
+            location=location,
+            notes=notes or None,
+        )
+    except AppointmentError as error:
+        return templates.TemplateResponse(
+            request,
+            "appointment_form.html",
+            {
+                "doctor_name": staff.full_name,
+                "active": "pacientes",
+                "patient": patient,
+                "doctors": doctors,
+                "selected_doctor_id": selected_doctor.id if selected_doctor else 0,
+                "errors": {"general": str(error)},
+                "values": {
+                    "specialty": specialty,
+                    "fecha": fecha,
+                    "hora": hora,
+                    "location": location,
+                    "notes": notes,
+                },
+            },
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
     await write_audit_event(
         db,
         user=user,
@@ -2400,7 +3340,7 @@ async def appointment_submit(
         entity_type="appointment",
         entity_id=appointment.id,
         request=request,
-        detail=f"patient_id={patient.id}",
+        detail=f"patient_id={patient.id} doctor_id={selected_doctor.id if selected_doctor else 0}",
     )
     await db.commit()
 
@@ -2426,6 +3366,12 @@ async def consultation_page(
     doctor = await portal_staff(db, user)
     if not has_permission(user, "consultations:write"):
         return forbidden(request, doctor.full_name, "Tu rol no puede registrar consultas.")
+    if not isinstance(doctor, Doctor):
+        return forbidden(
+            request,
+            doctor.full_name,
+            "Tu cuenta no tiene ficha de médico. Asigna el rol Médico a una cuenta con especialidad para registrar consultas.",
+        )
 
     patient = await db.get(Patient, patient_id)
     if patient is None:
@@ -2455,7 +3401,7 @@ async def consultation_page(
             rooms=ROOMS,
             errors={},
             values=consultation_defaults(reason=default_reason),
-            can_request_studies=has_permission(user, "studies:request"),
+            can_request_studies=has_permission(user, "studies:request") and isinstance(doctor, Doctor),
             can_write_prescriptions=has_permission(user, "prescriptions:write"),
             can_schedule=has_permission(user, "appointments:write"),
         ),
@@ -2470,6 +3416,14 @@ def consultation_defaults(**overrides) -> dict:
         "reason": "",
         "diagnosis": "",
         "notes": "",
+        "blood_pressure": "",
+        "heart_rate": "",
+        "respiratory_rate": "",
+        "temperature_c": "",
+        "oxygen_saturation": "",
+        "weight_kg": "",
+        "height_cm": "",
+        "physical_exam": "",
         "study_ids": [],
         "requires_prescription": False,
         "recipe_items": [{"medication": "", "dose": "", "frequency": "", "duration": ""}],
@@ -2518,6 +3472,14 @@ async def consultation_submit(
     reason: str = Form(""),
     diagnosis: str = Form(""),
     notes: str = Form(""),
+    blood_pressure: str = Form(""),
+    heart_rate: str = Form(""),
+    respiratory_rate: str = Form(""),
+    temperature_c: str = Form(""),
+    oxygen_saturation: str = Form(""),
+    weight_kg: str = Form(""),
+    height_cm: str = Form(""),
+    physical_exam: str = Form(""),
     cita: int = Form(0),
     study_ids: list[int] = Form([]),
     requires_prescription: str = Form(""),
@@ -2538,6 +3500,12 @@ async def consultation_submit(
     doctor = await portal_staff(db, user)
     if not has_permission(user, "consultations:write"):
         return forbidden(request, doctor.full_name, "Tu rol no puede registrar consultas.")
+    if not isinstance(doctor, Doctor):
+        return forbidden(
+            request,
+            doctor.full_name,
+            "Tu cuenta no tiene ficha de médico. Asigna el rol Médico a una cuenta con especialidad para registrar consultas.",
+        )
 
     patient = await db.get(Patient, patient_id)
     if patient is None:
@@ -2552,6 +3520,16 @@ async def consultation_submit(
     reason = reason.strip()
     diagnosis = diagnosis.strip()
     notes = notes.strip()
+    vital_values = {
+        "blood_pressure": blood_pressure,
+        "heart_rate": heart_rate,
+        "respiratory_rate": respiratory_rate,
+        "temperature_c": temperature_c,
+        "oxygen_saturation": oxygen_saturation,
+        "weight_kg": weight_kg,
+        "height_cm": height_cm,
+        "physical_exam": physical_exam,
+    }
     errors: dict[str, str] = {}
     if not REASON_MIN <= len(reason) <= REASON_MAX:
         errors["reason"] = f"Escribe el motivo de la consulta ({REASON_MIN} a {REASON_MAX} caracteres)."
@@ -2559,6 +3537,7 @@ async def consultation_submit(
         errors["diagnosis"] = f"Escribe el diagnóstico ({DIAGNOSIS_MIN} a {DIAGNOSIS_MAX} caracteres)."
     if len(notes) > NOTES_MAX:
         errors["notes"] = f"Las notas no deben pasar de {NOTES_MAX} caracteres."
+    vitals = _parse_vitals(vital_values, errors)
 
     # Receta: cada fila capturada debe tener medicamento, dosis y frecuencia.
     items: list[dict] = []
@@ -2638,6 +3617,14 @@ async def consultation_submit(
             reason=reason,
             diagnosis=diagnosis,
             notes=notes,
+            blood_pressure=vital_values["blood_pressure"],
+            heart_rate=vital_values["heart_rate"],
+            respiratory_rate=vital_values["respiratory_rate"],
+            temperature_c=vital_values["temperature_c"],
+            oxygen_saturation=vital_values["oxygen_saturation"],
+            weight_kg=vital_values["weight_kg"],
+            height_cm=vital_values["height_cm"],
+            physical_exam=vital_values["physical_exam"],
             study_ids=list(study_ids),
             requires_prescription=bool(requires_prescription),
             recipe_items=items
@@ -2663,7 +3650,7 @@ async def consultation_submit(
                 rooms=ROOMS,
                 errors=errors,
                 values=values,
-                can_request_studies=has_permission(user, "studies:request"),
+                can_request_studies=has_permission(user, "studies:request") and isinstance(doctor, Doctor),
                 can_write_prescriptions=has_permission(user, "prescriptions:write"),
                 can_schedule=has_permission(user, "appointments:write"),
             ),
@@ -2677,6 +3664,7 @@ async def consultation_submit(
         reason=reason,
         diagnosis=diagnosis,
         notes=notes or None,
+        **vitals,
     )
     if appointment is not None:
         appointment.status = AppointmentStatus.ATTENDED
@@ -2778,5 +3766,314 @@ async def consultation_submit(
 
     return RedirectResponse(
         f"/portal/pacientes/{patient.id}?creada={consultation.id}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+# ── Corrección de una consulta ya registrada ──────────────────────────────────
+
+
+async def _consultation_for_patient(
+    db: AsyncSession, patient_id: int, consultation_id: int
+) -> Consultation | None:
+    consultation = await db.get(Consultation, consultation_id)
+    if consultation is None or consultation.patient_id != patient_id:
+        return None
+    return consultation
+
+
+@router.get("/pacientes/{patient_id:int}/consulta/{consultation_id:int}/pdf")
+async def consultation_pdf(
+    patient_id: int,
+    consultation_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Nota clínica SOAP imprimible; solo roles con acceso al historial."""
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    if not has_permission(user, "consultations:read"):
+        return forbidden(request, user.username, "Tu rol no puede descargar notas clínicas.")
+
+    patient = await db.get(Patient, patient_id)
+    consultation = await _consultation_for_patient(db, patient_id, consultation_id)
+    if patient is None or consultation is None:
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": user.username}, status_code=status.HTTP_404_NOT_FOUND
+        )
+
+    author = await db.get(Doctor, consultation.doctor_id)
+    pdf = build_consultation_pdf(
+        patient_name=patient.full_name,
+        patient_curp=patient.curp,
+        doctor_name=author.full_name if author else "Médico",
+        specialty=author.specialty if author else "",
+        created_at=consultation.created_at,
+        reason=consultation.reason,
+        diagnosis=consultation.diagnosis,
+        notes=consultation.notes,
+        blood_pressure=consultation.blood_pressure,
+        heart_rate=consultation.heart_rate,
+        respiratory_rate=consultation.respiratory_rate,
+        temperature_c=consultation.temperature_c,
+        oxygen_saturation=consultation.oxygen_saturation,
+        weight_kg=consultation.weight_kg,
+        height_cm=consultation.height_cm,
+        physical_exam=consultation.physical_exam,
+    )
+    await write_audit_event(
+        db,
+        user=user,
+        action="portal_download_consultation",
+        entity_type="consultation",
+        entity_id=consultation.id,
+        request=request,
+        detail=f"patient_id={patient.id}",
+    )
+    await db.commit()
+    filename = quote(f"nota-consulta-{consultation.id}.pdf")
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename*=UTF-8''{filename}"},
+    )
+
+
+@router.get("/pacientes/{patient_id:int}/consulta/{consultation_id:int}/editar", response_class=HTMLResponse)
+async def consultation_edit_page(
+    patient_id: int,
+    consultation_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await portal_staff(db, user)
+    if not has_permission(user, "consultations:write"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede corregir consultas.")
+    if not isinstance(doctor, Doctor):
+        return forbidden(
+            request,
+            doctor.full_name,
+            "Tu cuenta no tiene ficha de médico. Solo un médico puede corregir una consulta.",
+        )
+
+    patient = await db.get(Patient, patient_id)
+    consultation = await _consultation_for_patient(db, patient_id, consultation_id)
+    if patient is None or consultation is None:
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": doctor.full_name}, status_code=status.HTTP_404_NOT_FOUND
+        )
+
+    author = await db.get(Doctor, consultation.doctor_id)
+    return templates.TemplateResponse(
+        request,
+        "consultation_edit.html",
+        {
+            "doctor_name": doctor.full_name,
+            "active": "pacientes",
+            "patient": patient,
+            "consultation": consultation,
+            "author_name": author.full_name if author else "Médico",
+            "errors": {},
+            "values": {
+                "reason": consultation.reason,
+                "diagnosis": consultation.diagnosis,
+                "notes": consultation.notes or "",
+                "blood_pressure": consultation.blood_pressure or "",
+                "heart_rate": "" if consultation.heart_rate is None else str(consultation.heart_rate),
+                "respiratory_rate": "" if consultation.respiratory_rate is None else str(consultation.respiratory_rate),
+                "temperature_c": "" if consultation.temperature_c is None else str(consultation.temperature_c),
+                "oxygen_saturation": (
+                    "" if consultation.oxygen_saturation is None else str(consultation.oxygen_saturation)
+                ),
+                "weight_kg": "" if consultation.weight_kg is None else str(consultation.weight_kg),
+                "height_cm": "" if consultation.height_cm is None else str(consultation.height_cm),
+                "physical_exam": consultation.physical_exam or "",
+            },
+        },
+    )
+
+
+@router.post(
+    "/pacientes/{patient_id:int}/consulta/{consultation_id:int}/editar",
+    response_class=HTMLResponse,
+)
+async def consultation_edit_submit(
+    patient_id: int,
+    consultation_id: int,
+    request: Request,
+    reason: str = Form(""),
+    diagnosis: str = Form(""),
+    notes: str = Form(""),
+    blood_pressure: str = Form(""),
+    heart_rate: str = Form(""),
+    respiratory_rate: str = Form(""),
+    temperature_c: str = Form(""),
+    oxygen_saturation: str = Form(""),
+    weight_kg: str = Form(""),
+    height_cm: str = Form(""),
+    physical_exam: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await portal_staff(db, user)
+    if not has_permission(user, "consultations:write"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede corregir consultas.")
+    if not isinstance(doctor, Doctor):
+        return forbidden(
+            request,
+            doctor.full_name,
+            "Tu cuenta no tiene ficha de médico. Solo un médico puede corregir una consulta.",
+        )
+
+    patient = await db.get(Patient, patient_id)
+    consultation = await _consultation_for_patient(db, patient_id, consultation_id)
+    if patient is None or consultation is None:
+        return templates.TemplateResponse(
+            request, "not_found.html", {"doctor_name": doctor.full_name}, status_code=status.HTTP_404_NOT_FOUND
+        )
+
+    reason = reason.strip()
+    diagnosis = diagnosis.strip()
+    notes = notes.strip()
+    vital_values = {
+        "blood_pressure": blood_pressure,
+        "heart_rate": heart_rate,
+        "respiratory_rate": respiratory_rate,
+        "temperature_c": temperature_c,
+        "oxygen_saturation": oxygen_saturation,
+        "weight_kg": weight_kg,
+        "height_cm": height_cm,
+        "physical_exam": physical_exam,
+    }
+    errors: dict[str, str] = {}
+    if not REASON_MIN <= len(reason) <= REASON_MAX:
+        errors["reason"] = f"Escribe el motivo de la consulta ({REASON_MIN} a {REASON_MAX} caracteres)."
+    if not DIAGNOSIS_MIN <= len(diagnosis) <= DIAGNOSIS_MAX:
+        errors["diagnosis"] = f"Escribe el diagnóstico ({DIAGNOSIS_MIN} a {DIAGNOSIS_MAX} caracteres)."
+    if len(notes) > NOTES_MAX:
+        errors["notes"] = f"Las notas no deben pasar de {NOTES_MAX} caracteres."
+    vitals = _parse_vitals(vital_values, errors)
+
+    author = await db.get(Doctor, consultation.doctor_id)
+    if errors:
+        return templates.TemplateResponse(
+            request,
+            "consultation_edit.html",
+            {
+                "doctor_name": doctor.full_name,
+                "active": "pacientes",
+                "patient": patient,
+                "consultation": consultation,
+                "author_name": author.full_name if author else "Médico",
+                "errors": errors,
+                "values": {
+                    "reason": reason,
+                    "diagnosis": diagnosis,
+                    "notes": notes,
+                    **vital_values,
+                },
+            },
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    new_values = {
+        "reason": reason,
+        "diagnosis": diagnosis,
+        "notes": notes or None,
+        **vitals,
+    }
+    changes = [
+        field for field, value in new_values.items() if getattr(consultation, field) != value
+    ]
+
+    if changes:
+        for field, value in new_values.items():
+            setattr(consultation, field, value)
+        consultation.updated_at = datetime.now(timezone.utc)
+        await db.flush()
+
+    await write_audit_event(
+        db,
+        user=user,
+        action="portal_update_consultation",
+        entity_type="consultation",
+        entity_id=consultation.id,
+        request=request,
+        detail=f"patient_id={patient.id} campos={','.join(changes) if changes else 'sin_cambios'}",
+    )
+    await db.commit()
+
+    return RedirectResponse(
+        f"/portal/pacientes/{patient.id}?editada={consultation.id}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/pacientes/{patient_id:int}/estudio-demo")
+async def patient_demo_study(
+    patient_id: int,
+    request: Request,
+    study_id: int = Form(0),
+    indications: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Crea una orden real para demostrar el flujo de laboratorio en clase.
+
+    Queda auditada como cualquier otra orden: no genera datos falsos ni salta
+    la cola del laboratorio.
+    """
+    user = await deps.current_doctor(request, db)
+    if user is None:
+        return login_redirect()
+    doctor = await portal_staff(db, user)
+    if not has_permission(user, "studies:request"):
+        return forbidden(request, doctor.full_name, "Tu rol no puede solicitar estudios.")
+    if not isinstance(doctor, Doctor):
+        return forbidden(
+            request,
+            doctor.full_name,
+            "Solo una cuenta con ficha de médico puede solicitar estudios.",
+        )
+
+    patient = await db.get(Patient, patient_id)
+    if patient is None:
+        return RedirectResponse("/portal/pacientes", status_code=status.HTTP_303_SEE_OTHER)
+
+    study = await db.get(LabStudy, study_id) if study_id else None
+    if study is None or not study.is_active:
+        return RedirectResponse(
+            f"/portal/pacientes/{patient.id}?estudio_error=Elige+un+estudio+disponible",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    clean = indications.strip()[:200]
+    orders = await create_orders(
+        db,
+        patient=patient,
+        doctor=doctor,
+        consultation_id=None,
+        studies=[study],
+        indications=clean or None,
+    )
+    order = orders[0]
+    await write_audit_event(
+        db,
+        user=user,
+        action="portal_create_demo_study_order",
+        entity_type="study_order",
+        entity_id=order.id,
+        request=request,
+        detail=f"patient_id={patient.id} study_id={study.id}",
+    )
+    await db.commit()
+
+    return RedirectResponse(
+        f"/portal/pacientes/{patient.id}?estudio={order.id}",
         status_code=status.HTTP_303_SEE_OTHER,
     )

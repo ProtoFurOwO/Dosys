@@ -13,32 +13,98 @@
       <span><b>Consultorio</b> {{ appointment.room or "Sin asignar" }}</span>
     </p>
   </div>
-  <span class="chip chip-confirmed" id="cita-chip">{{ status_label }}</span>
+  <span class="chip {% if appointment.status.value == 'requested' %}chip-scheduled{% elif appointment.status.value == 'cancelled' %}chip-cancelled{% else %}chip-confirmed{% endif %}" id="cita-chip">{{ status_label }}</span>
 </header>
 
+{% if appointment.status.value == 'requested' %}
+<div class="note note-info" role="status">
+  <p>Esta es una solicitud enviada desde la app del paciente.</p>
+  <p class="note-sub">Confírmala para habilitar el check-in y generar el QR de llegada.</p>
+</div>
+{% endif %}
+
+{% if request.query_params.get('confirmada') %}
+<div class="note note-ok" role="status">Cita confirmada. El check-in quedó habilitado.</div>
+{% endif %}
+
+{% if can_start_consultation %}
+<div class="form-actions">
+  <a class="btn btn-primary" href="/portal/pacientes/{{ patient.id }}/consulta?cita={{ appointment.id }}">Iniciar consulta</a>
+</div>
+{% endif %}
+
+{% if can_confirm %}
+<section class="block">
+  <h2 class="section-title">Confirmar cita</h2>
+  <p class="page-note">Al confirmar, el paciente podrá ver su cita como confirmada y usar el QR dentro de la ventana de check-in.</p>
+  <form method="post" action="/portal/citas/{{ appointment.id }}/confirmar">
+    <button class="btn btn-primary" type="submit">Confirmar cita</button>
+  </form>
+</section>
+{% endif %}
+
+{% if appointment.status.value == 'cancelled' %}
+<div class="note note-error" role="status">Esta cita fue cancelada. No se puede hacer check-in.</div>
+{% elif appointment.status.value != 'requested' %}
+<ol class="appointment-flow" aria-label="Flujo de la cita">
+  <li class="{% if workflow_step >= 1 %}is-done{% endif %} {% if workflow_step == 1 %}is-current{% endif %}">
+    <span>1</span> Agendada
+  </li>
+  <li class="{% if workflow_step >= 2 %}is-done{% endif %} {% if workflow_step == 2 %}is-current{% endif %}">
+    <span>2</span> Confirmada
+  </li>
+  <li class="{% if workflow_step >= 3 %}is-done{% endif %} {% if workflow_step == 3 %}is-current{% endif %}">
+    <span>3</span> En espera
+  </li>
+  <li class="{% if workflow_step >= 4 %}is-done{% endif %} {% if workflow_step == 4 %}is-current{% endif %}">
+    <span>4</span> Atendida
+  </li>
+</ol>
+{% endif %}
+
 <div id="checkin-aviso"></div>
+
+<section class="block">
+  <h2 class="section-title">Ventana de check-in</h2>
+  <div class="checkin-window">
+    <span class="chip {% if checkin_window.available %}chip-confirmed{% else %}chip-scheduled{% endif %}">
+      {{ checkin_label }}
+    </span>
+    <p class="page-note">
+      Abre {{ checkin_window.opens_at | fecha_hora }} y cierra {{ checkin_window.closes_at | fecha_hora }}.
+      Después de esa hora, recepción debe registrar la llegada manualmente.
+    </p>
+  </div>
+</section>
 
 {% if appointment.checked_in_at %}
 <div class="note note-ok" role="status">
   <p>Este paciente ya confirmó su llegada a las {{ appointment.checked_in_at | hora }}.</p>
 </div>
+{% elif checkin_error %}
+<div class="note note-error" role="alert">
+  <p>{{ checkin_error }}</p>
+</div>
 {% endif %}
 
 <div class="checkin-panel"
      id="checkin-panel"
-     {% if qr_svg and not appointment.checked_in_at %}data-checkin-watch="/portal/citas/{{ appointment.id }}/estado"{% endif %}>
+     {% if qr_svg and checkin_window.available and not appointment.checked_in_at %}data-checkin-watch="/portal/citas/{{ appointment.id }}/estado"{% endif %}>
   {% if qr_svg %}
   <div class="qr qr-large">{{ qr_svg | safe }}</div>
   <div class="checkin-info">
     <p class="checkin-title">Código de check-in</p>
     <p class="checkin-help">
       Pídele al paciente que lo escanee con la app desde <strong>Check-in con QR</strong>.
+      El código es de un solo uso y solo funciona dentro de la ventana de la cita.
     </p>
     <p class="checkin-code">Código de respaldo: <strong>{{ checkin_code }}</strong></p>
     {% if appointment.checked_in_at %}
     <p class="checkin-help">Llegada confirmada a las {{ appointment.checked_in_at | fecha_hora }}.</p>
-    {% else %}
+    {% elif checkin_window.available %}
     <p class="checkin-help" id="checkin-estado">Aún no confirma su llegada.</p>
+    {% else %}
+    <p class="checkin-help">El QR está visible, pero el servidor rechazará el check-in hasta que abra la ventana.</p>
     {% endif %}
   </div>
   {% else %}
@@ -65,6 +131,11 @@
     <div class="form-actions">
       <button class="btn btn-line" type="submit">Guardar consultorio</button>
     </div>
+  </form>
+
+  <form method="post" action="/portal/citas/{{ appointment.id }}/check-in/revertir" class="note-action"
+        onsubmit="return confirm('¿Reabrir el check-in de esta cita? La acción queda en la bitácora.');">
+    <button class="btn btn-quiet" type="submit">Reabrir check-in</button>
   </form>
 </section>
 {% endif %}

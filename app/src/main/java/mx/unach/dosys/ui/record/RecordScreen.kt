@@ -96,13 +96,15 @@ private fun RecordContent(state: RecordUiState, onBack: () -> Unit) {
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("Alergias, antecedentes y diagnósticos crónicos", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.height(8.dp))
                         Text(
-                            "Estos apartados se integrarán en una siguiente entrega. La información mostrada abajo proviene de la API.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            "Alergias, antecedentes y diagnósticos crónicos",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
                         )
+                        Spacer(Modifier.height(8.dp))
+                        ClinicalField("Alergias", state.profile?.allergies, warn = true)
+                        ClinicalField("Antecedentes", state.profile?.medicalHistory)
+                        ClinicalField("Diagnósticos crónicos", state.profile?.chronicConditions)
                     }
                 }
             }
@@ -118,6 +120,13 @@ private fun RecordContent(state: RecordUiState, onBack: () -> Unit) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
                         Text(formatClinicalDateTime(consultation.createdAt), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        consultation.updatedAt?.let { updated ->
+                            Text(
+                                text = "Corregida el ${formatClinicalDateTime(updated)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         Text(consultation.specialty, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Text(consultation.doctorName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(8.dp))
@@ -150,5 +159,23 @@ private fun InfoRow(label: String, value: String) {
     Column(Modifier.padding(vertical = 2.dp)) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun ClinicalField(label: String, value: String?, warn: Boolean = false) {
+    Column(Modifier.padding(vertical = 4.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (warn && !value.isNullOrBlank()) MaterialTheme.colorScheme.error
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value?.takeIf { it.isNotBlank() } ?: "Sin registrar",
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (value.isNullOrBlank()) MaterialTheme.colorScheme.onSurfaceVariant
+            else MaterialTheme.colorScheme.onSurface,
+        )
     }
 }

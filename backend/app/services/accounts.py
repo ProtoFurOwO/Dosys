@@ -14,9 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.security import hash_password, verify_password
+from app.models.enums import UserRole
 from app.models.patient import Patient
 from app.models.session_token import PasswordResetToken, RefreshToken
 from app.models.user import User
+from app.models.user_device import UserDevice
+from app.services import devices
 from app.services.users import AccountError, password_policy_error
 
 _RESET_BYTES = 32
@@ -57,21 +60,30 @@ async def find_user_by_identifier(db: AsyncSession, identifier: str) -> User | N
 # ── Sesión renovable ──────────────────────────────────────────────────────────
 
 
-async def issue_refresh_token(db: AsyncSession, user: User) -> str:
+async def issue_refresh_token(
+    db: AsyncSession, user: User, device_id: int | None = None
+) -> str:
     token = secrets.token_urlsafe(_REFRESH_BYTES)
     db.add(
         RefreshToken(
             user_id=user.id,
             token_hash=_digest(token),
             expires_at=_now() + timedelta(days=settings.refresh_token_expire_days),
+            device_id=device_id,
         )
     )
     await db.flush()
     return token
 
 
-async def rotate_refresh_token(db: AsyncSession, token: str) -> tuple[User, str] | None:
-    """Valida el token, lo revoca y entrega uno nuevo junto con su usuario."""
+async def rotate_refresh_token(
+    db: AsyncSession, token: str
+) -> tuple[User, str, str | None] | None:
+    """Valida el token, lo revoca y entrega uno nuevo junto con su usuario.
+
+    Devuelve también el hash del dispositivo ligado a la sesión (si lo hay)
+    para que el nuevo acceso conserve el claim ``did``.
+    """
     if not token:
         return None
     record = await db.scalar(select(RefreshToken).where(RefreshToken.token_hash == _digest(token)))
@@ -80,19 +92,34 @@ async def rotate_refresh_token(db: AsyncSession, token: str) -> tuple[User, str]
     user = await db.get(User, record.user_id)
     if user is None or not user.is_active:
         return None
+
+    device = await db.get(UserDevice, record.device_id) if record.device_id else None
+    if device is not None and not device.is_active:
+        # La sesión pertenecía a un dispositivo que ya fue reemplazado.
+        return None
+    if user.role.code == UserRole.PATIENT.value and device is None:
+        # Sesión vieja o emitida sin dispositivo: ya no se renueva.
+        return None
     record.revoked_at = _now()
-    new_token = await issue_refresh_token(db, user)
+    new_token = await issue_refresh_token(db, user, device_id=record.device_id)
     await db.flush()
-    return user, new_token
+    return user, new_token, device.device_hash if device else None
 
 
-async def revoke_refresh_token(db: AsyncSession, token: str) -> None:
+async def revoke_refresh_token(
+    db: AsyncSession, token: str
+) -> tuple[int, int | None] | None:
+    """Revoca la sesión y devuelve (usuario, dispositivo) al que estaba ligada."""
     if not token:
-        return
+        return None
     record = await db.scalar(select(RefreshToken).where(RefreshToken.token_hash == _digest(token)))
-    if record is not None and record.revoked_at is None:
+    if record is None:
+        return None
+    device_id = record.device_id
+    if record.revoked_at is None:
         record.revoked_at = _now()
         await db.flush()
+    return record.user_id, device_id
 
 
 async def revoke_user_sessions(db: AsyncSession, user: User) -> None:
@@ -152,6 +179,7 @@ async def change_password(db: AsyncSession, user: User, *, current: str, new: st
         raise AccountError(error)
     user.password_hash = hash_password(new)
     await revoke_user_sessions(db, user)
+    await devices.release_device(db, user)
     await db.flush()
 
 
@@ -162,4 +190,7 @@ async def replace_password(db: AsyncSession, user: User, *, new: str, confirm: s
         raise AccountError(error)
     user.password_hash = hash_password(new)
     await revoke_user_sessions(db, user)
+    # Recuperar la contraseña también libera el dispositivo de confianza para
+    # que el paciente pueda volver a entrar desde otro teléfono.
+    await devices.release_device(db, user)
     await db.flush()

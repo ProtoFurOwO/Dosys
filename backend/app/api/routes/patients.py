@@ -11,18 +11,23 @@ from app.models.appointment import Appointment
 from app.models.consultation import Consultation
 from app.models.doctor import Doctor
 from app.models.document import Document
-from app.models.enums import UserRole
+from app.models.enums import AppointmentStatus, UserRole
 from app.models.patient import Patient
 from app.models.prescription import Prescription
 from app.models.study_order import StudyOrder
 from app.models.user import User
-from app.schemas.appointment import AppointmentCheckInRequest, AppointmentResponse
+from app.schemas.appointment import (
+    AppointmentCheckInByCodeRequest,
+    AppointmentCheckInRequest,
+    AppointmentResponse,
+)
 from app.schemas.consultation import ConsultationResponse
-from app.schemas.document import DocumentResponse
+from app.schemas.document import DocumentIntegrityResponse, DocumentResponse
 from app.schemas.laboratory import PrescriptionItemResponse, PrescriptionResponse, StudyOrderResponse
 from app.schemas.patient import PatientProfileResponse
+from app.services import checkin, rate_limit
 from app.services.audit import write_audit_event
-from app.services.documents import document_path
+from app.services.documents import check_integrity, document_path
 
 
 router = APIRouter(prefix="/patients", tags=["Paciente"])
@@ -33,6 +38,35 @@ async def get_patient_for_user(db: AsyncSession, user: User) -> Patient:
     if patient is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Perfil de paciente no encontrado")
     return patient
+
+
+def appointment_response(appointment: Appointment, doctor: Doctor | None) -> AppointmentResponse:
+    """Arma la cita con su estado de vigencia y su ventana de check-in."""
+    now = datetime.now(timezone.utc)
+    scheduled = appointment.scheduled_at
+    if scheduled.tzinfo is None:
+        scheduled = scheduled.replace(tzinfo=timezone.utc)
+    is_upcoming = (
+        scheduled >= now
+        and appointment.status
+        in (
+            AppointmentStatus.REQUESTED,
+            AppointmentStatus.SCHEDULED,
+            AppointmentStatus.CONFIRMED,
+        )
+    )
+    return AppointmentResponse(
+        id=appointment.id,
+        specialty=appointment.specialty,
+        doctor_name=doctor.full_name if doctor else None,
+        scheduled_at=appointment.scheduled_at,
+        location=appointment.location,
+        status=appointment.status,
+        notes=appointment.notes,
+        checked_in_at=appointment.checked_in_at,
+        is_upcoming=is_upcoming,
+        **checkin.window_payload(appointment, now=now),
+    )
 
 
 @router.get("/me", response_model=PatientProfileResponse)
@@ -76,6 +110,14 @@ async def get_my_consultations(
             reason=consultation.reason,
             diagnosis=consultation.diagnosis,
             notes=consultation.notes,
+            blood_pressure=consultation.blood_pressure,
+            heart_rate=consultation.heart_rate,
+            respiratory_rate=consultation.respiratory_rate,
+            temperature_c=consultation.temperature_c,
+            oxygen_saturation=consultation.oxygen_saturation,
+            weight_kg=consultation.weight_kg,
+            height_cm=consultation.height_cm,
+            physical_exam=consultation.physical_exam,
             created_at=consultation.created_at,
         )
         for consultation, doctor in result.all()
@@ -188,16 +230,7 @@ async def get_my_appointments(
         .order_by(Appointment.scheduled_at.asc())
     )
     appointments = [
-        AppointmentResponse(
-            id=appointment.id,
-            specialty=appointment.specialty,
-            doctor_name=doctor.full_name if doctor else None,
-            scheduled_at=appointment.scheduled_at,
-            location=appointment.location,
-            status=appointment.status,
-            notes=appointment.notes,
-            checked_in_at=appointment.checked_in_at,
-        )
+        appointment_response(appointment, doctor)
         for appointment, doctor in result.all()
     ]
     await write_audit_event(
@@ -268,6 +301,88 @@ async def download_my_document(
     return FileResponse(path, media_type=document.content_type, filename=document.original_name)
 
 
+@router.get("/me/documents/{document_id}/verify", response_model=DocumentIntegrityResponse)
+async def verify_my_document(
+    document_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.PATIENT)),
+) -> DocumentIntegrityResponse:
+    """Verifica la firma electrónica del documento sin exponer otros archivos."""
+    patient = await get_patient_for_user(db, current_user)
+    document = await db.scalar(
+        select(Document).where(Document.id == document_id, Document.patient_id == patient.id)
+    )
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado")
+
+    intact, current_signature = check_integrity(document)
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="verify_document",
+        entity_type="document",
+        entity_id=document.id,
+        request=request,
+        detail="resultado=intacto" if intact else "resultado=alterado",
+    )
+    await db.commit()
+    return DocumentIntegrityResponse(
+        id=document.id,
+        intact=intact,
+        registered_signature=document.sha256,
+        current_signature=current_signature,
+        message=(
+            "Firma electrónica válida. El archivo no ha cambiado."
+            if intact
+            else "Documento alterado. La firma electrónica no coincide."
+        ),
+    )
+
+
+async def _confirm_checkin(
+    appointment: Appointment,
+    patient: Patient,
+    request: Request,
+    db: AsyncSession,
+    current_user: User,
+) -> Appointment:
+    """Valida la ventana y confirma la llegada una sola vez."""
+    if appointment.checked_in_at is not None:
+        return appointment
+
+    error = checkin.check_in_error(appointment)
+    if error:
+        window = checkin.window_for(appointment)
+        await write_audit_event(
+            db,
+            user=current_user,
+            action="patient_checkin_out_of_window",
+            entity_type="appointment",
+            entity_id=appointment.id,
+            request=request,
+            detail=f"motivo={window.reason}",
+        )
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=error)
+
+    appointment.checked_in_at = datetime.now(timezone.utc)
+    if appointment.status == AppointmentStatus.SCHEDULED:
+        appointment.status = AppointmentStatus.CONFIRMED
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="patient_checkin",
+        entity_type="appointment",
+        entity_id=appointment.id,
+        request=request,
+        detail=f"patient_id={patient.id}",
+    )
+    await db.commit()
+    await db.refresh(appointment)
+    return appointment
+
+
 @router.post("/me/appointments/{appointment_id}/check-in", response_model=AppointmentResponse)
 async def check_in_appointment(
     appointment_id: int,
@@ -277,6 +392,13 @@ async def check_in_appointment(
     current_user: User = Depends(require_roles(UserRole.PATIENT)),
 ) -> AppointmentResponse:
     """Confirma la llegada del paciente con el código del QR de recepción."""
+    if rate_limit.exceeded("api-checkin", request, limit=10):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados intentos de check-in. Espera un minuto.",
+            headers={"Retry-After": "60"},
+        )
+
     patient = await get_patient_for_user(db, current_user)
     appointment = await db.scalar(
         select(Appointment).where(Appointment.id == appointment_id, Appointment.patient_id == patient.id)
@@ -305,28 +427,64 @@ async def check_in_appointment(
             detail="El código no corresponde a esta cita",
         )
 
-    if appointment.checked_in_at is None:
-        appointment.checked_in_at = datetime.now(timezone.utc)
+    appointment = await _confirm_checkin(appointment, patient, request, db, current_user)
+    doctor = await db.get(Doctor, appointment.doctor_id) if appointment.doctor_id else None
+    return appointment_response(appointment, doctor)
+
+
+@router.post("/me/check-in", response_model=AppointmentResponse)
+async def check_in_with_code(
+    payload: AppointmentCheckInByCodeRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.PATIENT)),
+) -> AppointmentResponse:
+    """Check-in escribiendo solo el código: el servidor busca la cita vigente."""
+    if rate_limit.exceeded("api-checkin", request, limit=10):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados intentos de check-in. Espera un minuto.",
+            headers={"Retry-After": "60"},
+        )
+
+    patient = await get_patient_for_user(db, current_user)
+    code = payload.code.strip().upper()
+    rows = (
+        await db.execute(
+            select(Appointment, Doctor)
+            .outerjoin(Doctor, Appointment.doctor_id == Doctor.id)
+            .where(
+                Appointment.patient_id == patient.id,
+                Appointment.checkin_code.is_not(None),
+                Appointment.status.not_in([AppointmentStatus.CANCELLED, AppointmentStatus.ATTENDED]),
+            )
+            .order_by(Appointment.scheduled_at.desc())
+        )
+    ).all()
+    match = next(
+        (
+            (appointment, doctor)
+            for appointment, doctor in rows
+            if appointment.checkin_code and appointment.checkin_code.upper() == code
+        ),
+        None,
+    )
+    if match is None:
         await write_audit_event(
             db,
             user=current_user,
-            action="patient_checkin",
+            action="patient_checkin_failed",
             entity_type="appointment",
-            entity_id=appointment.id,
+            entity_id=None,
             request=request,
-            detail=f"patient_id={patient.id}",
+            detail="codigo_no_encontrado",
         )
         await db.commit()
-        await db.refresh(appointment)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El código no corresponde a ninguna cita vigente",
+        )
 
-    doctor = await db.get(Doctor, appointment.doctor_id) if appointment.doctor_id else None
-    return AppointmentResponse(
-        id=appointment.id,
-        specialty=appointment.specialty,
-        doctor_name=doctor.full_name if doctor else None,
-        scheduled_at=appointment.scheduled_at,
-        location=appointment.location,
-        status=appointment.status,
-        notes=appointment.notes,
-        checked_in_at=appointment.checked_in_at,
-    )
+    appointment, doctor = match
+    appointment = await _confirm_checkin(appointment, patient, request, db, current_user)
+    return appointment_response(appointment, doctor)

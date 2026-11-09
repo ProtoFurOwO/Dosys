@@ -20,7 +20,7 @@
     {% if can_write_appointments %}
     <a class="btn btn-line" href="/portal/pacientes/{{ patient.id }}/cita">Agendar cita</a>
     {% endif %}
-    {% if can_write_consultations %}
+    {% if can_edit_consultations %}
     <a class="btn btn-primary" href="/portal/pacientes/{{ patient.id }}/consulta">Nueva consulta</a>
     {% endif %}
   </div>
@@ -31,6 +31,85 @@
   <p>Consulta registrada el {{ created.created_at | fecha_hora }}.</p>
   <p class="note-sub">Motivo: {{ created.reason }}. Diagnóstico: {{ created.diagnosis }}.</p>
 </div>
+{% endif %}
+
+{% if edited %}
+<div class="note note-ok" role="status">
+  <p>Consulta corregida. El cambio quedó registrado en la bitácora.</p>
+  <p class="note-sub">Ahora: {{ edited.diagnosis }}.</p>
+</div>
+{% endif %}
+
+{% if actualizado %}
+<div class="note note-ok" role="status">
+  <p>Datos del paciente actualizados. La app verá los cambios en su próxima consulta.</p>
+</div>
+{% endif %}
+
+{% if estudio %}
+<div class="note note-ok" role="status">
+  <p>Estudio solicitado al laboratorio. Ya aparece en la cola de trabajo.</p>
+</div>
+{% endif %}
+
+{% if estudio_error %}
+<div class="note note-error" role="alert">
+  <p>{{ estudio_error }}</p>
+</div>
+{% endif %}
+
+{% if can_read_consultations %}
+<section class="chart">
+  <h2 class="section-title">Alertas clínicas</h2>
+  <div class="clinical-alerts">
+    <div class="clinical-alert {% if patient.allergies %}is-warning{% endif %}">
+      <span class="clinical-alert-label">Alergias</span>
+      <p>{{ patient.allergies or "Sin registrar. Confirma con el paciente antes de prescribir." }}</p>
+    </div>
+    <div class="clinical-alert">
+      <span class="clinical-alert-label">Antecedentes</span>
+      <p>{{ patient.medical_history or "Sin registrar." }}</p>
+    </div>
+    <div class="clinical-alert">
+      <span class="clinical-alert-label">Diagnósticos crónicos</span>
+      <p>{{ patient.chronic_conditions or "Sin registrar." }}</p>
+    </div>
+  </div>
+</section>
+{% else %}
+<section class="chart">
+  <h2 class="section-title">Datos clínicos</h2>
+  <p class="page-note">Restringidos al personal médico. Tu rol puede consultar identificación, contacto, citas y documentos.</p>
+</section>
+{% endif %}
+
+{% if timeline %}
+{% set kind_labels = {'consulta': 'Consulta', 'estudio': 'Estudio', 'receta': 'Receta', 'documento': 'Documento'} %}
+<section class="chart">
+  <h2 class="section-title">Línea de tiempo clínica</h2>
+  <ol class="clinical-timeline">
+    {% for event in timeline %}
+    <li class="timeline-item timeline-{{ event.kind }}">
+      <span class="timeline-dot" aria-hidden="true"></span>
+      <div class="timeline-body">
+        <p class="timeline-when">
+          {{ event.at | fecha_hora }}
+          <span class="timeline-kind">{{ kind_labels.get(event.kind, event.kind) }}</span>
+        </p>
+        <p class="timeline-title">
+          {% if event.url %}
+          <a class="link" href="{{ event.url }}">{{ event.title }}</a>
+          {% else %}
+          {{ event.title }}
+          {% endif %}
+        </p>
+        <p class="timeline-detail">{{ event.detail }}</p>
+        <p class="row-sub">{{ event.meta }}</p>
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
 {% endif %}
 
 {% if documento %}
@@ -77,7 +156,7 @@
       <thead>
         <tr>
           <th scope="col">Documento</th>
-          <th scope="col" class="hide-sm">Huella SHA-256</th>
+          <th scope="col" class="hide-sm">Firma electrónica</th>
           <th scope="col" class="hide-sm">Tamaño</th>
           <th scope="col">Fecha</th>
           <th scope="col" class="col-action"><span class="visually-hidden">Acciones</span></th>
@@ -135,7 +214,7 @@
     <div class="field">
       <label for="file">Archivo</label>
       <input id="file" name="file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" required>
-      <p class="help">PDF o imagen, hasta 10 MB. Se guarda la huella SHA-256 del contenido.</p>
+      <p class="help">PDF o imagen, hasta 10 MB. Se firma electrónicamente el contenido.</p>
     </div>
     <div class="form-actions">
       <button class="btn btn-primary" type="submit">Agregar documento</button>
@@ -144,9 +223,10 @@
   {% endif %}
 </section>
 
-{% if study_orders %}
+{% if study_orders or can_request_studies %}
 <section class="chart">
   <h2 class="section-title">Estudios de laboratorio e imagen</h2>
+  {% if study_orders %}
   <div class="table-wrap">
     <table class="table">
       <thead>
@@ -181,9 +261,38 @@
       </tbody>
     </table>
   </div>
+  {% else %}
+  <p class="page-note">Este paciente aún no tiene estudios solicitados.</p>
+  {% endif %}
+
+  {% if can_request_studies %}
+  <details class="demo-study">
+    <summary>Solicitar estudio de laboratorio <span class="chip chip-scheduled">DEMO</span></summary>
+    <form class="form" method="post" action="/portal/pacientes/{{ patient.id }}/estudio-demo">
+      <p class="help">Crea una orden real y auditada, sin consulta previa. Úsalo para mostrar la cola del laboratorio en clase.</p>
+      <div class="field-row">
+        <div class="field">
+          <label for="study_id">Estudio</label>
+          <select id="study_id" name="study_id" required>
+            <option value="">Elige un estudio</option>
+            {% for study in studies_catalog %}
+            <option value="{{ study.id }}">{{ study.name }} — {{ study.category }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="indications">Indicaciones (opcional)</label>
+          <input id="indications" name="indications" maxlength="200" placeholder="Ej. Ayuno de 8 horas">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-line" type="submit">Generar estudio</button>
+      </div>
+    </form>
+  </details>
+  {% endif %}
 </section>
 {% endif %}
-
 {% if prescriptions %}
 <section class="chart">
   <h2 class="section-title">Recetas emitidas</h2>
@@ -225,7 +334,10 @@
   <ol class="chart-list">
     {% for consultation in consultations %}
     <li class="chart-item">
-      <p class="chart-when">{{ consultation.created_at | fecha_hora }}</p>
+      <p class="chart-when">
+        {{ consultation.created_at | fecha_hora }}
+        {% if consultation.updated_at %}<span class="row-sub">Corregida {{ consultation.updated_at | fecha_hora }}</span>{% endif %}
+      </p>
       <p class="chart-who">{{ consultation.doctor_name }}, {{ consultation.specialty }}</p>
       <dl class="chart-fields">
         <div>
@@ -236,20 +348,50 @@
           <dt>Diagnóstico</dt>
           <dd>{{ consultation.diagnosis }}</dd>
         </div>
+        {% if consultation.blood_pressure or consultation.heart_rate or consultation.respiratory_rate
+              or consultation.temperature_c or consultation.oxygen_saturation
+              or consultation.weight_kg or consultation.height_cm %}
+        <div class="chart-wide">
+          <dt>Signos vitales</dt>
+          <dd>
+            <div class="vitals-summary">
+              {% if consultation.blood_pressure %}<span><b>TA</b> {{ consultation.blood_pressure }} mmHg</span>{% endif %}
+              {% if consultation.heart_rate %}<span><b>FC</b> {{ consultation.heart_rate }} lpm</span>{% endif %}
+              {% if consultation.respiratory_rate %}<span><b>FR</b> {{ consultation.respiratory_rate }} rpm</span>{% endif %}
+              {% if consultation.temperature_c %}<span><b>T°</b> {{ consultation.temperature_c }} °C</span>{% endif %}
+              {% if consultation.oxygen_saturation %}<span><b>SpO₂</b> {{ consultation.oxygen_saturation }}%</span>{% endif %}
+              {% if consultation.weight_kg %}<span><b>Peso</b> {{ consultation.weight_kg }} kg</span>{% endif %}
+              {% if consultation.height_cm %}<span><b>Talla</b> {{ consultation.height_cm }} cm</span>{% endif %}
+            </div>
+          </dd>
+        </div>
+        {% endif %}
+        {% if consultation.physical_exam %}
+        <div class="chart-wide">
+          <dt>Exploración física</dt>
+          <dd>{{ consultation.physical_exam }}</dd>
+        </div>
+        {% endif %}
         {% if consultation.notes %}
         <div>
-          <dt>Notas</dt>
+          <dt>Plan</dt>
           <dd>{{ consultation.notes }}</dd>
         </div>
         {% endif %}
       </dl>
+      <div class="row-actions">
+        <a class="btn btn-quiet" href="/portal/pacientes/{{ patient.id }}/consulta/{{ consultation.id }}/pdf" target="_blank" rel="noopener">Nota PDF</a>
+        {% if can_edit_consultations %}
+        <a class="btn btn-quiet" href="/portal/pacientes/{{ patient.id }}/consulta/{{ consultation.id }}/editar">Corregir diagnóstico</a>
+        {% endif %}
+      </div>
     </li>
     {% endfor %}
   </ol>
   {% else %}
   <div class="empty">
     <p class="empty-title">Este paciente aún no tiene consultas</p>
-    {% if can_write_consultations %}
+    {% if can_edit_consultations %}
     <p>Registra la primera consulta para que aparezca también en la app del paciente.</p>
     <a class="btn btn-line" href="/portal/pacientes/{{ patient.id }}/consulta">Registrar consulta</a>
     {% else %}

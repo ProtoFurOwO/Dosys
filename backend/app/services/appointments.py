@@ -65,6 +65,7 @@ async def create_appointment(
     location: str,
     notes: str | None,
     room: str | None = None,
+    status: AppointmentStatus = AppointmentStatus.SCHEDULED,
 ) -> Appointment:
     await ensure_available(db, patient=patient, doctor=doctor, room=room, scheduled_at=scheduled_at)
     appointment = Appointment(
@@ -74,8 +75,8 @@ async def create_appointment(
         scheduled_at=scheduled_at,
         location=location.strip(),
         room=(room or "").strip() or None,
-        status=AppointmentStatus.SCHEDULED,
-        checkin_code=generate_checkin_code(),
+        status=status,
+        checkin_code=generate_checkin_code() if status != AppointmentStatus.REQUESTED else None,
         notes=notes.strip() if notes and notes.strip() else None,
     )
     db.add(appointment)

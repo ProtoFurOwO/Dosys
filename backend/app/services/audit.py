@@ -1,13 +1,14 @@
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.request_ip import resolve_client_ip
 from app.models.audit_log import AuditLog
 from app.models.user import User
 
 
 def client_ip(request: Request) -> str | None:
-    """No se confía en X-Forwarded-For hasta configurar proxies confiables en VPS."""
-    return request.client.host if request.client else None
+    """IP real del cliente; NPM/Cloudflare se resuelven solo desde proxies internos."""
+    return resolve_client_ip(request)
 
 
 async def write_audit_event(

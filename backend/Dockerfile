@@ -14,6 +14,7 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY app ./app
+COPY scripts ./scripts
 
 # Los documentos se guardan en un volumen; la carpeta nace con el usuario de la app
 # para que el contenedor pueda escribir en él sin privilegios.

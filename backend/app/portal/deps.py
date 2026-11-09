@@ -52,6 +52,7 @@ async def current_doctor(request: Request, db: AsyncSession) -> User | None:
         return None
 
     request.state.permissions = granted
+    request.state.role_name = user.role.name
     return user
 
 

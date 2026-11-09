@@ -10,9 +10,11 @@ import kotlinx.coroutines.launch
 import mx.unach.dosys.core.di.ServiceLocator
 import mx.unach.dosys.data.model.PatientAppointment
 import mx.unach.dosys.data.repository.ClinicalResult
+import java.time.OffsetDateTime
 
 data class AppointmentsUiState(
-    val appointments: List<PatientAppointment> = emptyList(),
+    val upcoming: List<PatientAppointment> = emptyList(),
+    val past: List<PatientAppointment> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
 )
@@ -33,8 +35,12 @@ class AppointmentsViewModel : ViewModel() {
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             when (val result = repository.appointments()) {
-                is ClinicalResult.Success -> _state.update {
-                    it.copy(appointments = result.value, isLoading = false)
+                is ClinicalResult.Success -> {
+                    val now = OffsetDateTime.now()
+                    val (upcoming, past) = AppointmentFilters.split(result.value, now)
+                    _state.update {
+                        it.copy(upcoming = upcoming, past = past, isLoading = false)
+                    }
                 }
                 is ClinicalResult.Error -> _state.update {
                     it.copy(isLoading = false, error = result.message)

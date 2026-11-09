@@ -1,0 +1,277 @@
+{% extends "panel.html" %}
+{% block title %}Inicio · D.O.S.Y.S Portal clínico{% endblock %}
+{% block content_class %}content-wide{% endblock %}
+{% block content %}
+<header class="page-head dashboard-head">
+  <div>
+    <p class="eyebrow">{{ today_label }} · {{ role_name }}</p>
+    <h1>{{ greeting }}, {{ doctor_name }}</h1>
+    <p class="page-note">Resumen operativo de la clínica y pendientes del día.</p>
+  </div>
+  <div class="page-actions">
+    {% if can_patients %}
+    <a class="btn btn-quiet" href="/portal">Buscar paciente</a>
+    {% endif %}
+    {% if can_write_patients %}
+    <a class="btn btn-line" href="/portal/pacientes/nuevo">Nuevo paciente</a>
+    {% endif %}
+    {% if can_write_appointments %}
+    <a class="btn btn-line" href="/portal/agenda">Agenda</a>
+    {% endif %}
+    {% if can_perform_studies %}
+    <a class="btn btn-primary" href="/portal/laboratorio">Laboratorio</a>
+    {% endif %}
+  </div>
+</header>
+
+<section class="stats-grid" aria-label="Indicadores del día">
+  {% if can_appointments %}
+  <a class="stat-card" href="/portal/citas">
+    <span class="stat-label">Citas de hoy</span>
+    <strong>{{ stats.appointments }}</strong>
+    <span class="stat-note">Agenda programada</span>
+  </a>
+  <a class="stat-card stat-card-accent" href="/portal/en-espera">
+    <span class="stat-label">En espera</span>
+    <strong>{{ stats.waiting }}</strong>
+    <span class="stat-note">Pacientes con check-in</span>
+  </a>
+  {% if can_write_appointments %}
+  <a class="stat-card" href="/portal/agenda?estado=requested">
+    <span class="stat-label">Solicitudes</span>
+    <strong>{{ stats.requested }}</strong>
+    <span class="stat-note">Citas por confirmar</span>
+  </a>
+  {% endif %}
+  {% endif %}
+  {% if can_consultations %}
+  <a class="stat-card" href="/portal">
+    <span class="stat-label">Consultas de hoy</span>
+    <strong>{{ stats.consultations }}</strong>
+    <span class="stat-note">Notas registradas</span>
+  </a>
+  {% endif %}
+  {% if can_studies %}
+  <a class="stat-card" href="/portal/laboratorio">
+    <span class="stat-label">Estudios pendientes</span>
+    <strong>{{ stats.pending_studies }}</strong>
+    <span class="stat-note">Solicitados o en proceso</span>
+  </a>
+  {% endif %}
+  {% if can_patients %}
+  <a class="stat-card" href="/portal">
+    <span class="stat-label">Pacientes</span>
+    <strong>{{ stats.patients }}</strong>
+    <span class="stat-note">Expedientes activos</span>
+  </a>
+  {% endif %}
+  {% if can_users %}
+  <a class="stat-card" href="/portal/usuarios">
+    <span class="stat-label">Usuarios</span>
+    <strong>{{ stats.users }}</strong>
+    <span class="stat-note">Cuentas del sistema</span>
+  </a>
+  {% endif %}
+</section>
+
+{% if can_consultations %}
+<section class="dash-card chart-card">
+  <div class="dash-card-head">
+    <div>
+      <h2>Consultas · últimos 7 días</h2>
+      <p class="page-note">Actividad clínica registrada por día.</p>
+    </div>
+    <span class="chart-total">{{ chart_total }} en total</span>
+  </div>
+  {% if chart_total %}
+  <svg class="bar-chart" viewBox="0 0 360 100" role="img" aria-label="Consultas de los últimos siete días">
+    {% for point in consultation_chart %}
+    <rect class="bar" x="{{ loop.index0 * 48 + 18 }}" y="{{ point.y }}" width="30" height="{{ point.height }}" rx="5"></rect>
+    <text class="bar-value" x="{{ loop.index0 * 48 + 33 }}" y="{{ point.y - 5 }}" text-anchor="middle">{{ point.count }}</text>
+    <text class="bar-label" x="{{ loop.index0 * 48 + 33 }}" y="94" text-anchor="middle">{{ point.label }}</text>
+    {% endfor %}
+  </svg>
+  {% else %}
+  <p class="empty-inline">Aún no hay consultas en este periodo.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+<div class="dashboard-grid">
+  {% if can_appointments %}
+  <section class="dash-card">
+    <div class="dash-card-head">
+      <div>
+        <h2>Agenda de hoy</h2>
+        <p class="page-note">Citas ordenadas por hora.</p>
+      </div>
+      <a class="link" href="/portal/agenda">Ver agenda</a>
+    </div>
+    {% if appointments_today %}
+    <ul class="dash-list">
+      {% for appointment in appointments_today %}
+      <li class="dash-row">
+        <div class="dash-time">{{ appointment.time }}</div>
+        <div class="dash-main">
+          <a class="link" href="/portal/pacientes/{{ appointment.patient_id }}">{{ appointment.patient_name }}</a>
+          <span class="row-sub">{{ appointment.specialty }} · {{ appointment.room }}</span>
+        </div>
+        <div class="dash-meta">
+          <span class="modern-status-pill status-pill-{{ appointment.status }}">{{ appointment.status_label }}</span>
+          {% if appointment.checked_in %}<span class="chip chip-confirmed">Check-in</span>{% endif %}
+          <a class="btn btn-quiet" href="/portal/citas/{{ appointment.id }}">Ver</a>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-inline">No hay citas programadas para hoy.</p>
+    {% endif %}
+  </section>
+
+  <section class="dash-card">
+    <div class="dash-card-head">
+      <div>
+        <h2>Sala de espera</h2>
+        <p class="page-note">Pacientes que ya llegaron.</p>
+      </div>
+      <a class="link" href="/portal/en-espera">Pantalla completa</a>
+    </div>
+    {% if waiting %}
+    <ul class="dash-list">
+      {% for item in waiting %}
+      <li class="dash-row">
+        <div class="wait-badge">{{ item.waited }}<small>min</small></div>
+        <div class="dash-main">
+          <a class="link" href="/portal/pacientes/{{ item.patient_id }}">{{ item.patient_name }}</a>
+          <span class="row-sub">{{ item.specialty }} · {{ item.room }} · llegó {{ item.checked_in }}</span>
+        </div>
+        <div class="dash-meta">
+          {% if can_start_consultations %}
+          <a class="btn btn-primary" href="/portal/pacientes/{{ item.patient_id }}/consulta?cita={{ item.id }}">Iniciar consulta</a>
+          {% else %}
+          <a class="btn btn-line" href="/portal/citas/{{ item.id }}">Ver cita</a>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-inline">Nadie en espera en este momento.</p>
+    {% endif %}
+  </section>
+
+  {% if can_write_appointments %}
+  <section class="dash-card">
+    <div class="dash-card-head">
+      <div>
+        <h2>Solicitudes de cita</h2>
+        <p class="page-note">Pendientes de confirmar por recepción.</p>
+      </div>
+      <a class="link" href="/portal/agenda?estado=requested">Ver todas</a>
+    </div>
+    {% if requested_appointments %}
+    <ul class="dash-list">
+      {% for request in requested_appointments %}
+      <li class="dash-row">
+        <div class="dash-main">
+          <a class="link" href="/portal/citas/{{ request.id }}">{{ request.patient_name }}</a>
+          <span class="row-sub">{{ request.scheduled_at }} · {{ request.specialty }} · {{ request.doctor_name }}</span>
+        </div>
+        <div class="dash-meta">
+          <span class="chip chip-scheduled">Solicitada</span>
+          <a class="btn btn-line" href="/portal/citas/{{ request.id }}">Revisar</a>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-inline">No hay solicitudes pendientes.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+  {% endif %}
+
+  {% if can_studies %}
+  <section class="dash-card">
+    <div class="dash-card-head">
+      <div>
+        <h2>Estudios pendientes</h2>
+        <p class="page-note">Órdenes que esperan al laboratorio.</p>
+      </div>
+      <a class="link" href="/portal/laboratorio">Abrir laboratorio</a>
+    </div>
+    {% if pending_studies %}
+    <ul class="dash-list">
+      {% for study in pending_studies %}
+      <li class="dash-row">
+        <div class="dash-main">
+          <a class="link" href="/portal/pacientes/{{ study.patient_id }}">{{ study.patient_name }}</a>
+          <span class="row-sub">{{ study.study }} · solicitado {{ study.requested }}</span>
+        </div>
+        <div class="dash-meta">
+          <span class="chip {% if study.status == 'in_progress' %}chip-confirmed{% else %}chip-scheduled{% endif %}">
+            {{ study.status_label }}
+          </span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-inline">Sin estudios pendientes.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if can_consultations %}
+  <section class="dash-card">
+    <div class="dash-card-head">
+      <div>
+        <h2>Consultas recientes</h2>
+        <p class="page-note">Últimas notas registradas en la clínica.</p>
+      </div>
+    </div>
+    {% if recent_consultations %}
+    <ul class="dash-list">
+      {% for consultation in recent_consultations %}
+      <li class="dash-row">
+        <div class="dash-main">
+          <a class="link" href="/portal/pacientes/{{ consultation.patient_id }}">{{ consultation.patient_name }}</a>
+          <span class="row-sub">{{ consultation.diagnosis }} · {{ consultation.doctor_name }} · {{ consultation.at }}</span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-inline">Aún no hay consultas registradas.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if can_audit %}
+  <section class="dash-card">
+    <div class="dash-card-head">
+      <div>
+        <h2>Actividad reciente</h2>
+        <p class="page-note">Bitácora de solo lectura.</p>
+      </div>
+      <a class="link" href="/portal/actividad">Ver todo</a>
+    </div>
+    {% if recent_activity %}
+    <ul class="dash-list dash-activity">
+      {% for event in recent_activity %}
+      <li class="dash-row">
+        <div class="dash-main">
+          <span>{{ event.label }}</span>
+          <span class="row-sub">{{ event.actor }} · {{ event.at }}</span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-inline">Sin actividad registrada.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

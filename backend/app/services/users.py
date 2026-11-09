@@ -99,6 +99,9 @@ async def create_patient_account(
     email: str | None,
     username: str,
     password: str,
+    allergies: str | None = None,
+    medical_history: str | None = None,
+    chronic_conditions: str | None = None,
 ) -> tuple[User, Patient]:
     await _ensure_username_free(db, username)
     clean_email = await _ensure_email_free(db, email)
@@ -124,6 +127,9 @@ async def create_patient_account(
         birth_date=birth_date,
         emergency_contact=emergency_contact or None,
         email=clean_email,
+        allergies=(allergies or "").strip() or None,
+        medical_history=(medical_history or "").strip() or None,
+        chronic_conditions=(chronic_conditions or "").strip() or None,
     )
     db.add(patient)
     await db.flush()

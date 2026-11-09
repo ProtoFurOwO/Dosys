@@ -12,86 +12,71 @@ import json
 import os
 import re
 from datetime import datetime, timedelta
-from http.cookiejar import CookieJar
-from urllib.error import HTTPError
-from urllib.parse import urlencode
-from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
+
+import requests
 
 BASE_URL = os.getenv("DOSYS_API_URL", "http://127.0.0.1:8000").rstrip("/")
 # Cloudflare bloquea el User-Agent por defecto de Python (error 1010).
 USER_AGENT = "D.O.S.Y.S/1.0 (verificacion academica)"
 DOCTOR = {"username": "medico", "password": "Medico123!"}
 ADMIN = {"username": "admin", "password": "Admin123!"}
-PATIENT = {"username": "paciente", "password": "Paciente123!"}
+PATIENT = {
+    "username": "paciente",
+    "password": "Paciente123!",
+    "device_id": "verify-local-device-0001",
+    "device_name": "Verificación portal",
+}
+VERIFY_DEVICE = {"device_id": "verify-local-device-0001", "device_name": "Verificación portal"}
 
 
 def api(path: str, *, method: str = "GET", body: dict | None = None, token: str | None = None):
-    data = json.dumps(body, ensure_ascii=False).encode("utf-8") if body is not None else None
     headers = {"User-Agent": USER_AGENT}
-    if data:
-        headers["Content-Type"] = "application/json"
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    request = Request(f"{BASE_URL}{path}", data=data, headers=headers, method=method)
-    with urlopen(request, timeout=15) as response:
-        return response.status, json.loads(response.read().decode("utf-8"))
-
-
-def form_request(opener, path: str, fields: dict) -> tuple[int, str]:
-    data = urlencode(fields, doseq=True).encode()
-    request = Request(f"{BASE_URL}{path}", data=data, headers={"User-Agent": USER_AGENT}, method="POST")
+    response = requests.request(
+        method,
+        f"{BASE_URL}{path}",
+        json=body,
+        headers=headers,
+        timeout=20,
+    )
     try:
-        with opener.open(request, timeout=15) as response:
-            return response.status, response.read().decode("utf-8")
-    except HTTPError as error:
-        return error.code, error.read().decode("utf-8")
+        return response.status_code, response.json()
+    except ValueError:
+        return response.status_code, {"detail": response.text[:300]}
 
 
-def get(opener, path: str) -> tuple[int, str]:
-    request = Request(f"{BASE_URL}{path}", headers={"User-Agent": USER_AGENT}, method="GET")
-    try:
-        with opener.open(request, timeout=15) as response:
-            return response.status, response.read().decode("utf-8")
-    except HTTPError as error:
-        return error.code, error.read().decode("utf-8")
+def new_session() -> requests.Session:
+    session = requests.Session()
+    session.headers.update({"User-Agent": USER_AGENT})
+    return session
+
+
+def form_request(session: requests.Session, path: str, fields: dict) -> tuple[int, str]:
+    response = session.post(f"{BASE_URL}{path}", data=fields, timeout=20, allow_redirects=True)
+    return response.status_code, response.text
+
+
+def get(session: requests.Session, path: str) -> tuple[int, str]:
+    response = session.get(f"{BASE_URL}{path}", timeout=20, allow_redirects=True)
+    return response.status_code, response.text
 
 
 def upload_request(
-    opener,
+    session: requests.Session,
     path: str,
     fields: dict,
     filename: str,
     content: bytes,
     content_type: str = "application/pdf",
 ) -> tuple[int, str]:
-    boundary = "----dosysboundary"
-    parts = [
-        f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'
-        for name, value in fields.items()
-    ]
-    parts.append(
-        f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{filename}"\r\n'
-        f"Content-Type: {content_type}\r\n\r\n"
-    )
-    body = "".join(parts).encode("utf-8") + content + f"\r\n--{boundary}--\r\n".encode("utf-8")
-    request = Request(
+    response = session.post(
         f"{BASE_URL}{path}",
-        data=body,
-        headers={
-            "User-Agent": USER_AGENT,
-            "Content-Type": f"multipart/form-data; boundary={boundary}",
-        },
-        method="POST",
+        data=fields,
+        files={"file": (filename, content, content_type)},
+        timeout=20,
     )
-    try:
-        with opener.open(request, timeout=20) as response:
-            return response.status, response.read().decode("utf-8")
-    except HTTPError as error:
-        return error.code, error.read().decode("utf-8")
-
-
-def new_session():
-    return build_opener(HTTPCookieProcessor(CookieJar()))
+    return response.status_code, response.text
 
 
 def main() -> None:
@@ -151,20 +136,27 @@ def main() -> None:
     status, html = get(opener, f"/portal/pacientes/{patient_id}/cita")
     assert status == 200 and "Agendar cita" in html, "El formulario de cita debe abrir"
 
-    future = (datetime.now() + timedelta(days=7)).date().isoformat()
-    status, html = form_request(
-        opener,
-        f"/portal/pacientes/{patient_id}/cita",
-        {
-            "specialty": "Cardiología",
-            "fecha": future,
-            "hora": "11:30",
-            "location": "Consultorio 7",
-            "notes": "Acude con ayuno de 8 horas.",
-        },
-    )
-    assert status == 200 and "Cita agendada" in html, "La cita debe registrarse en el portal"
-    match = re.search(r'href="/portal/citas/(\d+)"', html)
+    # La cita de prueba debe caer en un hueco libre: el sistema rechaza
+    # empalmes y las corridas anteriores dejan citas agendadas.
+    appointment_html = None
+    for attempt in range(12):
+        candidate = datetime.now() + timedelta(days=20 + attempt)
+        status, html = form_request(
+            opener,
+            f"/portal/pacientes/{patient_id}/cita",
+            {
+                "specialty": "Cardiología",
+                "fecha": candidate.date().isoformat(),
+                "hora": f"{8 + attempt:02d}:15",
+                "location": "Consultorio 1",
+                "notes": "Acude con ayuno de 8 horas.",
+            },
+        )
+        if status == 200 and "Cita agendada" in html:
+            appointment_html = html
+            break
+    assert appointment_html, "La cita debe registrarse en el portal"
+    match = re.search(r'href="/portal/citas/(\d+)"', appointment_html)
     assert match, "La lista debe ofrecer el botón Ver QR"
     status, qr_html = get(opener, f"/portal/citas/{match.group(1)}")
     assert status == 200 and "Código de check-in" in qr_html and "Código de respaldo" in qr_html, "El QR debe verse"
@@ -178,7 +170,7 @@ def main() -> None:
     status, html = form_request(
         opener,
         f"/portal/pacientes/{patient_id}/cita",
-        {"specialty": "Cardiología", "fecha": "2020-01-01", "hora": "11:30", "location": "Consultorio 7", "notes": ""},
+        {"specialty": "Cardiología", "fecha": "2020-01-01", "hora": "11:30", "location": "Consultorio 1", "notes": ""},
     )
     assert status == 422 and "futuras" in html, "El portal debe rechazar citas en el pasado"
 
@@ -228,7 +220,9 @@ def main() -> None:
     assert status == 200 and "Correo enviado" in html, "El envío simulado debe mostrar la vista previa"
 
     status, login = api(
-        "/api/v1/auth/login", method="POST", body={"username": patient_username, "password": patient_password}
+        "/api/v1/auth/login",
+        method="POST",
+        body={"username": patient_username, "password": patient_password, **VERIFY_DEVICE},
     )
     assert status == 200 and login["role"] == "patient", "El paciente registrado debe entrar a la app"
     status, profile = api("/api/v1/patients/me", token=login["access_token"])
@@ -263,11 +257,12 @@ def main() -> None:
     assert status == 200 and login["role"] == "doctor", "El médico nuevo debe entrar a la API"
 
     status, _ = form_request(admin, f"/portal/usuarios/{doctor_user_id}/estado", {})
-    try:
-        api("/api/v1/auth/login", method="POST", body={"username": doctor_username, "password": patient_password})
-        raise AssertionError("Un usuario desactivado no debe poder entrar")
-    except HTTPError as error:
-        assert error.code == 401
+    status, _ = api(
+        "/api/v1/auth/login",
+        method="POST",
+        body={"username": doctor_username, "password": patient_password},
+    )
+    assert status == 401, "Un usuario desactivado no debe poder entrar"
 
     status, _ = form_request(admin, f"/portal/usuarios/{doctor_user_id}/estado", {})
     status, login = api(
@@ -328,15 +323,17 @@ def main() -> None:
 
     status, login = api("/api/v1/auth/login", method="POST", body={"username": doctor_username, "password": new_password})
     assert login["role"] == role_code, "El rol del token debe ser el nuevo"
-    try:
-        api("/api/v1/doctor/consultations", method="POST", token=login["access_token"], body={
+    status, _ = api(
+        "/api/v1/doctor/consultations",
+        method="POST",
+        token=login["access_token"],
+        body={
             "patient_id": patient_id,
             "reason": "Intento sin permiso",
             "diagnosis": "No debe permitirse",
-        })
-        raise AssertionError("Sin consultations:write la API debe rechazar")
-    except HTTPError as error:
-        assert error.code == 403, f"La API debe responder 403 (fue {error.code})"
+        },
+    )
+    assert status == 403, f"La API debe responder 403 (fue {status})"
 
     # 9d. Documentos: subir al expediente, verificar la huella y verlo desde la app.
     pdf_bytes = b"%PDF-1.4\n% documento de prueba\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n"

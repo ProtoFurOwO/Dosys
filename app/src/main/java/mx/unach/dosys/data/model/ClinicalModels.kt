@@ -14,6 +14,7 @@ data class PatientConsultation(
     val diagnosis: String,
     val notes: String? = null,
     @SerialName("created_at") val createdAt: String,
+    @SerialName("updated_at") val updatedAt: String? = null,
 )
 
 @Serializable
@@ -35,6 +36,11 @@ data class PatientAppointment(
     val status: AppointmentStatus,
     val notes: String? = null,
     @SerialName("checked_in_at") val checkedInAt: String? = null,
+    @SerialName("is_upcoming") val isUpcoming: Boolean = true,
+    @SerialName("checkin_available") val checkinAvailable: Boolean = false,
+    @SerialName("checkin_opens_at") val checkinOpensAt: String? = null,
+    @SerialName("checkin_closes_at") val checkinClosesAt: String? = null,
+    @SerialName("checkin_reason") val checkinReason: String? = null,
 )
 
 /** Código del QR de recepción para confirmar la llegada. */

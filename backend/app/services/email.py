@@ -21,6 +21,23 @@ def delivery_enabled() -> bool:
     return bool(settings.resend_api_key.strip())
 
 
+async def send_appointment_confirmation(
+    *, to: str, patient_name: str, doctor_name: str, when: str, location: str
+) -> tuple[bool, str]:
+    """Correo de cita confirmada (texto simple, sin datos clínicos)."""
+    text = (
+        f"Hola {patient_name}:\n\n"
+        f"Tu cita en D.O.S.Y.S quedó confirmada.\n\n"
+        f"Médico: {doctor_name}\n"
+        f"Fecha y hora: {when}\n"
+        f"Lugar: {location}\n\n"
+        "Llega 10 minutos antes y presenta tu código QR de check-in.\n"
+        "Si no puedes asistir, contacta a recepción.\n\n"
+        "D.O.S.Y.S · Sistema hospitalario"
+    )
+    return await send_email(to=to, subject="Cita confirmada · D.O.S.Y.S", text=text)
+
+
 async def send_email(*, to: str, subject: str, text: str) -> tuple[bool, str]:
     """Envía el correo; devuelve (ok, motivo). El motivo va vacío si se envió."""
     if not to:

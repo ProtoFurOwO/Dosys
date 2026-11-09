@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="D.O.S.Y.S: expediente clínico digital, portal médico y app Android para el paciente.">
+  <title>D.O.S.Y.S · Historial clínico digital</title>
+  <link rel="icon" href="/portal/static/img/LogoDOSYS.png">
+  <style>
+    @font-face {
+      font-family: "Geist";
+      src: url("/portal/static/fonts/geist-sans-latin-400-normal.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Geist";
+      src: url("/portal/static/fonts/geist-sans-latin-500-normal.woff2") format("woff2");
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Geist";
+      src: url("/portal/static/fonts/geist-sans-latin-600-normal.woff2") format("woff2");
+      font-weight: 600;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    :root {
+      --green: #0a3922;
+      --coral: #ff643b;
+      --indigo: #460095;
+      --leaf: #1dbf73;
+      --teal: #003642;
+      --lavender: #eee2ff;
+      --mint: #d2f2e3;
+      --sky: #ccf0f8;
+      --sage: #e4f7ee;
+      --lilac: #fdf0ff;
+      --peach: #ffede8;
+      --cream: #faf7e8;
+      --paper: #ffffff;
+      --ink: #000000;
+      --graphite: #3d3d3d;
+      --slate: #7a7a7a;
+      --ash: #a6a6a6;
+      --fog: #e0e0e0;
+      --cloud: #f2f2f2;
+      --display: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      --page: 1280px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--lavender);
+      color: var(--ink);
+      font-family: var(--display);
+      font-weight: 400;
+      line-height: 1.38;
+      -webkit-font-smoothing: antialiased;
+      font-feature-settings: "ss03";
+    }
+    a { color: inherit; }
+    .wrap { width: min(var(--page), calc(100% - 80px)); margin: 0 auto; }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .eyebrow::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 12px 24px;
+      border: 1px solid transparent;
+      border-radius: 40px;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .btn-coral { background: var(--coral); color: var(--paper); }
+    .btn-coral:hover { background: #f0522d; }
+    .btn-ghost { border-color: rgba(255,255,255,.7); color: var(--paper); }
+    .btn-ghost:hover { background: rgba(255,255,255,.1); border-color: var(--paper); }
+    .btn-outline { border-color: var(--ink); background: var(--paper); color: var(--ink); }
+    .btn-outline:hover { background: var(--cream); }
+    .btn-dark { background: var(--green); color: var(--paper); }
+    .btn-dark:hover { background: var(--teal); }
+
+    /* ── Nav ─────────────────────────────────────────────────────────────── */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: var(--paper);
+      border-bottom: 1px solid var(--fog);
+    }
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      min-height: 76px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      flex: none;
+      text-decoration: none;
+    }
+    .brand img { width: 124px; height: auto; display: block; }
+    .brand small {
+      color: var(--slate);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .nav-links a { text-decoration: none; color: var(--green); }
+    .nav-links a:hover { color: var(--indigo); }
+    .nav-cta { margin-left: 6px; }
+
+    /* ── Hero ────────────────────────────────────────────────────────────── */
+    .hero {
+      background: var(--green);
+      color: var(--paper);
+      padding: 88px 0 96px;
+      overflow: hidden;
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr);
+      gap: 64px;
+      align-items: center;
+    }
+    .hero .eyebrow { color: var(--leaf); }
+    .hero h1 {
+      max-width: 11ch;
+      margin: 22px 0 0;
+      font-size: clamp(4.1rem, 8.6vw, 7.25rem);
+      font-weight: 500;
+      line-height: .92;
+      letter-spacing: -.028em;
+    }
+    .hero h1 .leaf { color: var(--leaf); }
+    .hero-copy {
+      max-width: 520px;
+      margin: 24px 0 30px;
+      color: var(--mint);
+      font-size: 18px;
+      line-height: 1.4;
+    }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 30px;
+      color: #a8cbb9;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+    }
+    .hero-visual {
+      position: relative;
+      min-height: 450px;
+      display: grid;
+      place-items: center;
+    }
+    .pastel-stage {
+      position: absolute;
+      inset: 38px 6% 20px 2%;
+      border-radius: 32px;
+      background: var(--mint);
+      transform: rotate(-3deg);
+    }
+    .pastel-stage::after {
+      content: "";
+      position: absolute;
+      right: -28px;
+      top: 34px;
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      background: var(--peach);
+    }
+    .phone {
+      position: relative;
+      z-index: 1;
+      width: min(320px, 82%);
+      padding: 8px;
+      border-radius: 38px;
+      background: var(--green);
+      border: 1px solid #1d5c3a;
+    }
+    .phone-screen {
+      min-height: 400px;
+      padding: 18px;
+      border-radius: 30px;
+      background: var(--paper);
+      color: var(--ink);
+    }
+    .phone-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--fog);
+      color: var(--green);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .phone-top span:last-child { color: var(--slate); font-weight: 500; text-transform: none; }
+    .phone-label {
+      margin: 22px 0 8px;
+      color: var(--slate);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .appointment-card {
+      padding: 14px;
+      border-radius: 16px;
+      background: var(--lavender);
+    }
+    .appointment-card strong {
+      display: block;
+      color: var(--green);
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .appointment-card span {
+      display: block;
+      margin-top: 4px;
+      color: #47264c;
+      font-size: 12px;
+    }
+    .appointment-card .tag { margin-top: 10px; background: var(--paper); color: var(--indigo); }
+    .phone-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 10px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--fog);
+      font-size: 12px;
+    }
+    .phone-row b { color: var(--green); font-weight: 600; }
+    .phone-row span { color: var(--slate); }
+    .signature-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 18px;
+      padding: 10px 12px;
+      border-radius: 9999px;
+      background: var(--sage);
+      color: var(--green);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .signature-pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--leaf); }
+    .hero-floating {
+      position: absolute;
+      z-index: 2;
+      right: -14px;
+      bottom: 18px;
+      width: 170px;
+      padding: 14px;
+      border-radius: 16px;
+      background: var(--paper);
+      color: var(--green);
+      border: 1px solid var(--fog);
+    }
+    .hero-floating .tag { background: var(--peach); color: var(--green); }
+    .hero-floating strong { display: block; margin-top: 10px; font-size: 13px; font-weight: 600; }
+    .hero-floating span { display: block; margin-top: 3px; color: var(--slate); font-size: 11px; }
+
+    /* ── Bands ───────────────────────────────────────────────────────────── */
+    .band { padding: 80px 0; }
+    .band-white { background: var(--paper); }
+    .band-lavender { background: var(--lavender); }
+    .band-green { background: var(--green); color: var(--paper); }
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(280px, .9fr);
+      gap: 56px;
+      align-items: end;
+      margin-bottom: 40px;
+    }
+    .section-head .eyebrow { color: var(--green); }
+    .section-head h2 {
+      max-width: 14ch;
+      margin: 14px 0 0;
+      font-size: clamp(2.6rem, 5vw, 4.3rem);
+      font-weight: 500;
+      line-height: 1.02;
+      letter-spacing: -.028em;
+    }
+    .section-head p {
+      max-width: 42ch;
+      margin: 0;
+      color: var(--graphite);
+      font-size: 18px;
+      line-height: 1.4;
+    }
+    .section-head .eyebrow { margin-bottom: 0; }
+
+    /* ── Feature cards ───────────────────────────────────────────────────── */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px;
+    }
+    .feature {
+      min-height: 260px;
+      padding: 32px;
+      border-radius: 24px;
+      display: flex;
+      flex-direction: column;
+    }
+    .feature-mint { background: var(--mint); }
+    .feature-sky { background: var(--sky); }
+    .feature-lilac { background: var(--lilac); }
+    .feature-peach { background: var(--peach); }
+    .feature-cream { background: var(--cream); }
+    .feature-sage { background: var(--sage); }
+    .feature .tag { align-self: flex-start; background: rgba(255,255,255,.55); color: var(--green); }
+    .feature h3 {
+      margin: 24px 0 8px;
+      color: var(--green);
+      font-size: clamp(1.6rem, 2.4vw, 2rem);
+      font-weight: 600;
+      line-height: 1.08;
+      letter-spacing: -.019em;
+    }
+    .feature p {
+      max-width: 38ch;
+      margin: 0;
+      color: var(--graphite);
+      font-size: 16px;
+      line-height: 1.38;
+    }
+    .feature-foot {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: auto;
+      padding-top: 24px;
+    }
+    .feature-foot a {
+      color: var(--green);
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .feature-foot a:hover { text-decoration: underline; }
+    .feature-icon {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.65);
+      color: var(--green);
+    }
+
+    /* ── Toolkit / QR ────────────────────────────────────────────────────── */
+    .toolkit-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, .72fr);
+      gap: 64px;
+      align-items: center;
+    }
+    .toolkit-copy .eyebrow { color: var(--indigo); }
+    .toolkit-copy h2 {
+      max-width: 13ch;
+      margin: 14px 0 16px;
+      color: var(--indigo);
+      font-size: clamp(2.6rem, 5vw, 4.1rem);
+      font-weight: 500;
+      line-height: 1.02;
+      letter-spacing: -.028em;
+    }
+    .toolkit-copy > p {
+      max-width: 42ch;
+      margin: 0 0 28px;
+      color: #47264c;
+      font-size: 18px;
+      line-height: 1.4;
+    }
+    .checklist { display: grid; gap: 8px; }
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      color: var(--green);
+      font-size: 20px;
+      font-weight: 500;
+    }
+    .check-item.is-active { background: var(--paper); }
+    .check-icon {
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      flex: none;
+      border-radius: 8px;
+      background: var(--indigo);
+      color: var(--paper);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .qr-panel {
+      padding: 32px;
+      border-radius: 24px;
+      background: var(--paper);
+      color: var(--green);
+    }
+    .qr-panel .tag { background: var(--mint); color: var(--green); }
+    .qr-panel h3 {
+      margin: 18px 0 4px;
+      font-size: 26px;
+      font-weight: 600;
+      letter-spacing: -.019em;
+    }
+    .qr-panel p { margin: 0; color: var(--slate); font-size: 14px; }
+    .qr-panel .qr {
+      display: grid;
+      place-items: center;
+      padding: 24px 0 18px;
+    }
+    .qr-panel .qr svg { width: min(100%, 220px); height: auto; }
+    .qr-panel .btn { width: 100%; }
+
+    /* ── Flow ────────────────────────────────────────────────────────────── */
+    .flow-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .flow-step {
+      padding: 22px;
+      border-radius: 20px;
+      background: var(--paper);
+    }
+    .flow-step:nth-child(1) { background: var(--mint); }
+    .flow-step:nth-child(2) { background: var(--sky); }
+    .flow-step:nth-child(3) { background: var(--lilac); }
+    .flow-step:nth-child(4) { background: var(--peach); }
+    .flow-step .tag { background: rgba(255,255,255,.6); color: var(--green); }
+    .flow-step h3 {
+      margin: 24px 0 6px;
+      color: var(--green);
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -.019em;
+    }
+    .flow-step p { margin: 0; color: var(--graphite); font-size: 15px; line-height: 1.38; }
+
+    /* ── Security ────────────────────────────────────────────────────────── */
+    .security-grid {
+      display: grid;
+      grid-template-columns: .8fr 1.2fr;
+      gap: 56px;
+      align-items: start;
+    }
+    .security-copy .eyebrow { color: var(--leaf); }
+    .security-copy h2 {
+      max-width: 12ch;
+      margin: 14px 0 18px;
+      font-size: clamp(2.6rem, 5vw, 4.1rem);
+      font-weight: 500;
+      line-height: 1.02;
+      letter-spacing: -.028em;
+    }
+    .security-copy p { max-width: 36ch; margin: 0; color: var(--mint); font-size: 18px; line-height: 1.4; }
+    .security-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1px;
+      background: #1a5638;
+      border: 1px solid #1a5638;
+      border-radius: 24px;
+      overflow: hidden;
+    }
+    .security-item {
+      min-height: 122px;
+      padding: 18px;
+      background: var(--green);
+    }
+    .security-item span {
+      color: var(--leaf);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .security-item b { display: block; margin: 10px 0 4px; font-size: 18px; font-weight: 500; }
+    .security-item p { margin: 0; color: var(--mint); font-size: 13px; line-height: 1.35; }
+
+    /* ── Footer ──────────────────────────────────────────────────────────── */
+    footer {
+      background: var(--green);
+      color: var(--paper);
+      padding: 32px 0;
+      border-top: 1px solid #1a5638;
+    }
+    .footer-inner {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    footer p { margin: 0; color: var(--mint); font-size: 13px; }
+    footer a { color: var(--leaf); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 1040px) {
+      .wrap { width: min(var(--page), calc(100% - 48px)); }
+      .hero-grid, .section-head, .toolkit-grid, .security-grid { grid-template-columns: 1fr; }
+      .hero { padding: 64px 0 72px; }
+      .hero h1 { max-width: 12ch; }
+      .hero-visual { min-height: 430px; max-width: 520px; width: 100%; margin: 0 auto; }
+      .section-head { gap: 20px; }
+      .section-head p { margin-top: 8px; }
+      .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .flow-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 700px) {
+      .wrap { width: min(100% - 28px, var(--page)); }
+      .nav-links a:not(.nav-cta) { display: none; }
+      .brand small { display: none; }
+      .hero h1 { font-size: clamp(3.3rem, 16vw, 5.4rem); }
+      .hero-visual { min-height: 400px; }
+      .pastel-stage { inset: 24px 2% 14px 2%; }
+      .hero-floating { right: 0; bottom: 0; width: 154px; }
+      .feature-grid, .flow-grid, .security-list { grid-template-columns: 1fr; }
+      .band { padding: 60px 0; }
+      .feature { min-height: 0; }
+      .feature h3 { margin-top: 18px; }
+      .toolkit-copy .check-item { font-size: 17px; }
+      .qr-panel { padding: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="/" aria-label="D.O.S.Y.S, inicio">
+        <img src="/portal/static/img/LogoDOSYS.png" alt="D.O.S.Y.S">
+        <small>Historial clínico digital</small>
+      </a>
+      <nav class="nav-links" aria-label="Navegación principal">
+        <a href="#sistema">Sistema</a>
+        <a href="#modulos">Módulos</a>
+        <a href="#flujo">Flujo</a>
+        <a href="#seguridad">Seguridad</a>
+        <a class="btn btn-outline nav-cta" href="/portal/login">Abrir portal</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div>
+          <p class="eyebrow">Sistema clínico · UNACH · Equipo 5</p>
+          <h1>El expediente que <span class="leaf">sí puede ver</span> el paciente.</h1>
+          <p class="hero-copy">
+            D.O.S.Y.S conecta recepción, médicos, laboratorio y pacientes en un solo flujo:
+            citas, consultas, recetas, estudios y documentos, con seguridad desde el servidor.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-coral" href="/portal/login">Abrir portal</a>
+            <a class="btn btn-ghost" href="#flujo">Ver el flujo</a>
+          </div>
+          <div class="hero-meta">
+            <span>FastAPI · PostgreSQL</span>
+            <span>Android nativo</span>
+            <span>Datos ficticios</span>
+          </div>
+        </div>
+
+        <div class="hero-visual" aria-label="Vista previa de la app del paciente">
+          <div class="pastel-stage" aria-hidden="true"></div>
+          <div class="phone">
+            <div class="phone-screen">
+              <div class="phone-top"><span>D.O.S.Y.S</span><span>Paciente Demo</span></div>
+              <p class="phone-label">Próxima cita</p>
+              <div class="appointment-card">
+                <strong>Medicina General</strong>
+                <span>10:00 · Dr. Demo Médico</span>
+                <span class="tag">Confirmada</span>
+              </div>
+              <div class="phone-row"><b>Solicitud</b><span>Pendiente</span></div>
+              <div class="phone-row"><b>Consulta SOAP</b><span>Ver nota</span></div>
+              <div class="signature-pill"><i></i> Firma electrónica válida</div>
+            </div>
+          </div>
+          <div class="hero-floating">
+            <span class="tag">Nuevo</span>
+            <strong>Check-in con QR</strong>
+            <span>Llega y confirma en segundos.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band band-white" id="sistema">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">01 / Sistema</p>
+            <h2>Un sistema, tres experiencias.</h2>
+          </div>
+          <p>La misma API sirve al portal del personal y a la app del paciente, sin duplicar información.</p>
+        </div>
+
+        <div class="feature-grid" id="modulos">
+          <article class="feature feature-mint">
+            <span class="tag">01 / Recepción</span>
+            <h3>Agenda y llegada</h3>
+            <p>Alta de pacientes, citas, check-in QR, solicitudes y asignación de consultorio.</p>
+            <div class="feature-foot">
+              <a href="/portal/login">Abrir portal</a>
+              <span class="feature-icon" aria-hidden="true">+</span>
+            </div>
+          </article>
+          <article class="feature feature-sky">
+            <span class="tag">02 / Médico</span>
+            <h3>Consulta SOAP</h3>
+            <p>Dashboard del día, expediente, signos vitales, receta, estudios y seguimiento.</p>
+            <div class="feature-foot">
+              <a href="/portal/login">Abrir portal</a>
+              <span class="feature-icon" aria-hidden="true">M</span>
+            </div>
+          </article>
+          <article class="feature feature-lilac">
+            <span class="tag">03 / Laboratorio</span>
+            <h3>Resultados firmados</h3>
+            <p>Cola de estudios, captura de resultados y PDF con firma electrónica.</p>
+            <div class="feature-foot">
+              <a href="/portal/login">Abrir portal</a>
+              <span class="feature-icon" aria-hidden="true">L</span>
+            </div>
+          </article>
+          <article class="feature feature-peach">
+            <span class="tag">04 / Paciente</span>
+            <h3>App Android</h3>
+            <p>Citas, consultas, recetas, estudios, documentos y check-in desde el celular.</p>
+            <div class="feature-foot">
+              <a href="#flujo">Ver flujo</a>
+              <span class="feature-icon" aria-hidden="true">P</span>
+            </div>
+          </article>
+          <article class="feature feature-cream">
+            <span class="tag">05 / Administración</span>
+            <h3>Roles y auditoría</h3>
+            <p>Usuarios, permisos dinámicos, bloqueos y bitácora de solo lectura.</p>
+            <div class="feature-foot">
+              <a href="/portal/login">Abrir portal</a>
+              <span class="feature-icon" aria-hidden="true">A</span>
+            </div>
+          </article>
+          <article class="feature feature-sage">
+            <span class="tag">06 / Seguridad</span>
+            <h3>Confianza verificable</h3>
+            <p>JWT, 2FA, rate limit, HTTPS y detección de documentos alterados.</p>
+            <div class="feature-foot">
+              <a href="#seguridad">Ver seguridad</a>
+              <span class="feature-icon" aria-hidden="true">S</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="band band-lavender">
+      <div class="wrap toolkit-grid">
+        <div class="toolkit-copy">
+          <p class="eyebrow">02 / Toolkit</p>
+          <h2>Todo el recorrido clínico, en un solo lugar.</h2>
+          <p>El paciente solicita, recepción confirma, el médico documenta y laboratorio cierra el ciclo.</p>
+          <div class="checklist">
+            <div class="check-item is-active"><span class="check-icon">1</span> Solicitud de citas desde la app</div>
+            <div class="check-item"><span class="check-icon">2</span> Consulta SOAP con signos vitales</div>
+            <div class="check-item"><span class="check-icon">3</span> Firma electrónica de documentos</div>
+            <div class="check-item"><span class="check-icon">4</span> Auditoría con IP y usuario</div>
+          </div>
+        </div>
+        <aside class="qr-panel" aria-label="Acceso rápido al portal">
+          <span class="tag">Demo en vivo</span>
+          <h3>Escanea para abrir el portal.</h3>
+          <p>Ideal para tablets y celulares durante la demostración.</p>
+          <div class="qr">{{ portal_qr | safe }}</div>
+          <a class="btn btn-dark" href="/portal/login">Abrir portal clínico</a>
+        </aside>
+      </div>
+    </section>
+
+    <section class="band band-white" id="flujo">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">03 / Flujo</p>
+            <h2>El recorrido del paciente.</h2>
+          </div>
+          <p>Un flujo claro desde que solicita una cita hasta que consulta su resultado.</p>
+        </div>
+        <div class="flow-grid">
+          <article class="flow-step"><span class="tag">01 / Solicita</span><h3>Elige horario</h3><p>Médico, fecha y slot disponible desde la app.</p></article>
+          <article class="flow-step"><span class="tag">02 / Confirma</span><h3>Recepción valida</h3><p>Revisa la solicitud, asigna consultorio y confirma.</p></article>
+          <article class="flow-step"><span class="tag">03 / Atiende</span><h3>Llega y consulta</h3><p>Check-in QR, sala de espera y nota SOAP con vitales.</p></article>
+          <article class="flow-step"><span class="tag">04 / Sigue</span><h3>Da seguimiento</h3><p>Receta, estudios, resultados y documentos en su expediente.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="band band-green" id="seguridad">
+      <div class="wrap security-grid">
+        <div class="security-copy">
+          <p class="eyebrow">04 / Seguridad</p>
+          <h2>Seguridad desde el servidor.</h2>
+          <p>No es una capa visual: cada petición valida identidad, rol, permisos y estado de la sesión.</p>
+        </div>
+        <div class="security-list">
+          <div class="security-item"><span>JWT + REFRESH</span><b>Tokens cortos</b><p>Rotación y revocación de sesión.</p></div>
+          <div class="security-item"><span>RBAC</span><b>Roles dinámicos</b><p>Permisos editables por el administrador.</p></div>
+          <div class="security-item"><span>2FA · TOTP</span><b>Segundo factor</b><p>Authenticator y códigos de recuperación.</p></div>
+          <div class="security-item"><span>FIRMA ELECTRÓNICA</span><b>Documento verificable</b><p>El archivo alterado no coincide.</p></div>
+          <div class="security-item"><span>AUDITORÍA</span><b>Bitácora</b><p>Usuario, IP, acción y entidad.</p></div>
+          <div class="security-item"><span>HTTPS · HSTS</span><b>Transporte</b><p>Producción con Let’s Encrypt.</p></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap footer-inner">
+      <p>D.O.S.Y.S · Sistema hospitalario académico · Datos ficticios · UNACH · Equipo 5</p>
+      <p><a href="/portal/login">Portal clínico</a> · <a href="/health">Estado del servicio</a></p>
+    </div>
+  </footer>
+</body>
+</html>

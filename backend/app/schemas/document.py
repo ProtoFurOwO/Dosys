@@ -14,3 +14,11 @@ class DocumentResponse(BaseModel):
     size_bytes: int
     sha256: str
     created_at: datetime
+
+
+class DocumentIntegrityResponse(BaseModel):
+    id: int
+    intact: bool
+    registered_signature: str
+    current_signature: str
+    message: str

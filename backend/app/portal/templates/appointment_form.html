@@ -12,7 +12,26 @@
   </div>
 </header>
 
-<form class="form" method="post" action="/portal/pacientes/{{ patient.id }}/cita" novalidate>
+{% if errors.general %}
+<div class="note note-error" role="alert">{{ errors.general }}</div>
+{% endif %}
+
+<form class="form" method="post" action="/portal/pacientes/{{ patient.id }}/cita" data-demo-appointment novalidate>
+  <div class="field {% if errors.doctor_id %}has-error{% endif %}">
+    <label for="doctor_id">Médico que atenderá</label>
+    <select id="doctor_id" name="doctor_id" required>
+      <option value="">Selecciona un médico</option>
+      {% for option in doctors %}
+      <option value="{{ option.id }}" {% if option.id == selected_doctor_id %}selected{% endif %}>
+        {{ option.full_name }}{% if option.specialty %} · {{ option.specialty }}{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+    <p class="help">Recepción puede asignar a cualquier médico activo. El sistema valida empalmes de médico, paciente y consultorio.</p>
+    {% if errors.doctor_id %}<p class="error">{{ errors.doctor_id }}</p>{% endif %}
+    {% if not doctors %}<p class="error">No hay médicos activos. Activa una cuenta médica antes de agendar.</p>{% endif %}
+  </div>
+
   <div class="field {% if errors.specialty %}has-error{% endif %}">
     <label for="specialty">Especialidad o servicio</label>
     <input id="specialty" name="specialty" maxlength="120" value="{{ values.specialty }}" required>
@@ -47,6 +66,8 @@
 
   <div class="form-actions">
     <button class="btn btn-primary" type="submit">Agendar cita</button>
+    <button class="btn btn-quiet" type="button" data-demo-fill-appointment title="Atajo: Alt+Shift+A">Llenar ejemplo</button>
+    <span class="help" data-demo-status role="status" aria-live="polite"></span>
     <a class="btn btn-quiet" href="/portal/pacientes/{{ patient.id }}">Cancelar</a>
   </div>
 </form>

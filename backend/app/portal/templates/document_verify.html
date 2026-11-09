@@ -1,23 +1,36 @@
 {% extends "panel.html" %}
-{% block title %}Verificación de documento · D.O.S.Y.S Portal clínico{% endblock %}
+{% block title %}Verificación de firma electrónica · D.O.S.Y.S Portal clínico{% endblock %}
 {% block content %}
 <header class="page-head">
   <div>
     <a class="back-link" href="/portal/pacientes/{{ patient.id }}">Volver al expediente</a>
-    <h1>Verificación de integridad</h1>
+    <h1>Verificación de firma electrónica</h1>
     <p class="page-note">{{ document.title }} · {{ patient.full_name }}</p>
   </div>
 </header>
 
+{% if reemplazado %}
+<div class="note note-ok" role="status">
+  <p>Documento reemplazado y firmado de nuevo.</p>
+  <p class="note-sub">La versión anterior quedó registrada en la bitácora con su firma.</p>
+</div>
+{% endif %}
+
+{% if error %}
+<div class="note note-error" role="alert">
+  <p>{{ error }}</p>
+</div>
+{% endif %}
+
 {% if intact %}
 <div class="note note-ok" role="status">
-  <p>El archivo coincide con la huella registrada.</p>
-  <p class="note-sub">Puedes entregarlo o descargarlo con confianza: no se modificó desde que se subió.</p>
+  <p><b>Firma electrónica válida.</b> El archivo coincide con la firma registrada.</p>
+  <p class="note-sub">El contenido no cambió desde que se subió. Puedes descargarlo o imprimirlo con confianza.</p>
 </div>
 {% else %}
 <div class="note note-error" role="alert">
-  <p>El archivo no coincide con la huella registrada.</p>
-  <p class="note-sub">El contenido cambió después de subirlo. No lo uses como evidencia y vuelve a cargarlo.</p>
+  <p><b>Documento alterado.</b> La firma electrónica no coincide con el archivo actual.</p>
+  <p class="note-sub">El contenido cambió después de subirlo. No lo uses como evidencia: reemplázalo con la versión correcta o elimínalo.</p>
 </div>
 {% endif %}
 
@@ -27,16 +40,16 @@
   <p class="credential-role">{{ category_label }} · {{ document.original_name }} · {{ size }}</p>
   <dl class="credential-fields one-column">
     <div>
-      <dt>Huella registrada (SHA-256)</dt>
+      <dt>Firma electrónica registrada</dt>
       <dd class="hash">{{ document.sha256 }}</dd>
     </div>
     <div>
-      <dt>Huella calculada ahora</dt>
+      <dt>Firma calculada del archivo actual</dt>
       <dd class="hash">{{ current_hash or "Archivo no disponible" }}</dd>
     </div>
   </dl>
   <p class="credential-note">
-    Sello del servidor: <span class="code">{{ document.seal[:24] }}…</span><br>
+    Sello criptográfico del servidor: <span class="code">{{ document.seal[:24] }}…</span><br>
     Subido por {{ uploader.username if uploader else "—" }} el {{ document.created_at | fecha_hora }}.
   </p>
 </article>
@@ -45,4 +58,36 @@
   <a class="btn btn-line" href="/portal/documentos/{{ document.id }}/archivo">Descargar</a>
   <button class="btn btn-quiet" type="button" data-print>Imprimir resultado</button>
 </div>
+
+{% if can_replace %}
+<section class="block">
+  <h2 class="section-title">Reemplazar archivo</h2>
+  <p class="page-note">Sube la versión correcta. El servidor elimina la versión anterior del disco, recalcula la firma electrónica y deja el cambio en la bitácora.</p>
+  <form class="form" method="post" action="/portal/documentos/{{ document.id }}/reemplazar"
+        enctype="multipart/form-data">
+    <div class="field">
+      <label for="replacement">Archivo corregido</label>
+      <input id="replacement" name="file" type="file"
+             accept="application/pdf,image/jpeg,image/png,image/webp" required>
+      <p class="help">PDF o imagen, hasta 10 MB. Conserva el título y la categoría del documento.</p>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">Reemplazar y firmar de nuevo</button>
+    </div>
+  </form>
+</section>
+{% endif %}
+
+{% if can_delete %}
+<section class="block">
+  <h2 class="section-title">Eliminar documento</h2>
+  <p class="page-note">Si el archivo no debe existir en el expediente, elimínalo. La acción queda auditada.</p>
+  <form method="post" action="/portal/documentos/{{ document.id }}/eliminar"
+        data-confirm="¿Eliminar este documento del expediente? La acción queda en la bitácora.">
+    <button class="btn btn-quiet" type="submit">Eliminar documento</button>
+  </form>
+</section>
+{% endif %}
+
+<p class="page-note"><a class="link" href="/portal/pacientes/{{ patient.id }}">Volver al expediente del paciente</a></p>
 {% endblock %}

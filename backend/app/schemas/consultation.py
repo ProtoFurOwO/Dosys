@@ -18,4 +18,13 @@ class ConsultationResponse(BaseModel):
     reason: str
     diagnosis: str
     notes: str | None
+    blood_pressure: str | None = None
+    heart_rate: int | None = None
+    respiratory_rate: int | None = None
+    temperature_c: float | None = None
+    oxygen_saturation: int | None = None
+    weight_kg: float | None = None
+    height_cm: float | None = None
+    physical_exam: str | None = None
     created_at: datetime
+    updated_at: datetime | None = None

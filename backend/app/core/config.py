@@ -24,10 +24,21 @@ class Settings(BaseSettings):
     totp_issuer: str = "D.O.S.Y.S"
     two_factor_challenge_minutes: int = Field(default=5, ge=1, le=15)
 
+    # Transferencia de sesión entre dispositivos (app del paciente).
+    device_transfer_ttl_seconds: int = Field(default=120, ge=60, le=600)
+    device_transfer_max_code_submissions: int = Field(default=3, ge=1, le=10)
+    device_transfer_max_per_hour: int = Field(default=5, ge=1, le=50)
+    max_trusted_devices: int = Field(default=3, ge=1, le=10)
+    fcm_credentials_file: str = ""
+
     # Documentos clínicos.
     documents_dir: str = "/data/documents"
     documents_max_mb: int = Field(default=10, ge=1, le=50)
     documents_signing_key: str = ""
+
+    # Check-in: la llegada solo se confirma cerca de la cita.
+    checkin_window_before_minutes: int = Field(default=120, ge=0, le=1440)
+    checkin_window_after_minutes: int = Field(default=240, ge=0, le=1440)
 
     # Cuentas: sesión renovable, recuperación y límite de peticiones.
     refresh_token_expire_days: int = Field(default=7, ge=1, le=30)

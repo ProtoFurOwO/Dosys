@@ -1,8 +1,9 @@
 # D.O.S.Y.S — App Android (paciente)
 
 Aplicación móvil **nativa** del paciente (Kotlin + Jetpack Compose). Consulta información
-clínica en **modo solo lectura**, da seguimiento a tratamientos, confirma la llegada con
-**cámara** (check-in QR) y protege el expediente con **huella**.
+clínica en **modo solo lectura**, revisa recetas y estudios reales, confirma la llegada con
+**cámara** (check-in QR), protege el expediente con **huella** y permite **transferir la
+sesión a un teléfono nuevo** con un código OTP generado en el dispositivo de confianza.
 
 ## Requisitos
 
@@ -35,7 +36,8 @@ Si el emulador no aparece: **Device Manager** (icono de celular con una lupa) �
 El APK ya viene compilado apuntando al backend real (`https://medicos.stolasimp.dev/api/v1/`):
 
 ```
-Proyecto/dosys-demo-vps.apk
+Proyecto/dosys-clinico-vps.apk      # apunta al VPS (requiere el backend nuevo desplegado)
+Proyecto/dosys-clinico-local.apk    # emulador con backend local en 10.0.2.2:8000
 ```
 
 Cópialo al teléfono (cable, Drive o WhatsApp) e instálalo. Android pedirá permitir
@@ -60,6 +62,7 @@ El emulador debe estar encendido (Android Studio o `emulator -avd DosysPhone`).
 | **Cámara** | Check-in con QR | Recepción muestra el QR en el portal; el paciente lo escanea y confirma su llegada al backend |
 | **Huella** | Mi expediente | `BiometricPrompt` pide huella (o bloqueo del teléfono) antes de mostrar datos clínicos |
 | **GPS** | Check-in | Mapa real (OpenStreetMap) con el pin del hospital, tu ubicación y la distancia en metros |
+| **Notificaciones push** | Transferencia de sesión | FCM avisa al teléfono de confianza; sin Firebase, la app detecta la solicitud con el sondeo en primer plano |
 
 El mapa usa **OSMDroid + OpenStreetMap**: no necesita API key ni cuenta de Google.
 Las coordenadas del hospital de demostración son `16.755731, -93.136586` (Sanatorio en Tuxtla Gutiérrez).
@@ -67,16 +70,28 @@ Las coordenadas del hospital de demostración son `16.755731, -93.136586` (Sanat
 La cámara está en el **celular del paciente** (que es la app del proyecto). El hospital solo
 **muestra** el QR en pantalla desde el portal; no necesita cámara ni permisos del navegador.
 
+## Datos clínicos y auditoría
+
+- **Alergias, antecedentes y diagnósticos crónicos** se capturan desde el portal (crear o
+  editar paciente) y la app los muestra tras la huella. Si no hay dato, dice “Sin
+  registrar”; no inventa información.
+- **Consultas**: el paciente ve el historial real. Si un médico corrige un diagnóstico, la
+  app muestra “Corregida el …” y el cambio queda en la bitácora del portal.
+- **Estudios y recetas**: se leen de la API; no hay catálogos ni resultados de ejemplo en
+  la app.
+- **Check-in**: el servidor decide si la ventana está abierta; la app muestra el motivo
+  cuando aún no aplica o cuando ya cerró.
+
 ## Recorrido de la demo
 
 | Desde Home | Qué ves |
 |---|---|
-| Próxima cita | Lista de citas (agendada / confirmada / atendida) |
-| Tratamiento activo / Recetas | Receta del médico + botón **Ya la tomé** |
-| Expediente | **Pide huella** y luego muestra CURP, consultas reales del backend |
-| Estudios | Flujo Solicitado → En proceso → Listo (toca uno para el resultado) |
-| Mi QR | QR que expira en 3 min + código de respaldo `A7K9M2` |
-| **Check-in con QR** | **Abre la cámara**, escanea el QR de recepción y confirma la llegada |
+| Próxima cita | Solo la cita futura más cercana; el historial está en **Mis citas** |
+| Tratamiento y recetas | Recetas reales emitidas por el médico (sin datos de ejemplo) |
+| Expediente | **Pide huella** y muestra CURP, alergias, antecedentes, crónicos y consultas reales |
+| Estudios | Solicitud y resultado reales; el PDF se descarga del backend |
+| **Check-in con QR** | **Abre la cámara**, escanea el QR de recepción y confirma la llegada (2 h antes a 4 h después de la cita) |
+| **Mi seguridad → Dispositivo de confianza** | Nombre del teléfono activo; si entras desde otro, la app pide el código que muestra este |
 
 ### Guion para la demo (dos dispositivos)
 
@@ -85,16 +100,34 @@ La cámara está en el **celular del paciente** (que es la app del proyecto). El
 3. La app responde “Llegada confirmada”; el portal, al recargar, muestra “Llegó 16:32”.
 4. Extra: abre **Mi expediente** y desbloquea con la huella.
 
+> El check-in solo se acepta desde **2 horas antes** hasta **4 horas después** de la cita.
+> Para la demo, agenda una cita para dentro de los próximos 30 minutos: el QR se abre de
+> inmediato. Una cita de días pasados ya no aparece como próxima.
+
+### Transferencia de sesión (dos teléfonos)
+
+1. En el teléfono **A** inicia sesión como paciente: queda registrado como dispositivo de
+   confianza.
+2. En el teléfono **B** inicia sesión con la misma cuenta: aparece el paso
+   **“Autoriza este dispositivo”** y no se emiten tokens todavía.
+3. En **A** llega la notificación de seguridad (o, con la app abierta, la solicitud aparece
+   sola). Confirma con huella y aparecerá un **código de 6 dígitos** que dura 60 s.
+4. Escríbelo en **B**; **A** lo compara en local y, si coincide, aprueba. **B** entra y **A**
+   queda sin acceso de inmediato.
+
+Para repetir la demo: portal → **Usuarios → Restablecer dispositivo de confianza**, o cierra
+sesión / restablece la contraseña. Sin Firebase todo funciona con el sondeo cada 5 s.
+
 ## Estructura
 
 ```
 app/src/main/java/mx/unach/dosys/
 ├─ DosysApp.kt · MainActivity.kt
-├─ core/auth · core/di
-├─ data/model · data/remote · data/repository · data/mock
+├─ core/auth · core/device · core/push · core/di
+├─ data/model · data/remote · data/repository
 └─ ui/
-   ├─ login · home · checkin
-   ├─ record · studies · prescriptions · appointments · qr
+   ├─ login · home · checkin · transfer
+   ├─ record · studies · prescriptions · appointments
    ├─ navigation · theme · components
 ```
 
@@ -115,6 +148,21 @@ El diseño completo de la app (entregables E1–E4) está en:
 > Las capturas son del prototipo ejecutable con datos ficticios de demostración. El documento incluye
 > además wireframes de baja fidelidad y el mapa de navegación completo.
 
+## Firebase (opcional)
+
+La app compila y la transferencia funciona **sin Firebase** (sondeo en primer plano). Para
+activar las notificaciones en segundo plano:
+
+1. Crea el proyecto en Firebase y registra la app Android `mx.unach.dosys` con el SHA-1 de
+   debug.
+2. Descarga `google-services.json` en `app/`; el plugin de Google Services se aplica solo si
+   ese archivo existe (está en `.gitignore`).
+3. En el servidor, coloca la cuenta de servicio como `backend/secrets/fcm.json` y define
+   `FCM_CREDENTIALS_FILE=/run/secrets/fcm.json`. Sin ese archivo el envío queda simulado.
+
+En Android 13+ la app pide el permiso de notificaciones después del primer inicio de sesión,
+con una explicación; si se niega, el sondeo sigue cubriendo el flujo.
+
 ## Backend (FastAPI)
 
 La app usa el backend real para inicio de sesión, perfil, citas, consultas y check-in.
@@ -130,7 +178,11 @@ Comprueba dentro del emulador: `adb shell ping -c 1 10.0.2.2`. Si falla, reinici
 
 ## Notas de seguridad
 
-- Solo `MainActivity` está exportada (requisito del launcher).
+- Solo `MainActivity` está exportada (requisito del launcher); el servicio FCM es `exported=false`.
+- El identificador del dispositivo es un UUID aleatorio en un DataStore **aparte** del de la
+  sesión (para que cerrar sesión no lo borre); el servidor guarda solo su hash SHA-256.
+- El código de transferencia se genera con `SecureRandom`, vive 60 s en memoria, se compara
+  con `MessageDigest.isEqual` y la pantalla aplica `FLAG_SECURE` mientras se muestra.
 - El token de sesión **no** se incluye en respaldos.
-- El expediente se protege con huella; si el teléfono no tiene biometría, se avisa y se deja continuar (decisión de demostración).
+- El expediente se protege con huella; si el teléfono no tiene biometría, se avisa y se deja continuar (decisión de demostración). La **aprobación de transferencia de sesión es fail-closed**: sin huella/PIN no se puede autorizar.
 - `SessionManager` pendiente de endurecer con Android Keystore.

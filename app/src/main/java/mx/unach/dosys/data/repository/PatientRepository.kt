@@ -30,6 +30,7 @@ interface PatientRepository {
     suspend fun prescriptions(): ClinicalResult<List<PatientPrescription>>
     suspend fun documentFile(documentId: Int): ClinicalResult<ByteArray>
     suspend fun checkIn(appointmentId: Int, code: String): ClinicalResult<PatientAppointment>
+    suspend fun checkInWithCode(code: String): ClinicalResult<PatientAppointment>
 }
 
 class RemotePatientRepository(
@@ -93,21 +94,48 @@ class RemotePatientRepository(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: HttpException) {
-            when (error.code()) {
-                400 -> ClinicalResult.Error("El código no corresponde a esta cita")
-                401 -> {
-                    session.clear()
-                    ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
-                }
-                404 -> ClinicalResult.Error("No encontramos esa cita en tu expediente")
-                409 -> ClinicalResult.Error("Esta cita todavía no tiene check-in habilitado")
-                else -> ClinicalResult.Error("No se pudo confirmar la llegada. Intenta más tarde")
-            }
+            checkInError(error)
         } catch (error: IOException) {
             ClinicalResult.Error("No se pudo conectar con el servidor")
         } catch (error: Exception) {
             ClinicalResult.Error("No se pudo confirmar la llegada. Intenta más tarde")
         }
+    }
+
+    override suspend fun checkInWithCode(code: String): ClinicalResult<PatientAppointment> {
+        val token = session.currentToken()
+            ?: return ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
+
+        return try {
+            ClinicalResult.Success(api.checkInWithCode("Bearer $token", CheckInRequest(code.trim().uppercase())))
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: HttpException) {
+            checkInError(error)
+        } catch (error: IOException) {
+            ClinicalResult.Error("No se pudo conectar con el servidor")
+        } catch (error: Exception) {
+            ClinicalResult.Error("No se pudo confirmar la llegada. Intenta más tarde")
+        }
+    }
+
+    private suspend fun checkInError(error: HttpException): ClinicalResult.Error {
+        if (error.code() == 401) {
+            session.clear()
+            return ClinicalResult.Error("Tu sesión terminó. Inicia sesión nuevamente")
+        }
+        val detail = runCatching {
+            val body = error.response()?.errorBody()?.string().orEmpty()
+            Regex("\"detail\"\\s*:\\s*\"([^\"]+)\"").find(body)?.groupValues?.get(1)
+        }.getOrNull()
+        val message = when (error.code()) {
+            400 -> detail ?: "El código no corresponde a ninguna cita vigente"
+            404 -> "No encontramos esa cita en tu expediente"
+            409 -> detail ?: "El check-in no está disponible en este momento"
+            429 -> "Demasiados intentos. Espera un minuto."
+            else -> "No se pudo confirmar la llegada. Intenta más tarde"
+        }
+        return ClinicalResult.Error(message)
     }
 
     private suspend fun <T> authorized(call: suspend (String) -> T): ClinicalResult<T> {
