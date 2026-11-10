@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_roles
+from app.core.crypto import CryptoConfigError, SIGNATURE_ALGORITHM, public_key_fingerprint
 from app.db.session import get_db
 from app.models.appointment import Appointment
 from app.models.consultation import Consultation
@@ -22,12 +23,12 @@ from app.schemas.appointment import (
     AppointmentResponse,
 )
 from app.schemas.consultation import ConsultationResponse
-from app.schemas.document import DocumentResponse
+from app.schemas.document import DocumentIntegrityResponse, DocumentResponse
 from app.schemas.laboratory import PrescriptionItemResponse, PrescriptionResponse, StudyOrderResponse
 from app.schemas.patient import PatientProfileResponse
 from app.services import checkin, rate_limit
 from app.services.audit import write_audit_event
-from app.services.documents import document_path
+from app.services.documents import document_path, verify_document
 
 
 router = APIRouter(prefix="/patients", tags=["Paciente"])
@@ -264,6 +265,65 @@ async def get_my_documents(
     )
     await db.commit()
     return [DocumentResponse.model_validate(document) for document in documents]
+
+
+@router.get("/me/documents/{document_id}/verify", response_model=DocumentIntegrityResponse)
+async def verify_my_document(
+    document_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.PATIENT)),
+) -> DocumentIntegrityResponse:
+    """Verifica la huella, el sello HMAC y la firma Ed25519 del documento."""
+    patient = await get_patient_for_user(db, current_user)
+    document = await db.scalar(
+        select(Document).where(Document.id == document_id, Document.patient_id == patient.id)
+    )
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado")
+
+    verification = verify_document(document)
+    try:
+        fingerprint = public_key_fingerprint()
+    except CryptoConfigError:
+        fingerprint = ""
+
+    if verification.intact:
+        message = "La firma digital y la huella del documento son válidas."
+    elif not verification.hash_ok:
+        message = "El archivo cambió después de firmarlo. No lo uses como evidencia."
+    elif not verification.seal_ok:
+        message = "El registro del documento fue alterado. No lo uses como evidencia."
+    elif document.signature is None:
+        message = "El documento no tiene una firma digital registrada."
+    elif not verification.signature_ok:
+        message = "La firma digital Ed25519 no coincide con el documento."
+    else:
+        message = "El documento no se pudo verificar."
+
+    await write_audit_event(
+        db,
+        user=current_user,
+        action="verify_document",
+        entity_type="document",
+        entity_id=document.id,
+        request=request,
+        detail="resultado=intacto" if verification.intact else "resultado=alterado",
+    )
+    await db.commit()
+
+    return DocumentIntegrityResponse(
+        id=document.id,
+        intact=verification.intact,
+        hash_ok=verification.hash_ok,
+        seal_ok=verification.seal_ok,
+        signature_ok=verification.signature_ok,
+        signature_algorithm=SIGNATURE_ALGORITHM,
+        public_key_fingerprint=fingerprint,
+        registered_signature=document.signature or "",
+        current_signature="válida" if verification.signature_ok else "no coincide",
+        message=message,
+    )
 
 
 @router.get("/me/documents/{document_id}/file")

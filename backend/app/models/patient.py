@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, ForeignKey, Integer, String, Text
+from sqlalchemy import Date, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.db.encrypted_text import EncryptedText
 from app.db.session import Base
 
 if TYPE_CHECKING:
@@ -27,11 +28,11 @@ class Patient(Base):
     email: Mapped[str | None] = mapped_column(String(160), nullable=True)
 
     # Datos clínicos de alerta: se muestran en el expediente y en la app del
-    # paciente. Se guardan como texto libre porque el catálogo de alergias y
-    # antecedentes cambia entre instituciones.
-    allergies: Mapped[str | None] = mapped_column(Text, nullable=True)
-    medical_history: Mapped[str | None] = mapped_column(Text, nullable=True)
-    chronic_conditions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # paciente. Se guardan cifrados con AES-256-GCM (ver app/db/encrypted_text.py);
+    # el ORM los entrega en claro a la API y al portal.
+    allergies: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)
+    medical_history: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)
+    chronic_conditions: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="patient")
     consultations: Mapped[list[Consultation]] = relationship(back_populates="patient")

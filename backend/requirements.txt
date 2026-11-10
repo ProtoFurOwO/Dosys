@@ -7,6 +7,8 @@ pydantic-settings==2.9.1
 PyJWT==2.10.1
 pwdlib[argon2]==0.2.1
 pyotp==2.9.0
+# Criptografía: AES-256-GCM para datos en reposo y Ed25519 para firmas.
+cryptography==47.0.0
 
 # Notificaciones push de seguridad (opcional: sin credenciales se simula).
 firebase-admin==6.6.0

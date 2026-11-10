@@ -11,13 +11,13 @@
 
 {% if intact %}
 <div class="note note-ok" role="status">
-  <p>El archivo coincide con la huella registrada.</p>
+  <p>El archivo coincide con la huella y la firma digital es válida.</p>
   <p class="note-sub">Puedes entregarlo o descargarlo con confianza: no se modificó desde que se subió.</p>
 </div>
 {% else %}
 <div class="note note-error" role="alert">
-  <p>El archivo no coincide con la huella registrada.</p>
-  <p class="note-sub">El contenido cambió después de subirlo. No lo uses como evidencia y vuelve a cargarlo.</p>
+  <p>El archivo no coincide con la huella o la firma digital no es válida.</p>
+  <p class="note-sub">El contenido o su firma cambiaron después de subirlo. No lo uses como evidencia y vuelve a cargarlo.</p>
 </div>
 {% endif %}
 
@@ -34,10 +34,33 @@
       <dt>Huella calculada ahora</dt>
       <dd class="hash">{{ current_hash or "Archivo no disponible" }}</dd>
     </div>
+    <div>
+      <dt>Firma digital (Ed25519)</dt>
+      <dd>
+        {% if verification.signature_ok %}
+          <strong>Válida</strong>
+        {% elif document.signature %}
+          <strong>No coincide</strong>
+        {% else %}
+          Sin firma registrada
+        {% endif %}
+      </dd>
+    </div>
+    <div>
+      <dt>Llave pública (huella SHA-256)</dt>
+      <dd class="hash">{{ public_key_fingerprint or "No configurada" }}</dd>
+    </div>
+    <div>
+      <dt>Sello HMAC del servidor</dt>
+      <dd>
+        {% if verification.seal_ok %}Válido{% else %}No coincide{% endif %}
+        · <span class="code">{{ document.seal[:24] }}…</span>
+      </dd>
+    </div>
   </dl>
   <p class="credential-note">
-    Sello del servidor: <span class="code">{{ document.seal[:24] }}…</span><br>
-    Subido por {{ uploader.username if uploader else "—" }} el {{ document.created_at | fecha_hora }}.
+    Firma registrada: <span class="code">{{ document.signature[:32] if document.signature else "—" }}…</span><br>
+    Subido por {{ uploader.username if uploader else "-" }} el {{ document.created_at | fecha_hora }}.
   </p>
 </article>
 

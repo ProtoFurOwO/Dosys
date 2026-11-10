@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     documents_max_mb: int = Field(default=10, ge=1, le=50)
     documents_signing_key: str = ""
 
+    # Criptografía de datos clínicos en reposo y firma digital de documentos.
+    # Las llaves se cargan desde .env (nunca se escriben en el código).
+    data_encryption_key: str = ""
+    documents_signing_private_key_b64: str = ""
+
     # Check-in: la llegada solo se confirma cerca de la cita.
     checkin_window_before_minutes: int = Field(default=120, ge=0, le=1440)
     checkin_window_after_minutes: int = Field(default=240, ge=0, le=1440)

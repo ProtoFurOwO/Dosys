@@ -30,6 +30,8 @@ class Document(Base):
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     seal: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Firma Ed25519 (base64url, 86 caracteres) del mensaje canónico del documento.
+    signature: Mapped[str | None] = mapped_column(String(128), nullable=True)
     stored_name: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

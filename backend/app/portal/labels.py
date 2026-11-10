@@ -90,6 +90,7 @@ ACTION_LABELS = {
     "portal_upload_document": "Documento agregado al expediente",
     "portal_download_document": "Documento descargado del expediente",
     "portal_verify_document": "Integridad de documento verificada",
+    "verify_document": "Firma de documento verificada desde la app",
     "portal_delete_document": "Documento eliminado del expediente",
 }
 

@@ -5,5 +5,4 @@ __pycache__/
 *.py[cod]
 .git/
 README.md
-tests/
 secrets/

@@ -5,3 +5,6 @@ __pycache__/
 *.py[cod]
 .coverage
 htmlcov/
+# Llaves generadas localmente: nunca se versionan.
+secrets/*.pem
+secrets/*.json

@@ -100,9 +100,14 @@ data class PatientDocument(
 data class DocumentIntegrityResponse(
     val id: Int,
     val intact: Boolean,
+    @SerialName("hash_ok") val hashOk: Boolean = false,
+    @SerialName("seal_ok") val sealOk: Boolean = false,
+    @SerialName("signature_ok") val signatureOk: Boolean = false,
+    @SerialName("signature_algorithm") val signatureAlgorithm: String = "",
+    @SerialName("public_key_fingerprint") val publicKeyFingerprint: String = "",
     @SerialName("registered_signature") val registeredSignature: String,
     @SerialName("current_signature") val currentSignature: String,
-    val message: String,
+    val message: String = "",
 )
 
 /** Estudio de laboratorio o imagen solicitado al paciente. */

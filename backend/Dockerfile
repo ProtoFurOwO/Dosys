@@ -2,7 +2,8 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app
 
 WORKDIR /app
 
@@ -14,6 +15,9 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY app ./app
+COPY scripts ./scripts
+COPY tests ./tests
+COPY pytest.ini ./pytest.ini
 
 # Los documentos se guardan en un volumen; la carpeta nace con el usuario de la app
 # para que el contenedor pueda escribir en él sin privilegios.

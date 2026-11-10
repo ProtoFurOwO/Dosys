@@ -14,6 +14,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.crypto import CryptoConfigError, public_key_fingerprint
 from app.core.security import (
     TWO_FACTOR_PURPOSE,
     create_access_token,
@@ -49,11 +50,11 @@ from app.services.consultations import create_consultation
 from app.services.documents import (
     CATEGORIES,
     DocumentError,
-    check_integrity,
     document_path,
     human_size,
     store_document,
     store_document_bytes,
+    verify_document,
 )
 from app.services.lab import LabError, complete_order, create_orders
 from app.services.permissions import has_permission, permission_codes
@@ -2872,9 +2873,14 @@ async def document_verify(
             request, "not_found.html", {"doctor_name": user.username}, status_code=status.HTTP_404_NOT_FOUND
         )
 
-    intact, current_hash = check_integrity(document)
+    verification = verify_document(document)
+    intact, current_hash = verification.intact, verification.current_sha256
     patient = await db.get(Patient, document.patient_id)
     uploader = await db.get(User, document.uploaded_by_user_id) if document.uploaded_by_user_id else None
+    try:
+        fingerprint = public_key_fingerprint()
+    except CryptoConfigError:
+        fingerprint = ""
 
     await write_audit_event(
         db,
@@ -2897,6 +2903,8 @@ async def document_verify(
             "patient": patient,
             "uploader": uploader,
             "intact": intact,
+            "verification": verification,
+            "public_key_fingerprint": fingerprint,
             "current_hash": current_hash,
             "size": human_size(document.size_bytes),
             "category_label": dict(CATEGORIES).get(document.category, document.category),

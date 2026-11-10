@@ -9,12 +9,19 @@ Cada archivo se guarda en disco y su contenido se protege con dos valores:
 import hashlib
 import hmac
 import secrets
+from dataclasses import dataclass
 from pathlib import Path
 
 from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.crypto import (
+    CryptoConfigError,
+    ensure_signing_configured,
+    sign_document,
+    verify_document_signature,
+)
 from app.models.document import Document
 from app.models.patient import Patient
 from app.models.user import User
@@ -37,6 +44,20 @@ CATEGORIES = (
 
 class DocumentError(ValueError):
     """Error de negocio mostrable al usuario."""
+
+
+@dataclass(frozen=True)
+class DocumentVerification:
+    """Resultado de comprobar huella, sello HMAC y firma Ed25519."""
+
+    hash_ok: bool
+    seal_ok: bool
+    signature_ok: bool
+    current_sha256: str
+
+    @property
+    def intact(self) -> bool:
+        return self.hash_ok and self.seal_ok and self.signature_ok
 
 
 def documents_dir() -> Path:
@@ -110,6 +131,13 @@ async def store_document_bytes(
     if len(data) > limit:
         raise DocumentError(f"El archivo supera el límite de {settings.documents_max_mb} MB.")
 
+    try:
+        ensure_signing_configured()
+    except CryptoConfigError as error:
+        raise DocumentError(
+            "El servidor no tiene configurada la firma digital de documentos."
+        ) from error
+
     sha256 = compute_sha256(data)
     stored_name = f"{secrets.token_hex(16)}{ALLOWED_TYPES[content_type]}"
     (documents_dir() / stored_name).write_bytes(data)
@@ -124,11 +152,22 @@ async def store_document_bytes(
         size_bytes=len(data),
         sha256=sha256,
         seal="",
+        signature=None,
         stored_name=stored_name,
     )
     db.add(document)
     await db.flush()
     document.seal = compute_seal(document_id=document.id, patient_id=patient.id, sha256=sha256)
+    try:
+        document.signature = sign_document(
+            document_id=document.id,
+            patient_id=patient.id,
+            sha256=sha256,
+        )
+    except CryptoConfigError as error:
+        raise DocumentError(
+            "El servidor no tiene configurada la firma digital de documentos."
+        ) from error
     await db.flush()
     return document
 
@@ -137,17 +176,33 @@ def document_path(document: Document) -> Path:
     return documents_dir() / document.stored_name
 
 
-def check_integrity(document: Document) -> tuple[bool, str]:
-    """Recalcula la huella y valida el sello. Devuelve (intacto, huella_actual)."""
+def verify_document(document: Document) -> DocumentVerification:
+    """Comprueba el archivo, el sello HMAC y la firma Ed25519."""
     path = document_path(document)
-    if not path.exists():
-        return False, ""
-    current = compute_sha256(path.read_bytes())
+    current = compute_sha256(path.read_bytes()) if path.exists() else ""
+    hash_ok = bool(current) and hmac.compare_digest(current, document.sha256)
     seal_ok = hmac.compare_digest(
         document.seal,
         compute_seal(document_id=document.id, patient_id=document.patient_id, sha256=document.sha256),
     )
-    return (current == document.sha256) and seal_ok, current
+    signature_ok = verify_document_signature(
+        document_id=document.id,
+        patient_id=document.patient_id,
+        sha256=document.sha256,
+        signature=document.signature,
+    )
+    return DocumentVerification(
+        hash_ok=hash_ok,
+        seal_ok=seal_ok,
+        signature_ok=signature_ok,
+        current_sha256=current,
+    )
+
+
+def check_integrity(document: Document) -> tuple[bool, str]:
+    """Compatibilidad: devuelve (intacto, huella_actual)."""
+    verification = verify_document(document)
+    return verification.intact, verification.current_sha256
 
 
 def human_size(size: int) -> str:

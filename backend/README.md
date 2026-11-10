@@ -386,7 +386,7 @@ GET/PUT/DELETE** y gestión de usuarios restringida al rol médico.
 | CORS restringido a orígenes autorizados | ✅ |
 | Principio de mínimo privilegio | ✅ permisos por rol; el paciente solo ve sus propios datos |
 | Errores sin fuga de información | ✅ mensajes genéricos, sin trazas ni detalles internos |
-| Documentos clínicos íntegros | ✅ huella SHA-256 + sello HMAC y verificación en el portal |
+| Documentos clínicos íntegros | ✅ huella SHA-256 + sello HMAC + firma digital Ed25519 y verificación en portal/app |
 
 ## Documentos clínicos
 
@@ -397,3 +397,74 @@ GET/PUT/DELETE** y gestión de usuarios restringida al rol médico.
 - La pantalla **Verificar** recalcula la huella y valida el sello: si el contenido cambió,
   lo advierte en lugar de mostrarlo como válido.
 - Toda subida, descarga, verificación y eliminación queda en la bitácora.
+
+## Criptografía de la aplicación
+
+La app incorpora dos mecanismos independientes, con librerías establecidas y llaves
+fuera del código fuente.
+
+### 1. Cifrado simétrico AES-256-GCM de datos clínicos
+
+- Campos protegidos en `patients`: `allergies`, `medical_history` y `chronic_conditions`.
+- Implementación: `app/core/crypto.py` con `cryptography.hazmat.primitives.ciphers.aead.AESGCM`.
+- Tipo de SQLAlchemy: `app/db/encrypted_text.py` (`EncryptedText`). La API y el portal
+  reciben texto claro; PostgreSQL guarda `enc:v1:<nonce+tag+ciphertext>` en base64.
+- Cada valor usa un nonce aleatorio de 96 bits y la etiqueta de autenticación de GCM
+  detecta alteraciones. Una modificación del ciphertext lanza `ValueError` al descifrar.
+- La llave de 32 bytes vive en `DATA_ENCRYPTION_KEY`, dentro de `backend/.env`
+  (excluido de Git y con permisos restringidos), o en el gestor de secretos del
+  despliegue. No está en el código ni en la base de datos.
+- La migración `20261110_0014_crypto_mechanisms.py` cifra los registros existentes.
+
+Comprobación directa en PostgreSQL:
+
+```powershell
+docker exec dosys-db-local psql -U dosys -d dosys -c "SELECT id, left(allergies, 80) FROM patients ORDER BY id LIMIT 3;"
+```
+
+La app muestra el mismo campo descifrado en **Mi expediente**. El script
+`scripts/demo_crypto.py` imprime el texto claro, el ciphertext de la base y el
+resultado de descifrarlo.
+
+### 2. Firma digital Ed25519 de documentos clínicos
+
+- Cada documento se firma con una llave privada Ed25519 (`cryptography`). La firma se
+  guarda en `documents.signature` y cubre el mensaje canónico
+  `DOSYS-DOC-v1|document_id|patient_id|sha256`.
+- La verificación usa únicamente la llave pública: no hace falta la privada para
+  comprobar la firma. Se valida en el portal y en la app del paciente mediante
+  `GET /api/v1/patients/me/documents/{id}/verify`.
+- La llave privada se guarda en `DOCUMENTS_SIGNING_PRIVATE_KEY_B64` (PEM en base64)
+  dentro de `backend/.env`; la llave pública se escribe en
+  `backend/secrets/documents_signing_public.pem` y su huella SHA-256 se muestra en la UI.
+- Se conserva además el sello HMAC anterior y la huella SHA-256 (defensa en capas).
+- Las firmas de documentos existentes se generan en la migración `20261110_0014`.
+
+### Generar las llaves (solo la primera vez)
+
+```powershell
+cd backend
+py -3.12 scripts/generate_crypto_keys.py --write-env
+```
+
+El script se niega a sobrescribir llaves existentes: cambiarlas volvería ilegibles los
+datos cifrados y invalidaría las firmas.
+
+### Demostración rápida
+
+```powershell
+# Ciphertext en PostgreSQL vs. texto claro en la app
+docker compose exec api python scripts/demo_crypto.py
+
+# Pruebas de los dos mecanismos
+docker compose exec api pytest -q tests/test_crypto.py
+```
+
+### Pruebas automatizadas
+
+`tests/test_crypto.py` comprueba:
+
+- ida y vuelta AES-GCM, nonce distinto por valor y detección de alteraciones;
+- que `EncryptedText` guarda ciphertext en la base y devuelve texto claro al ORM;
+- firma/verificación Ed25519, rechazo de documento o firma alterados;
+- verificación completa de huella + sello HMAC + firma.

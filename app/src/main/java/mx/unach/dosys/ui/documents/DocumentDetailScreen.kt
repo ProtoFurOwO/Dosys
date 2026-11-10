@@ -194,6 +194,26 @@ private fun IntegrityBanner(integrity: DocumentIntegrityResponse) {
                     fontWeight = FontWeight.Bold,
                 )
             }
+            if (integrity.message.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = integrity.message,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (integrity.signatureAlgorithm.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "Firma ${integrity.signatureAlgorithm}" +
+                        if (integrity.publicKeyFingerprint.isNotBlank()) {
+                            " · llave ${integrity.publicKeyFingerprint.take(16)}…"
+                        } else {
+                            ""
+                        },
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                )
+            }
             if (!integrity.intact) {
                 Spacer(Modifier.height(8.dp))
                 Text(
